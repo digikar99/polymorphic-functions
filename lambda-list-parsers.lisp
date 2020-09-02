@@ -56,27 +56,3 @@ If TYPED is non-NIL, the second return value is a TYPE-LIST corresponding to the
                                  (list (intern (symbol-name keyword) :keyword)
                                                keyword)))
                              keyword-args)))))
-
-(defun parse-lambda-list (lambda-list)
-  "Extracts and appends ORDINARY and OPTIONAL args. Ignores everything else."
-  (multiple-value-bind (ordinary-args optional-args)
-      (parse-ordinary-lambda-list lambda-list :normalize-optional nil)
-    (append ordinary-args (mapcar #'first optional-args))))
-
-(defun untyped-optional-args (lambda-list)
-  "Parses typed optional args in the LAMBDA-LIST, each arg of the form ((A TYPE) DEFAULT &optional AP), to (A TYPE).
-
-Example:
-  (untyped-optional-args '(a b &optional ((b 'string) \"hello\"))) ;=> ((B 'STRING))
-"
-  (let ((end   '(&allow-other-keys &key &rest &aux))
-        (start '&optional))
-    (loop :until (and lambda-list
-                      (eq start (first lambda-list)))
-          :do (setq lambda-list (rest lambda-list)))
-    (setq lambda-list (rest lambda-list))
-    (loop :while (and lambda-list
-                      (not (member (first lambda-list) end)))                 
-          :collect (first (first lambda-list))
-          :do (setq lambda-list (rest lambda-list)))))
-

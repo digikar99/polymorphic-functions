@@ -50,8 +50,6 @@
                (format t "COMPILER-MACRO can only optimize raw function calls.")
                form))))))
 
-(defun foo ())
-
 (defmacro defun-typed (name lambda-list &body body)
   "Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type symbol        name)
