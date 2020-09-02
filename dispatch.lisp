@@ -7,39 +7,52 @@
                        (t (error "Cannot optimize this case!")))))
 
 (defmacro define-typed-function (name lambda-list)
+  "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
   (declare (type symbol        name)
            (type list   lambda-list))
-  `(progn
-     (register-typed-function-name ',name ',lambda-list)
-     (defun ,name ,lambda-list
-       (funcall (nth-value 1 (retrieve-typed-function ',name (mapcar #'type-of
-                                                                     (list ,@lambda-list))))
-                ,@lambda-list))
-     (define-compiler-macro ,name (&whole form ,@lambda-list &environment env)
-       (declare (ignorable ,@lambda-list))
-       (if (eq (car form) ',name)
-           (progn
-             (let ((type-list (get-type-list (cdr form) env)))
-               ;; (format t "~%COMPILE-TIME TYPE-LIST: ~D~%" type-list)
-               (if (every (curry #'eq t) type-list)
-                   (when (< 1 (policy-quality 'speed env))
-                     (format t "~%Unable to optimize call to ~D because TYPE-LIST was concluded to be ~D" form type-list)
-                     form)
-                   (print ` (,(nth-value 0 (retrieve-typed-function ',name type-list))
-                             ,@(cdr form))))))
-           (progn
-             (format t "COMPILER-MACRO can only optimize raw function calls.")
-             form)))))
+  ;; TODO: The LAMBDA-LIST here should not have default values for REQUIRED and OPTIONAL args
+  ;; in fact, it should not have default values for any arguments used in typing
+  ;; TODO: Handle the case of redefinition
+  (let ((typed-args  (remove-untyped-args lambda-list :typed nil))
+        ;; TODO: Handle the case of parsed-args better
+        (parsed-args (parse-lambda-list   lambda-list :typed nil)))
+    `(progn
+       (register-typed-function-name ',name ',lambda-list)
+       (defun ,name ,lambda-list
+         (let ((type-list (mapcar #'type-of (list ,@typed-args))))
+           (funcall (nth-value 1 (retrieve-typed-function ',name type-list))
+                    ,@parsed-args)))
+       (define-compiler-macro ,name (&whole form ,@lambda-list &environment env)
+         (declare (ignorable ,@typed-args))
+         (if (eq (car form) ',name)
+             (progn
+               ;; TODO: Check this!
+               (let ((type-list (get-type-list (list ,@typed-args) env)))
+                 ;; (format t "~%COMPILE-TIME TYPE-LIST: ~D~%" type-list)
+                 (if (every (curry #'eq t) type-list)
+                     (when (< 1 (policy-quality 'speed env))
+                       (format t "~%Unable to optimize call to ~D because TYPE-LIST was concluded to be ~D" form type-list)
+                       form)
+                     `(,(nth-value 0 (retrieve-typed-function ',name type-list))
+                       ,@(cdr form)))))
+             (progn
+               (format t "COMPILER-MACRO can only optimize raw function calls.")
+               form))))))
 
 (defmacro defun-typed (name lambda-list &body body)
+  "Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type symbol        name)
            (type list   lambda-list))
-  (let* ((actual-lambda-list (mapcar #'first lambda-list))
-         (type-list          (mapcar (compose #'typexpand #'second) lambda-list))
-         (lambda-body         `(lambda ,actual-lambda-list ,@body)))
+  ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
+  (let* ((actual-lambda-list (typed-function-lambda-list
+                              (retrieve-typed-function-with-name name)))
+         (type-list          (nth-value 1 (remove-untyped-args lambda-list :typed t)))
+         (lambda-body        `(lambda ,actual-lambda-list ,@body)))
     ;; We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files.
-    `(register-typed-function ',name ',type-list
-                              ',lambda-body
-                              (lambda ,actual-lambda-list
-                                ,@body))))
+    `(progn
+       (register-typed-function ',name ',type-list
+                                ',lambda-body
+                                (lambda ,actual-lambda-list
+                                  ,@body))
+       ',name)))
 

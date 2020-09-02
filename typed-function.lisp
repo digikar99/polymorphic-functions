@@ -10,7 +10,7 @@
   (lambda-list (error "LAMBDA-LIST must be supplied.") :type list)
   (hash-table (make-hash-table :test 'equalp) :type hash-table))
 
-(defun register-typed-function-name (name lambda-list)
+(defun register-typed-function-with-name (name lambda-list)
   (declare (type symbol        name)
            (type list   lambda-list))
   (when (gethash name *typed-function-table*)
@@ -18,6 +18,9 @@
   (setf (gethash name *typed-function-table*)
         (make-typed-function :name name
                              :lambda-list lambda-list)))
+
+(defun retrieve-typed-function-with-name (name)
+  (gethash name *typed-function-table*))
 
 (defun register-typed-function (name type-list function-body function)
   (declare (type symbol        name)

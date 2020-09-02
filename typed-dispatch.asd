@@ -8,5 +8,6 @@
                "introspect-environment")
   :components ((:file "package")
                (:file "typed-function")
+               (:file "lambda-list-parsers")
                (:file "dispatch")))
 
