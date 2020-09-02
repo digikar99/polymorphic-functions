@@ -33,15 +33,24 @@
                ;; TODO: Check this!
                (let ((type-list (get-type-list (list ,@typed-args) env)))
                  ;; (format t "~%COMPILE-TIME TYPE-LIST: ~D~%" type-list)
-                 (if (every (curry #'eq t) type-list)
-                     (when (< 1 (policy-quality 'speed env))
-                       (format t "~%Unable to optimize call to ~D because TYPE-LIST was concluded to be ~D" form type-list)
-                       form)
-                     `(,(nth-value 0 (retrieve-typed-function ',name type-list))
-                       ,@(cdr form)))))
+                 (cond ((and (every (curry #'eq t) type-list)
+                             (< 1 (policy-quality 'speed env)))
+                        (format t
+                                "~%Unable to optimize call to ~D because TYPE-LIST was concluded to be ~D"
+                                form type-list)
+                        form)
+                       ((< 1 (policy-quality 'speed env)) ; inline
+                        `((lambda ,@(subseq (nth-value 0 (retrieve-typed-function ',name type-list))
+                                    2))
+                          ,@(cdr form)))
+                       (t ; no inline
+                        `(funcall ,(nth-value 0 (retrieve-typed-function ',name type-list))
+                                  ,@(cdr form))))))
              (progn
                (format t "COMPILER-MACRO can only optimize raw function calls.")
                form))))))
+
+(defun foo ())
 
 (defmacro defun-typed (name lambda-list &body body)
   "Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
@@ -51,12 +60,12 @@
   (let* ((actual-lambda-list (typed-function-lambda-list
                               (retrieve-typed-function-with-name name)))
          (type-list          (nth-value 1 (remove-untyped-args lambda-list :typed t)))
-         (lambda-body        `(lambda ,actual-lambda-list ,@body)))
+         (lambda-body        `(named-lambda ,name ,actual-lambda-list ,@body)))
     ;; We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files.
     `(progn
        (register-typed-function ',name ',type-list
                                 ',lambda-body
-                                (lambda ,actual-lambda-list
+                                (named-lambda ,name ,actual-lambda-list
                                   ,@body))
        ',name)))
 
