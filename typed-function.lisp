@@ -50,8 +50,10 @@
       (1 (destructuring-bind (body &rest function)
              (gethash (first applicable-function-type-lists) typed-function-hash-table)
            (values body function)))
-      (0 (error "No applicable TYPED-FUNCTION discovered. Available TYPE-LISTs include~%~D"
+      (0 (error "No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%~{~D~^  ~%~}"
+                supplied-type-list
                 type-lists))
-      (t (error "Multiple applicable TYPED-FUNCTIONs discovered: ~%~{~^~%~}"
+      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for TYPE-LIST ~D:~%~{~D~^  ~%~}"
+                supplied-type-list
                 applicable-function-type-lists)))))
 

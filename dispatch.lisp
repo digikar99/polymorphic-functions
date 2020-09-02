@@ -21,7 +21,7 @@
         ;; TODO: Handle the case of parsed-args better
         (parsed-args (parse-lambda-list   lambda-list :typed nil)))
     `(progn
-       (register-typed-function-name ',name ',lambda-list)
+       (register-typed-function-with-name ',name ',lambda-list)
        (defun ,name ,lambda-list
          (let ((type-list (mapcar #'type-of (list ,@typed-args))))
            (funcall (nth-value 1 (retrieve-typed-function ',name type-list))
