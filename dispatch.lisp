@@ -3,7 +3,11 @@
 (defun get-type-list (arg-list &optional env)
   ;; TODO: Improve this
   (loop :for arg :in arg-list
-        :collect (cond ((symbolp arg) (variable-type arg env))
+        :collect (cond ((symbolp arg)   (variable-type arg env))
+                       ((constantp arg) (type-of arg))
+                       ((and (listp arg)
+                             (eq 'the (first arg)))
+                        (second arg))
                        (t (error "Cannot optimize this case!")))))
 
 (defmacro define-typed-function (name lambda-list)
