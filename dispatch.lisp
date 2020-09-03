@@ -12,7 +12,7 @@
 
 (defmacro define-typed-function (name lambda-list)
   "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
-  (declare (type symbol        name)
+  (declare (type function-name name)
            (type list   lambda-list))
   ;; TODO: The LAMBDA-LIST here should not have default values for REQUIRED and OPTIONAL args
   ;; in fact, it should not have default values for any arguments used in typing
@@ -52,7 +52,7 @@
 
 (defmacro defun-typed (name lambda-list &body body)
   "Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
-  (declare (type symbol        name)
+  (declare (type function-name name)
            (type list   lambda-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
   (let* ((actual-lambda-list (typed-function-lambda-list

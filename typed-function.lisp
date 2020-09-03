@@ -1,17 +1,18 @@
 (in-package typed-dispatch)
 
-(defparameter *typed-function-table* (make-hash-table :test 'eq))
+;; equalp: need to allow for symbols and (setf symbol) "function-name" more strictly
+(defparameter *typed-function-table* (make-hash-table :test 'equalp)) 
 
 (defstruct (typed-function)
   "  HASH-TABLE maps a TYPE-LIST to a pair of two elements: the first element consists of the (lambda) function body while the second consists of the compiled lambda function itself. 
   A TYPE-LIST is simply a LIST of TYPEs."
   ;; TODO: Check if a symbol / list denotes a type
-  (name (error "NAME must be supplied.") :type symbol)
+  (name (error "NAME must be supplied.") :type function-name)
   (lambda-list (error "LAMBDA-LIST must be supplied.") :type list)
   (hash-table (make-hash-table :test 'equalp) :type hash-table))
 
 (defun register-typed-function-with-name (name lambda-list)
-  (declare (type symbol        name)
+  (declare (type function-name name)
            (type list   lambda-list))
   (when (gethash name *typed-function-table*)
     (warn "Redefining typed-function ~D ..." name))
@@ -23,7 +24,7 @@
   (gethash name *typed-function-table*))
 
 (defun register-typed-function (name type-list function-body function)
-  (declare (type symbol        name)
+  (declare (type function-name name)
            (type list     type-list)
            (type function  function))
   (let ((table (typed-function-hash-table (gethash name *typed-function-table*))))
@@ -32,8 +33,8 @@
 
 (defun retrieve-typed-function (name type-list)
   "If successful, returns 2 values: the first object is the function body, while the second is the function itself."
-  (declare (type symbol      name)
-           (type list   type-list))
+  (declare (type function-name name)
+           (type list     type-list))
   (let* ((typed-function-hash-table (typed-function-hash-table
                                      (gethash name
                                              *typed-function-table*)))

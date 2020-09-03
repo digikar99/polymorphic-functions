@@ -5,7 +5,8 @@
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
-               "introspect-environment")
+               "introspect-environment"
+               "trivial-types")
   :components ((:file "package")
                (:file "typed-function")
                (:file "lambda-list-parsers")

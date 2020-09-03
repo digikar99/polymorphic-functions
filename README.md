@@ -2,6 +2,7 @@
 
 >WARNING: No tests have been set up yet. The below worked as of the very first commit.
 
+
 ## Why?
 
 Well...
@@ -89,8 +90,8 @@ CL-USER> (my= 5 "hello")
 
 I know of exactly one: [specialization-store](https://github.com/markcox80/specialization-store). It does a few more things:
 
-- Dispatch on optional and keyword args
-- Allow for naming "specialized function"
+- Dispatch on keyword args
+- Allow for explicitly naming "specialized function"
 
 Honestly, I'd be on the lookout for something based on MOP. I spent half an hour on the book; then, gave up, and spent two hours on this.
 
@@ -99,4 +100,6 @@ What does this do differently?
 - Current implementation in <150 lines vs 3400+ for specialization-store. Yes the latter has more features, but I feel it can be done in <1000 LOC.
 - I wanted one feature (warn/error at compile time, if error can be determined at run time; otherwise compile successfully); I spent 1.5+ hours on specialization-store, and then gave up.
 
+## Dependencies outside quicklisp
 
+- [trivial-types:function-name](https://github.com/digikar99/trivial-types)
