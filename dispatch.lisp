@@ -10,16 +10,15 @@
                         (second arg))
                        (t (error "Cannot optimize this case!")))))
 
-(defmacro define-typed-function (name lambda-list)
+(defmacro define-typed-function (name untyped-lambda-list)
   "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
-  (declare (type function-name name)
-           (type list   lambda-list))
-  ;; TODO: The LAMBDA-LIST here should not have default values for REQUIRED and OPTIONAL args
-  ;; in fact, it should not have default values for any arguments used in typing
+  (declare (type function-name       name)
+           (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
-  (let ((typed-args  (remove-untyped-args lambda-list :typed nil))
-        ;; TODO: Handle the case of parsed-args better
-        (parsed-args (parse-lambda-list   lambda-list :typed nil)))
+  (let* ((lambda-list untyped-lambda-list)
+         (typed-args  (remove-untyped-args lambda-list :typed nil))
+         ;; TODO: Handle the case of parsed-args better
+         (parsed-args (parse-lambda-list   lambda-list :typed nil)))
     `(progn
        (register-typed-function-wrapper ',name ',lambda-list)
        (defun ,name ,lambda-list
@@ -50,12 +49,13 @@
                (format t "COMPILER-MACRO can only optimize raw function calls.")
                form))))))
 
-(defmacro defun-typed (name lambda-list &body body)
+(defmacro defun-typed (name typed-lambda-list &body body)
   "Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type function-name name)
-           (type list   lambda-list))
+           (type typed-lambda-list typed-lambda-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
-  (let* ((actual-lambda-list (typed-function-wrapper-lambda-list
+  (let* ((lambda-list        typed-lambda-list)
+         (actual-lambda-list (typed-function-wrapper-lambda-list
                               (retrieve-typed-function-wrapper name)))
          (type-list          (nth-value 1 (remove-untyped-args lambda-list :typed t)))
          (lambda-body        `(named-lambda ,name ,actual-lambda-list ,@body)))
