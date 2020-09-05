@@ -21,7 +21,7 @@
         ;; TODO: Handle the case of parsed-args better
         (parsed-args (parse-lambda-list   lambda-list :typed nil)))
     `(progn
-       (register-typed-function-with-name ',name ',lambda-list)
+       (register-typed-function-wrapper ',name ',lambda-list)
        (defun ,name ,lambda-list
          (let ((type-list (mapcar #'type-of (list ,@typed-args))))
            (funcall (nth-value 1 (retrieve-typed-function ',name type-list))
@@ -41,9 +41,9 @@
                         form)
                        ((< 1 (policy-quality 'speed env)) ; inline
                         `((lambda ,@(subseq (nth-value 0 (retrieve-typed-function ',name type-list))
-                                    2))
+                                     2))
                           ,@(cdr form)))
-                       (t ; no inline
+                       (t               ; no inline
                         `(funcall ,(nth-value 0 (retrieve-typed-function ',name type-list))
                                   ,@(cdr form))))))
              (progn
@@ -55,8 +55,8 @@
   (declare (type function-name name)
            (type list   lambda-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
-  (let* ((actual-lambda-list (typed-function-lambda-list
-                              (retrieve-typed-function-with-name name)))
+  (let* ((actual-lambda-list (typed-function-wrapper-lambda-list
+                              (retrieve-typed-function-wrapper name)))
          (type-list          (nth-value 1 (remove-untyped-args lambda-list :typed t)))
          (lambda-body        `(named-lambda ,name ,actual-lambda-list ,@body)))
     ;; We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files.
