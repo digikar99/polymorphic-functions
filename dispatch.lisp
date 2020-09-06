@@ -19,35 +19,48 @@
          (typed-args  (remove-untyped-args lambda-list :typed nil))
          ;; TODO: Handle the case of parsed-args better
          (parsed-args (parse-lambda-list   lambda-list :typed nil)))
+    
     `(progn
+       
+       ;; Take this out of progn?
+       ;; > Perhaps, keep it inside; helps macroexpanders know better what the macro is doing
        (register-typed-function-wrapper ',name ',lambda-list)
+       
        (defun ,name ,lambda-list
-         (let ((type-list (mapcar #'type-of (list ,@typed-args))))
+         (let ((type-list (list ,@(loop :for typed-arg :in typed-args
+                                        :collect `(type-of ,typed-arg)))))
            (funcall (nth-value 1 (retrieve-typed-function ',name type-list))
                     ,@parsed-args)))
+       
        (define-compiler-macro ,name (&whole form ,@lambda-list &environment env)
-         (declare (ignorable ,@typed-args))
-         (if (eq (car form) ',name)
-             (progn
-               ;; TODO: Check this!
-               (let ((type-list (get-type-list (list ,@typed-args) env)))
-                 ;; (format t "~%COMPILE-TIME TYPE-LIST: ~D~%" type-list)
-                 (cond ((and (every (curry #'eq t) type-list)
-                             (< 1 (policy-quality 'speed env)))
-                        (format t
-                                "~%Unable to optimize call to ~D because TYPE-LIST was concluded to be ~D"
-                                form type-list)
-                        form)
-                       ((< 1 (policy-quality 'speed env)) ; inline
-                        `((lambda ,@(subseq (nth-value 0 (retrieve-typed-function ',name type-list))
-                                     2))
-                          ,@(cdr form)))
-                       (t               ; no inline
-                        `(funcall ,(nth-value 0 (retrieve-typed-function ',name type-list))
-                                  ,@(cdr form))))))
-             (progn
-               (format t "COMPILER-MACRO can only optimize raw function calls.")
-               form))))))
+         (declare (ignorable ,@typed-args)) ; typed-args are a subset of lambda-list
+         (with-compiler-note
+           (if (eq (car form) ',name)
+               (progn
+                 ;; TODO: Check this!
+                 (let ((type-list (get-type-list (list ,@typed-args) env)))
+                   ;; (format t "~%COMPILE-TIME TYPE-LIST: ~D~%" type-list)
+                   (cond ((and (every (curry #'eq t) type-list)
+                               (< 1 (policy-quality 'speed env)))
+                          ;; TODO: trivial-compiler-note
+                          (signal 'compiler-note
+                                  :form form
+                                  :reason "TYPE-LIST was concluded to be ~D"
+                                  :args (list type-list))
+                          form)
+                         ((< 1 (policy-quality 'speed env)) ; inline
+                          `((lambda ,@(subseq (nth-value 0 (retrieve-typed-function ',name type-list))
+                                       2))
+                            ,@(cdr form)))
+                         (t               ; no inline
+                          `(funcall ,(nth-value 0 (retrieve-typed-function ',name type-list))
+                                    ,@(cdr form))))))
+               (progn
+                 (signal 'compiler-note
+                         :form form
+                         :reason "COMPILER-MACRO of ~D can only optimize raw function calls."
+                         :args (list ',name))
+                 form)))))))
 
 (defmacro defun-typed (name typed-lambda-list &body body)
   "Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
