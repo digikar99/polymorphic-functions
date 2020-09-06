@@ -68,10 +68,14 @@
                               (retrieve-typed-function ',name type-list)
                               form))
                          (error (condition)
-                           (signal 'compiler-note :reason
-                                   (str:replace-all (string #\newline)
-                                                    (uiop:strcat #\newline #\; #\space)
-                                                    (format nil "~D" condition)))
+                           (signal 'compiler-note
+                                   :reason
+                                   "; While expanding ~D at compile-time: ~D"
+                                   :args (list form
+                                               (str:replace-all
+                                                (string #\newline)
+                                                (uiop:strcat #\newline #\; "   ")
+                                                (format nil "~D" condition))))
                            form)))))
                (progn
                  (signal 'optimize-speed-note

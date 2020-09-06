@@ -68,11 +68,12 @@ CL-USER> (defun baz (a b)
            (declare (type string a)
                     (type integer b))
            (my= a b))
-; No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
-; Available TYPE-LISTs include:
-;    ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
-;    (CHARACTER CHARACTER)
-;    (STRING STRING)
+; While expanding (MY= A B) at compile-time: 
+;   No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
+;   Available TYPE-LISTs include:
+;      ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
+;      (CHARACTER CHARACTER)
+;      (STRING STRING)
 WARNING: redefining TYPED-DISPATCH::BAZ in DEFUN
 BAZ
 CL-USER> (my= 5 "hello")
@@ -86,7 +87,7 @@ I know of exactly one: [specialization-store](https://github.com/markcox80/speci
 - Dispatch on keyword args
 - Allow for explicitly naming "specialized function"
 
-Honestly, I'd be on the lookout for something based on MOP. I spent half an hour on the book; then, gave up, and spent two hours of the first commit of this.
+Honestly, I'd be on the lookout for something based on MOP. I spent half an hour on the book; then, gave up, and spent two hours on the first commit of this.
 
 What does this do differently?
 
