@@ -5,7 +5,8 @@
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
                "introspect-environment"
-               "trivial-types")
+               "trivial-types"
+               "str")
   :components ((:file "package")
                (:file "typed-function"      :depends-on ("package"))
                (:file "lambda-list"         :depends-on ("package"))

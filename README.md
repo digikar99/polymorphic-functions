@@ -1,6 +1,6 @@
 # typed-dispatch
 
->WARNING: No tests have been set up yet. The below worked as of the very first commit.
+>WARNING: No tests have been set up yet. The below worked as of the commit the README was updated.
 
 
 ## Why?
@@ -68,22 +68,15 @@ CL-USER> (defun baz (a b)
            (declare (type string a)
                     (type integer b))
            (my= a b))
-; in: DEFUN BAZ
-;     (MY= A B)
-; 
-; caught WARNING:
-;   Error during compiler-macroexpansion of (MY= A B). Use *BREAK-ON-SIGNALS* to
-;   intercept.
-;   
-;    No applicable TYPED-FUNCTION discovered. Available TYPE-LISTs include
-;   (((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
-;    (CHARACTER CHARACTER) (STRING STRING))
-; 
-; compilation unit finished
-;   caught 1 WARNING condition
+; No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
+; Available TYPE-LISTs include:
+;    ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
+;    (CHARACTER CHARACTER)
+;    (STRING STRING)
+WARNING: redefining TYPED-DISPATCH::BAZ in DEFUN
 BAZ
 CL-USER> (my= 5 "hello")
-; Evaluation aborted on #<SIMPLE-ERROR "No applicable TYPED-FUNCTION discovered. Available TYPE-LISTs include~%~D" {101073D8C3}>.
+; Evaluation aborted on #<SIMPLE-ERROR "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~D~^~%   ~}" {1004FC50D3}>.
 ```
 
 ## Hmm... Aren't there existing works?
@@ -93,11 +86,11 @@ I know of exactly one: [specialization-store](https://github.com/markcox80/speci
 - Dispatch on keyword args
 - Allow for explicitly naming "specialized function"
 
-Honestly, I'd be on the lookout for something based on MOP. I spent half an hour on the book; then, gave up, and spent two hours on this.
+Honestly, I'd be on the lookout for something based on MOP. I spent half an hour on the book; then, gave up, and spent two hours of the first commit of this.
 
 What does this do differently?
 
-- Current implementation in <150 lines vs 3400+ for specialization-store. Yes the latter has more features, but I feel it can be done in <1000 LOC.
+- Current implementation in <500 lines vs 3400+ for specialization-store. Yes the latter has more features, but I feel it can be done in <1000 LOC.
 - I wanted one feature (warn/error at compile time, if error can be determined at run time; otherwise compile successfully); I spent 1.5+ hours on specialization-store, and then gave up.
 
 ## Dependencies outside quicklisp

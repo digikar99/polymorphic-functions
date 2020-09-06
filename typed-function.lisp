@@ -34,8 +34,6 @@
 (defun register-typed-function-wrapper (name lambda-list)
   (declare (type function-name name)
            (type list   lambda-list))
-  (when (gethash name *typed-function-table*)
-    (warn "Redefining typed-function ~D ..." name))
   (setf (gethash name *typed-function-table*)
         (make-typed-function-wrapper :name name
                                      :lambda-list lambda-list)))
@@ -48,7 +46,10 @@
            (type function  function)
            (type type-list type-list))
   (let ((table (typed-function-wrapper-hash-table (gethash name *typed-function-table*))))
-    (setf (gethash type-list table) (cons function-body function))))
+    (setf (gethash type-list table)
+          (make-typed-function :type-list type-list
+                               :body function-body
+                               :function function))))
 
 (defun retrieve-typed-function (name type-list)
   "If successful, returns 2 values: the first object is the function body, while the second is the function itself."
@@ -67,10 +68,50 @@
                             expected-type-list)
                    :collect expected-type-list)))
     (case (length applicable-function-type-lists)
-      (1 (destructuring-bind (body &rest function)
+      (1 (with-slots (body function)
              (gethash (first applicable-function-type-lists) typed-function-wrapper-hash-table)
            (values body function)))
-      (0 (error "No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%~{~D~^    ~%~}"
+      (0 (error "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~D~^~%   ~}"
+                supplied-type-list
+                type-lists))
+      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for TYPE-LIST ~D:~%~{~D~^    ~%~}"
+                supplied-type-list
+                applicable-function-type-lists)))))
+
+(defun register-typed-function-compiler-macro (name type-list function)
+  (declare (type function-name name)
+           (type type-list type-list)
+           (type function function))
+  (let ((table (typed-function-wrapper-hash-table (gethash name *typed-function-table*))))
+    (multiple-value-bind (typed-function exists)
+        (gethash type-list table)
+      (if exists
+          (setf (typed-function-compiler-macro typed-function) function)
+          ;; TODO: Avoid erroring and put a function instead.
+          (error "No TYPED-FUNCTION with NAME ~D and TYPE-list ~D exists"
+                 name
+                 type-list)))))
+
+(defun retrieve-typed-function-compiler-macro (name type-list)
+  (declare (type function-name name)
+           (type type-list type-list))
+  (let* ((typed-function-wrapper-hash-table (typed-function-wrapper-hash-table
+                                             (gethash name
+                                                      *typed-function-table*)))
+         (type-lists                (hash-table-keys typed-function-wrapper-hash-table))
+         (supplied-type-list        type-list)
+         (applicable-function-type-lists
+           (loop :for expected-type-list :in type-lists
+                 :if (every (lambda (supplied-type expected-type)
+                              (subtypep supplied-type expected-type))
+                            supplied-type-list
+                            expected-type-list)
+                   :collect expected-type-list)))
+    (case (length applicable-function-type-lists)
+      (1 (typed-function-compiler-macro
+          (gethash (first applicable-function-type-lists)
+                   typed-function-wrapper-hash-table)))
+      (0 (error "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~D~^~%   ~}"
                 supplied-type-list
                 type-lists))
       (t (error "Multiple applicable TYPED-FUNCTIONs discovered for TYPE-LIST ~D:~%~{~D~^    ~%~}"
