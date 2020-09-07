@@ -2,13 +2,25 @@
 
 (defun get-type-list (arg-list &optional env)
   ;; TODO: Improve this
-  (loop :for arg :in arg-list
-        :collect (cond ((symbolp arg)   (variable-type arg env))
-                       ((constantp arg) (type-of arg))
-                       ((and (listp arg)
-                             (eq 'the (first arg)))
-                        (second arg))
-                       (t (error "Cannot optimize this case!")))))
+  (flet ((type-declared-p (var)
+           (cdr (assoc 'type (nth-value 2 (variable-information var env))))))
+    (let* ((undeclared-args ())
+           (type-list
+             (loop :for arg :in arg-list
+                   :collect (cond ((symbolp arg)
+                                   (unless (type-declared-p arg)
+                                     (push arg undeclared-args))
+                                   (variable-type arg env))
+                                  ((constantp arg) (type-of arg))
+                                  ((and (listp arg)
+                                        (eq 'the (first arg)))
+                                   (second arg))
+                                  (t (signal 'compiler-note "Cannot optimize this case!"))))))
+      (if undeclared-args
+          (mapcar (lambda (arg)
+                    (signal 'undeclared-type :var arg))
+                  (nreverse undeclared-args))
+          type-list))))
 
 (defmacro define-typed-function (name untyped-lambda-list)
   "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
@@ -36,53 +48,57 @@
        
        (define-compiler-macro ,name (&whole form ,@lambda-list &environment env)
          (declare (ignorable ,@typed-args)) ; typed-args are a subset of lambda-list
-         (with-compiler-note
-           (if (eq (car form) ',name)
-               (progn
-                 ;; TODO: Check this!
-                 (let ((type-list (get-type-list (list ,@typed-args) env)))
-                   ;; (format t "~%COMPILE-TIME TYPE-LIST: ~D~%" type-list)
-                   (if (every (curry #'eq t) type-list) ; check for valid type list
-                       (when (< 1 (policy-quality 'speed env))
-                         ;; Optimized for speed, but type information not available
-                         (signal 'optimize-speed-note
-                                 :form form
-                                 :reason "TYPE-LIST was concluded to be ~D"
-                                 :args (list type-list))
-                         form)
-                       ;; TODO: Use some other declaration for inlining as well
-                       ;; Optimized for speed and type information available
-                       ;; We have a valid TYPE-LIST
-                       (handler-case
-                           (cond
-                             ((retrieve-typed-function-compiler-macro ',name type-list)
-                              (funcall (retrieve-typed-function-compiler-macro ',name type-list)
-                                       form
-                                       env))
-                             ((< 1 (policy-quality 'speed env)) ; inline
-                              `((lambda ,@(subseq (nth-value 0
-                                                   (retrieve-typed-function ',name type-list))
-                                           2))
-                                ,@(cdr form)))
-                             (t ; Check the types since they are declared
-                              (retrieve-typed-function ',name type-list)
-                              form))
-                         (error (condition)
-                           (signal 'compiler-note
-                                   :reason
-                                   "; While expanding ~D at compile-time: ~D"
-                                   :args (list form
-                                               (str:replace-all
-                                                (string #\newline)
-                                                (uiop:strcat #\newline #\; "   ")
-                                                (format nil "~D" condition))))
-                           form)))))
-               (progn
-                 (signal 'optimize-speed-note
-                         :form form
-                         :reason "COMPILER-MACRO of ~D can only optimize raw function calls."
-                         :args (list ',name))
-                 form)))))))
+         (if (eq (car form) ',name)
+             (if (< 1 (policy-quality 'speed env)) ; optimize for speed
+                 (handler-case
+                     (let ((type-list (get-type-list (list ,@typed-args) env)))
+                       (if (retrieve-typed-function-compiler-macro ',name type-list)
+                           (funcall (retrieve-typed-function-compiler-macro ',name type-list)
+                                    form
+                                    env)
+                           ;; TODO: Use some other declaration for inlining as well
+                           ;; Optimized for speed and type information available
+                           `((lambda ,@(subseq (nth-value 0 ; inline
+                                                (retrieve-typed-function ',name type-list))
+                                        2))
+                             ,@(cdr form))))
+                   (condition (condition)
+                     (format t "~%~%; Unable to optimize ~D because:" form)
+                     (write-string
+                      (str:replace-all (string #\newline)
+                                       (uiop:strcat #\newline #\; "  ")
+                                       (format nil "~D" condition)))
+                     form))
+                 (let ((first-note-signalled-p nil))   ; not for speed
+                   (flet ((ensure-first-note-signalled ()
+                            (unless first-note-signalled-p
+                              (format t
+                                      "~%~%; While compiling ~D: "
+                                      form)
+                              (setq first-note-signalled-p t))))
+                     (handler-case
+                         (handler-bind ((undeclared-type
+                                          (lambda (condition)
+                                            (ensure-first-note-signalled)
+                                            (write-string
+                                             (str:replace-all (string #\newline)
+                                                              (uiop:strcat #\newline #\; "   ")
+                                                              (format nil "~D" condition))))))
+                           (let ((type-list (get-type-list (list ,@typed-args) env)))
+                             (retrieve-typed-function ',name type-list)))
+                       (error (condition)
+                         (ensure-first-note-signalled)
+                         (write-string
+                          (str:replace-all (string #\newline)
+                                           (uiop:strcat #\newline #\; "   ")
+                                           (format nil "~D" condition))))))
+                   form))
+             (progn
+               (signal 'optimize-speed-note
+                       :form form
+                       :reason "COMPILER-MACRO of ~D can only optimize raw function calls."
+                       :args (list ',name))
+               form))))))
 
 (defmacro defun-typed (name typed-lambda-list &body body)
   "  Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
@@ -110,8 +126,8 @@
   (let ((gensym (gensym)))
     `(progn
        (compile ',gensym (parse-compiler-macro ',gensym
-                                              ',compiler-macro-lambda-list
-                                              ',body))
+                                               ',compiler-macro-lambda-list
+                                               ',body))
        (register-typed-function-compiler-macro ',name ',type-list
                                                (symbol-function ',gensym))
        ',name)))

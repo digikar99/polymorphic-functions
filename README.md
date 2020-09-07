@@ -68,7 +68,7 @@ CL-USER> (defun baz (a b)
            (declare (type string a)
                     (type integer b))
            (my= a b))
-; While expanding (MY= A B) at compile-time: 
+; While compiling (MY= A B): 
 ;   No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
 ;   Available TYPE-LISTs include:
 ;      ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))

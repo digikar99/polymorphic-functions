@@ -18,8 +18,10 @@
                             (reason condition)
                             (reason-args condition))))))
 
-(defmacro with-compiler-note (&body body)
-  `(handler-bind ((compiler-note (lambda (condition)
-                                   (format t "~D" condition))))
-     ,@body))
+(define-condition undeclared-type (compiler-note)
+  ((var :initarg :var :reader var))
+  (:report (lambda (condition stream)
+             (format stream "~%Type of ~D is not declared" (var condition)))))
+
+
 
