@@ -46,13 +46,16 @@
                   (update-with-and (listp (first param)))
                   (update-with-and (null (cdddr param))) ; max-length 3
                   (update-with-and (destructuring-bind ((name type)
-                                                        &optional default-value given-p)
+                                                        &optional default-value
+                                                          (given-p nil given-p-p))
                                        param
                                      (and (valid-parameter-name-p name)
                                           (type-specifier-p type)
                                           ;; TODO: Signal a better error with typing
                                           (typep default-value type)
-                                          (valid-parameter-name-p given-p))))
+                                          (if given-p-p
+                                              (valid-parameter-name-p given-p)
+                                              t))))
                   (when typed-lambda-list-p
                     (push (first (first param))
                           untyped-lambda-list)
@@ -68,7 +71,7 @@
                            (declare (ignore c))
                            nil)))
       (when typed-lambda-list-p (setq untyped-lambda-list
-                                      (append untyped-lambda-list
+                                      (append (nreverse untyped-lambda-list)
                                               list))))
     (check-type untyped-lambda-list untyped-lambda-list)
     (values typed-lambda-list-p

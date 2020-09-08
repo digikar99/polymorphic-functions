@@ -190,6 +190,8 @@ CL-USER> (defun-typed bar ((a string) &optional (b integer))
              datum: ((A STRING) &OPTIONAL (B INTEGER))>.
 CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5)) 
            (list a b))
-; Evaluation aborted on #<TYPE-ERROR expected-type: (SATISFIES TYPED-DISPATCH::TYPED-LAMBDA-LIST-P)
-             datum: ((A STRING) &OPTIONAL ((B INTEGER) 5))>.
+BAR
+CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5 bp)) 
+           (list a b))
+BAR
 ```
