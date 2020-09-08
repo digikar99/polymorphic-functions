@@ -7,6 +7,7 @@
                "introspect-environment"
                "trivial-types"
                "str")
+  :pathname #P"src/"
   :components ((:file "package")
                (:file "typed-function"      :depends-on ("package"))
                (:file "lambda-list"         :depends-on ("package"))

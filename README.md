@@ -5,6 +5,8 @@
 
 ## Why?
 
+(Also see the section on [Examples](#examples))
+
 Well...
 
 ```lisp
@@ -82,18 +84,112 @@ CL-USER> (my= 5 "hello")
 
 ## Hmm... Aren't there existing works?
 
-I know of exactly one: [specialization-store](https://github.com/markcox80/specialization-store). It does a few more things:
+I know of exactly one: [specialization-store](https://github.com/markcox80/specialization-store). It does a [few more things](https://github.com/markcox80/specialization-store/wiki):
 
-- Dispatch on keyword args
+- Dispatch on rest and keyword args
 - Allow for explicitly naming "specialized function"
 
 Honestly, I'd be on the lookout for something based on MOP. I spent half an hour on the book; then, gave up, and spent two hours on the first commit of this.
 
-What does this do differently?
+**What does this do differently?**
 
-- Current implementation in <500 lines vs 3400+ for specialization-store. Yes the latter has more features, but I feel it can be done in <1000 LOC.
-- I wanted one feature (warn/error at compile time, if error can be determined at run time; otherwise compile successfully); I spent 1.5+ hours on specialization-store, and then gave up.
+- Current implementation in <500 lines vs 3400+ for specialization-store. Yes the latter has more features, but I feel it can be done in <1000 LOC
+- I wanted one feature (warn/error at compile time, if type error can be determined at run time; otherwise compile successfully); I spent 1.5+ hours on specialization-store, and then gave up
+- I wanted a bit better compile time warnings/suggestions/notes
 
 ## Dependencies outside quicklisp
 
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
+
+## Examples
+
+As of this commit, there are exactly three exported symbols:
+
+- define-typed-function
+- defun-typed
+- define-compiler-macro-typed
+
+```lisp
+CL-USER> (use-package :typed-dispatch)
+T
+CL-USER> (define-typed-function my= (a b))
+MY=
+CL-USER> (defun-typed my= ((a string) (b string))
+           (string= a b))
+MY=
+CL-USER> (defun foo (a b)
+           (declare (optimize speed))
+           (my= a b))
+
+; Unable to optimize (MY= A B) because:
+;  Type of A is not declared
+FOO
+CL-USER> (defun foo (a b)
+           (declare (optimize speed)
+                    (type string a b))
+           (my= a b))
+WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
+FOO
+CL-USER> (defun foo (a b)
+           (declare (type string a)
+                    (type integer b))
+           (my= a b))
+
+; While compiling (MY= A B): 
+;   No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
+;   Available TYPE-LISTs include:
+;      (STRING STRING)
+WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
+FOO
+CL-USER> (defun foo (a b)
+           (declare (optimize speed)
+                    (type string a)
+                    (type integer b))
+           (my= a b))
+
+; Unable to optimize (MY= A B) because:
+;  No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
+;  Available TYPE-LISTs include:
+;     (STRING STRING)
+WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
+FOO
+CL-USER> (defun-typed my= ((a integer) (b integer))
+           (= a b))
+MY=
+CL-USER> (defun foo (a b)
+           (declare (optimize speed)
+                    (type integer a b))
+           (my= a b))
+WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
+FOO
+CL-USER> (define-compiler-macro-typed my= (integer integer)
+             (&whole form &rest args)
+           (declare (ignore args))
+           (format t "Inside compiler macro ~D" form)
+           form)
+MY=
+CL-USER> (defun foo (a b)
+           (declare (optimize speed)
+                    (type integer a b))
+           (my= a b))
+Inside compiler macro (MY= A B)
+WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
+FOO
+```
+
+Note that while the compiler macro of the typed function checks the types during compilation, and signals a note if a compatible type-list is not registered, it does not error. And it will not error, to handle the case for circular dependencies.
+
+**A note about &optional args**
+
+```lisp
+CL-USER> (define-typed-function bar (a &optional b))
+BAR
+CL-USER> (defun-typed bar ((a string) &optional (b integer)) 
+           (list a b))
+; Evaluation aborted on #<TYPE-ERROR expected-type: (SATISFIES TYPED-DISPATCH::TYPED-LAMBDA-LIST-P)
+             datum: ((A STRING) &OPTIONAL (B INTEGER))>.
+CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5)) 
+           (list a b))
+; Evaluation aborted on #<TYPE-ERROR expected-type: (SATISFIES TYPED-DISPATCH::TYPED-LAMBDA-LIST-P)
+             datum: ((A STRING) &OPTIONAL ((B INTEGER) 5))>.
+```
