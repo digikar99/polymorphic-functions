@@ -51,6 +51,41 @@
                                :body function-body
                                :function function))))
 
+(defun compute-applicable-function-type-lists (supplied-type-list expected-type-lists)
+  (loop :for expected-type-list :in expected-type-lists
+        :if (let ((supplied-type-list supplied-type-list))
+              (loop :for idx :from 0
+                    :with supplied-type-list-length := (length supplied-type-list)
+                    :for expected-type :in expected-type-list
+                    :with list-valid-p := t
+                    :while list-valid-p
+                    :with optional-args-p := nil
+                    :do ;; (print (list expected-type supplied-type-list
+                        ;;              supplied-type-list-length
+                        ;;              idx))
+                        (setq list-valid-p
+                              (and list-valid-p
+                                   (cond ((eq expected-type '&optional)
+                                          (setq optional-args-p t)
+                                          t)
+                                         ((and (first supplied-type-list)
+                                               (subtypep (first supplied-type-list)
+                                                         expected-type))
+                                          t)
+                                         ((and (first supplied-type-list)
+                                               (not (subtypep (first supplied-type-list)
+                                                              expected-type)))
+                                          nil)
+                                         ((and (>= idx supplied-type-list-length)
+                                               optional-args-p)
+                                          t)
+                                         (t
+                                          nil))))
+                        (unless (eq expected-type '&optional)
+                          (setq supplied-type-list (rest supplied-type-list)))
+                    :finally (return list-valid-p)))
+          :collect expected-type-list))
+
 (defun retrieve-typed-function (name type-list)
   "If successful, returns 2 values: the first object is the function body, while the second is the function itself."
   (declare (type function-name name)
@@ -61,33 +96,7 @@
          (type-lists                (hash-table-keys typed-function-wrapper-hash-table))
          (supplied-type-list        type-list)
          (applicable-function-type-lists
-           (loop :for expected-type-list :in type-lists
-                 :if (let ((supplied-type-list supplied-type-list))
-                       (loop :for idx :from 0
-                             :with supplied-type-list-length := (length supplied-type-list)
-                             :for expected-type :in expected-type-list
-                             :with list-valid-p := t
-                             :while list-valid-p
-                             :with optional-args-p := nil
-                             :do ;; (print (list expected-type supplied-type-list
-                                 ;;              supplied-type-list-length
-                                 ;;              idx))
-                                 (setq list-valid-p
-                                       (and list-valid-p
-                                            (cond ((eq expected-type '&optional)
-                                                   (setq optional-args-p t)
-                                                   t)
-                                                  ((and (>= idx supplied-type-list-length)
-                                                        optional-args-p)
-                                                   t)
-                                                  ((subtypep (first supplied-type-list)
-                                                             expected-type)
-                                                   t)
-                                                  (t
-                                                   nil))))
-                                 (setq supplied-type-list (rest supplied-type-list))
-                             :finally (return list-valid-p)))
-                   :collect expected-type-list)))
+           (compute-applicable-function-type-lists supplied-type-list type-lists)))
     (case (length applicable-function-type-lists)
       (1 (with-slots (body function)
              (gethash (first applicable-function-type-lists) typed-function-wrapper-hash-table)
@@ -122,12 +131,7 @@
          (type-lists                (hash-table-keys typed-function-wrapper-hash-table))
          (supplied-type-list        type-list)
          (applicable-function-type-lists
-           (loop :for expected-type-list :in type-lists
-                 :if (every (lambda (supplied-type expected-type)
-                              (subtypep supplied-type expected-type))
-                            supplied-type-list
-                            expected-type-list)
-                   :collect expected-type-list)))
+           (compute-applicable-function-type-lists supplied-type-list type-lists)))
     (case (length applicable-function-type-lists)
       (1 (typed-function-compiler-macro
           (gethash (first applicable-function-type-lists)
