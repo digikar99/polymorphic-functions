@@ -39,9 +39,9 @@
                'error))
     (is (eq 'zero (foo)))))
 
-(let ((a 5)) ; This requires SBCL version > 2.0.8: there's a commit after 2.0.8 was released.
+(progn ; This requires SBCL version > 2.0.8: there's a commit after 2.0.8 was released.
   (define-typed-function bar (a &optional b c))
-  (defun-typed bar ((str string) &optional ((b integer) a) ((c integer) 7))
+  (defun-typed bar ((str string) &optional ((b integer) 5) ((c integer) 7))
     (list str b c))
   (define-compiler-macro-typed bar (string &optional integer integer) (&whole form &rest args)
     (declare (ignore args))
@@ -59,3 +59,25 @@
               '("hello" 6 9)))
   (is (equalp (foobar)
               '(("hello" 9 7)))))
+
+(let ((a "hello")
+      (b 5))
+  (define-typed-function baz (c &optional d))
+  (defun-typed baz ((c string) &optional ((d integer) b))
+    (declare (ignore c))
+    (list a d)))
+
+(defun baz-caller (a1 a2)
+  (baz a1 a2))
+
+(defun baz-caller-inline (a1 a2)
+  (declare (type string a1)
+           (type integer a2)
+           (optimize speed))
+  (baz a1 a2))
+
+(def-test hairy-environment-correctness ()
+  (is (equalp (baz-caller "world" 7)
+              '("hello" 7)))
+  (is (equalp (baz-caller-inline "world" 7)
+              '("hello" 7))))

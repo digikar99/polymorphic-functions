@@ -75,19 +75,19 @@
                                                               0
                                                               (min (length (cdr form))
                                                                    (length ',typed-args)))
-                                                      env))
-                            (lambda
-                              `(lambda ,@(subseq (nth-value 0
-                                              (retrieve-typed-function ',name type-list))
-                                      2))))
-                       (if-let ((compiler-function (retrieve-typed-function-compiler-macro
-                                                    ',name type-list)))
-                         (funcall compiler-function
-                                  (cons lambda (rest form))
-                                  env)
-                         ;; TODO: Use some other declaration for inlining as well
-                         ;; Optimized for speed and type information available
-                         `(funcall ,lambda ,@(cdr form))))
+                                                      env)))
+                       (multiple-value-bind (body function)
+                           (retrieve-typed-function ',name type-list)
+                         (when (closurep function)
+                           (signal "~%~D ~D is a closure" ',name type-list))
+                         (if-let ((compiler-function (retrieve-typed-function-compiler-macro
+                                                      ',name type-list)))
+                           (funcall compiler-function
+                                    (cons `(lambda ,@(subseq body 2)) (rest form))
+                                    env)
+                           ;; TODO: Use some other declaration for inlining as well
+                           ;; Optimized for speed and type information available
+                           `((lambda ,@(subseq body 2)) ,@(cdr form)))))
                    (condition (condition)
                      (format *error-output* "~%~%; Unable to optimize ~D because:" form)
                      (write-string
