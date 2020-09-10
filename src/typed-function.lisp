@@ -46,10 +46,15 @@
            (type function  function)
            (type type-list type-list))
   (let ((table (typed-function-wrapper-hash-table (gethash name *typed-function-table*))))
-    (setf (gethash type-list table)
-          (make-typed-function :type-list type-list
-                               :body function-body
-                               :function function))))
+    (multiple-value-bind (typed-function exists)
+        (gethash type-list table)
+      (if exists
+          (setf (typed-function-function typed-function) function
+                (typed-function-body     typed-function) function-body)
+          (setf (gethash type-list table)
+                (make-typed-function :type-list type-list
+                                     :body function-body
+                                     :function function))))))
 
 (defun compute-applicable-function-type-lists (supplied-type-list expected-type-lists)
   (loop :for expected-type-list :in expected-type-lists
@@ -117,10 +122,9 @@
         (gethash type-list table)
       (if exists
           (setf (typed-function-compiler-macro typed-function) function)
-          ;; TODO: Avoid erroring and put a function instead.
-          (error "No TYPED-FUNCTION with NAME ~D and TYPE-list ~D exists"
-                 name
-                 type-list)))))
+          (setf (gethash type-list table)
+                (make-typed-function :type-list type-list
+                                     :compiler-macro function))))))
 
 (defun retrieve-typed-function-compiler-macro (name type-list)
   (declare (type function-name name)

@@ -172,7 +172,7 @@ CL-USER> (defun foo (a b)
            (declare (optimize speed)
                     (type integer a b))
            (my= a b))
-Inside compiler macro (MY= A B)
+Inside compiler macro ((LAMBDA (A B) (= A B)) A B)
 WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
 FOO
 ```
@@ -181,6 +181,8 @@ Note that while the compiler macro of the typed function checks the types during
 
 **A note about &optional args**
 
+(Note the lambda-lists.)
+
 ```lisp
 CL-USER> (define-typed-function bar (a &optional b))
 BAR
@@ -188,10 +190,15 @@ CL-USER> (defun-typed bar ((a string) &optional (b integer))
            (list a b))
 ; Evaluation aborted on #<TYPE-ERROR expected-type: (SATISFIES TYPED-DISPATCH::TYPED-LAMBDA-LIST-P)
              datum: ((A STRING) &OPTIONAL (B INTEGER))>.
-CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5)) 
+CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5))
            (list a b))
 BAR
-CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5 bp)) 
+CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5 bp))
+           (declare (ignore bp))
            (list a b))
 BAR
+CL-USER> (bar "hello")
+("hello" 5)
+CL-USER> (bar "hello" 7)
+("hello" 7)
 ```

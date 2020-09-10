@@ -34,12 +34,10 @@
          ;; (parsed-args (parse-lambda-list   lambda-list :typed nil))
          )
 
-    (register-typed-function-wrapper name lambda-list)
-    `(progn
-       (eval-when (:compile-toplevel)
-         ;; Take this out of progn?
-         ;; > Perhaps, keep it inside; helps macroexpanders know better what the macro is doing
-         (register-typed-function-wrapper ',name ',lambda-list))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       ;; Take this out of progn?
+       ;; > Perhaps, keep it inside; helps macroexpanders know better what the macro is doing
+       (register-typed-function-wrapper ',name ',lambda-list)
        
        (defun ,name ,processed-lambda-list
          (declare (ignorable ,@(loop :for arg :in typed-args
@@ -71,40 +69,47 @@
        (define-compiler-macro ,name (&whole form &rest args &environment env)
          (declare (ignorable args)) ; typed-args are a subset of lambda-list
          (if (eq (car form) ',name)
-             (let ((type-list (print (get-type-list (subseq (cdr form)
-                                                            0
-                                                            (min (length (cdr form))
-                                                                 (length ',typed-args)))
-                                                    env))))
-               (if (< 1 (policy-quality 'speed env)) ; optimize for speed
+             (if (< 1 (policy-quality 'speed env)) ; optimize for speed
+                 (handler-case
+                     (let* ((type-list (get-type-list (subseq (cdr form)
+                                                              0
+                                                              (min (length (cdr form))
+                                                                   (length ',typed-args)))
+                                                      env))
+                            (lambda
+                                `(lambda ,@(subseq (nth-value 0
+                                                    (retrieve-typed-function ',name type-list))
+                                            2))))
+                       (if-let ((compiler-function (retrieve-typed-function-compiler-macro
+                                                    ',name type-list)))
+                         (funcall compiler-function
+                                  (cons lambda (rest form))
+                                  env)
+                         ;; TODO: Use some other declaration for inlining as well
+                         ;; Optimized for speed and type information available
+                         `(,lambda ,@(cdr form))))
+                   (condition (condition)
+                     (format *error-output* "~%~%; Unable to optimize ~D because:" form)
+                     (write-string
+                      (str:replace-all (string #\newline)
+                                       (uiop:strcat #\newline #\; "  ")
+                                       (format nil "~D" condition)))
+                     form))
+                 (progn
                    (handler-case
-                       (if (retrieve-typed-function-compiler-macro ',name type-list)
-                           (funcall (retrieve-typed-function-compiler-macro ',name type-list)
-                                    form
-                                    env)
-                           ;; TODO: Use some other declaration for inlining as well
-                           ;; Optimized for speed and type information available
-                           `((lambda ,@(subseq (nth-value 0 ; inline
-                                                (retrieve-typed-function ',name type-list))
-                                        2))
-                             ,@(cdr form)))
+                       (let ((type-list (get-type-list (subseq (cdr form)
+                                                               0
+                                                               (min (length (cdr form))
+                                                                    (length ',typed-args)))
+                                                       env)))
+                         (retrieve-typed-function ',name type-list))
                      (condition (condition)
-                       (format *error-output* "~%~%; Unable to optimize ~D because:" form)
+                       (format *error-output* "~%~%; While compiling ~D: " form)
                        (write-string
                         (str:replace-all (string #\newline)
-                                         (uiop:strcat #\newline #\; "  ")
-                                         (format nil "~D" condition)))
-                       form))
-                   (progn
-                     (handler-case
-                         (retrieve-typed-function ',name type-list)
-                       (condition (condition)
-                         (format *error-output* "~%~%; While compiling ~D: " form)
-                         (write-string
-                          (str:replace-all (string #\newline)
-                                           (uiop:strcat #\newline #\; "   ")
-                                           (format nil "~D" condition)))))
-                     form)))
+                                         (uiop:strcat #\newline #\; "   ")
+                                         (format nil "~D" condition)))))
+                   form))
              (progn
                (signal 'optimize-speed-note
                        :form form
@@ -126,7 +131,7 @@
          (type-list          (nth-value 1 (remove-untyped-args lambda-list :typed t)))
          (lambda-body        `(named-lambda ,name ,processed-lambda-list ,@body)))
     ;; We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files.
-    `(progn
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
        (register-typed-function ',name ',type-list
                                 ',lambda-body
                                 (named-lambda ,name ,processed-lambda-list
@@ -135,16 +140,18 @@
 
 (defmacro define-compiler-macro-typed (name type-list compiler-macro-lambda-list
                                        &body body)
+  "An example of a type-list for a function with optional args would be (STRING &OPTIONAL INTEGER)"
   (declare (type function-name name)
            (type type-list type-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
+
   (let ((gensym (gensym)))
-    `(progn
-       (compile ',gensym (parse-compiler-macro ',gensym
-                                               ',compiler-macro-lambda-list
-                                               ',body))
-       (register-typed-function-compiler-macro ',name ',type-list
-                                               (symbol-function ',gensym))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       (register-typed-function-compiler-macro
+        ',name ',type-list
+        (compile nil (parse-compiler-macro ',gensym
+                                           ',compiler-macro-lambda-list
+                                           ',body)))
        ',name)))
 
 
