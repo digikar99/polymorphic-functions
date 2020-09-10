@@ -1,6 +1,7 @@
 # typed-dispatch
 
 >WARNING: No tests have been set up yet. The below worked as of the commit the README was updated.
+>Requires latest SBCL (post 2.0.8 even) due to a [local call context dumping](https://github.com/sbcl/sbcl/commit/135afdf39381266ffd4baeeeb285fb11868fd57b).
 
 
 ## Why?
@@ -49,6 +50,7 @@ CL-USER> (defun bar (a b)
            (declare (optimize speed)
                     (type string a b))
            (my= a b))
+BAR
 CL-USER> (disassemble 'bar)
 ; disassembly for BAR
 ; Size: 47 bytes. Origin: #x52D40883                          ; BAR
@@ -63,6 +65,7 @@ CL-USER> (disassemble 'bar)
 ; A9:       B8E2E83450       MOV EAX, #x5034E8E2              ; #<FDEFN SB-KERNEL:STRING=*>
 ; AE:       FFE0             JMP RAX
 ; B0:       CC10             INT3 16                          ; Invalid argument count trap
+NIL
 CL-USER> (my= (make-array 1 :element-type 'single-float)
               (make-array 1 :element-type 'single-float))
 HELLO
@@ -76,7 +79,6 @@ CL-USER> (defun baz (a b)
 ;      ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
 ;      (CHARACTER CHARACTER)
 ;      (STRING STRING)
-WARNING: redefining TYPED-DISPATCH::BAZ in DEFUN
 BAZ
 CL-USER> (my= 5 "hello")
 ; Evaluation aborted on #<SIMPLE-ERROR "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~D~^~%   ~}" {1004FC50D3}>.
@@ -93,8 +95,8 @@ Honestly, I'd be on the lookout for something based on MOP. I spent half an hour
 
 **What does this do differently?**
 
-- Current implementation in <500 lines vs 3400+ for specialization-store. Yes the latter has more features, but I feel it can be done in <1000 LOC
-- I wanted one feature (warn/error at compile time, if type error can be determined at run time; otherwise compile successfully); I spent 1.5+ hours on specialization-store, and then gave up
+- Current implementation in <600 lines vs 3400+ for specialization-store. Yes the latter has more features, but I feel it can be done in <1000 LOC
+- I (actually [we](https://github.com/commander-trashdin/cl-overload)) wanted some better compile time reporting; I spent 1.5+ hours on specialization-store, and then gave up
 - I wanted a bit better compile time warnings/suggestions/notes
 
 ## Dependencies outside quicklisp
@@ -172,7 +174,11 @@ CL-USER> (defun foo (a b)
            (declare (optimize speed)
                     (type integer a b))
            (my= a b))
-Inside compiler macro ((LAMBDA (A B) (= A B)) A B)
+Inside compiler macro ((LAMBDA (A B)
+                         (DECLARE (TYPE INTEGER B)
+                                  (TYPE INTEGER A))
+                         (= A B))
+                       A B)
 WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
 FOO
 ```

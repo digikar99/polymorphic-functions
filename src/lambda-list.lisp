@@ -61,8 +61,6 @@
                                                processed-lambda-list))
                                      (and (valid-parameter-name-p name)
                                           (type-specifier-p type)
-                                          ;; TODO: Signal a better error with typing
-                                          (typep default-value type)
                                           (if given-p-p
                                               (valid-parameter-name-p given-p)
                                               t))))

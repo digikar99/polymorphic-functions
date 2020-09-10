@@ -67,7 +67,7 @@
                       arg-list))))
        
        (define-compiler-macro ,name (&whole form &rest args &environment env)
-         (declare (ignorable args)) ; typed-args are a subset of lambda-list
+         (declare (ignorable args))
          (if (eq (car form) ',name)
              (if (< 1 (policy-quality 'speed env)) ; optimize for speed
                  (handler-case
@@ -77,9 +77,9 @@
                                                                    (length ',typed-args)))
                                                       env))
                             (lambda
-                                `(lambda ,@(subseq (nth-value 0
-                                                    (retrieve-typed-function ',name type-list))
-                                            2))))
+                              `(lambda ,@(subseq (nth-value 0
+                                              (retrieve-typed-function ',name type-list))
+                                      2))))
                        (if-let ((compiler-function (retrieve-typed-function-compiler-macro
                                                     ',name type-list)))
                          (funcall compiler-function
@@ -87,7 +87,7 @@
                                   env)
                          ;; TODO: Use some other declaration for inlining as well
                          ;; Optimized for speed and type information available
-                         `(,lambda ,@(cdr form))))
+                         `(funcall ,lambda ,@(cdr form))))
                    (condition (condition)
                      (format *error-output* "~%~%; Unable to optimize ~D because:" form)
                      (write-string
@@ -124,19 +124,25 @@
            (type typed-lambda-list typed-lambda-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
   (let* ((lambda-list        typed-lambda-list)
-         (processed-lambda-list (process-typed-lambda-list lambda-list)
-                                ;; (typed-function-wrapper-lambda-list
-                                ;;  (retrieve-typed-function-wrapper name))
-                                )
-         (type-list          (nth-value 1 (remove-untyped-args lambda-list :typed t)))
-         (lambda-body        `(named-lambda ,name ,processed-lambda-list ,@body)))
-    ;; We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files.
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (register-typed-function ',name ',type-list
-                                ',lambda-body
-                                (named-lambda ,name ,processed-lambda-list
-                                  ,@body))
-       ',name)))
+         (processed-lambda-list (process-typed-lambda-list lambda-list)))
+    (multiple-value-bind (param-list type-list)
+        (remove-untyped-args lambda-list :typed t)
+      (let* ((lambda-body `(named-lambda ,name ,processed-lambda-list
+                             (declare ,@(let ((type-declarations nil))
+                                          (loop :for type :in type-list
+                                                :with param-list := param-list
+                                                :do (unless (eq type '&optional)
+                                                      (push `(type ,type ,(first param-list))
+                                                            type-declarations)
+                                                      (setq param-list (rest param-list))))
+                                          type-declarations))
+                             ,@body)))
+        ;; TODO: We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files. TODO: Is that an issue after 2.0.8+ as well?
+        `(eval-when (:compile-toplevel :load-toplevel :execute)
+           (register-typed-function ',name ',type-list
+                                    ',lambda-body
+                                    ,lambda-body)
+           ',name)))))
 
 (defmacro define-compiler-macro-typed (name type-list compiler-macro-lambda-list
                                        &body body)

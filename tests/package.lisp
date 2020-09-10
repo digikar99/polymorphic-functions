@@ -39,10 +39,10 @@
                'error))
     (is (eq 'zero (foo)))))
 
-(progn
+(let ((a 5)) ; This requires SBCL version > 2.0.8: there's a commit after 2.0.8 was released.
   (define-typed-function bar (a &optional b c))
-  (defun-typed bar ((a string) &optional ((b integer) 5) ((c integer) 7))
-    (list a b c))
+  (defun-typed bar ((str string) &optional ((b integer) a) ((c integer) 7))
+    (list str b c))
   (define-compiler-macro-typed bar (string &optional integer integer) (&whole form &rest args)
     (declare (ignore args))
     `(list ,form)) ; This usage of FORM also tests infinite recursion
@@ -59,4 +59,3 @@
               '("hello" 6 9)))
   (is (equalp (foobar)
               '(("hello" 9 7)))))
-
