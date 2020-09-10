@@ -2,8 +2,8 @@
 
 (defun type-list-p (list)
   (every (lambda (obj)
-           (or (type-specifier-p obj)
-               (eq '&optional obj)))
+           (or (eq '&optional obj)
+               (type-specifier-p obj)))
          list))
 
 (deftype type-list () `(satisfies type-list-p))
@@ -62,10 +62,31 @@
          (supplied-type-list        type-list)
          (applicable-function-type-lists
            (loop :for expected-type-list :in type-lists
-                 :if (every (lambda (supplied-type expected-type)
-                              (subtypep supplied-type expected-type))
-                            supplied-type-list
-                            expected-type-list)
+                 :if (let ((supplied-type-list supplied-type-list))
+                       (loop :for idx :from 0
+                             :with supplied-type-list-length := (length supplied-type-list)
+                             :for expected-type :in expected-type-list
+                             :with list-valid-p := t
+                             :while list-valid-p
+                             :with optional-args-p := nil
+                             :do ;; (print (list expected-type supplied-type-list
+                                 ;;              supplied-type-list-length
+                                 ;;              idx))
+                                 (setq list-valid-p
+                                       (and list-valid-p
+                                            (cond ((eq expected-type '&optional)
+                                                   (setq optional-args-p t)
+                                                   t)
+                                                  ((and (>= idx supplied-type-list-length)
+                                                        optional-args-p)
+                                                   t)
+                                                  ((subtypep (first supplied-type-list)
+                                                             expected-type)
+                                                   t)
+                                                  (t
+                                                   nil))))
+                                 (setq supplied-type-list (rest supplied-type-list))
+                             :finally (return list-valid-p)))
                    :collect expected-type-list)))
     (case (length applicable-function-type-lists)
       (1 (with-slots (body function)

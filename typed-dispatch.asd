@@ -17,3 +17,8 @@
                                               "lambda-list-parsers"
                                               "compiler-note"))))
 
+(asdf:defsystem "typed-dispatch/tests"
+  :depends-on ("typed-dispatch"
+               "fiveam")
+  :pathname #P"tests/"
+  :components ((:file "package")))
