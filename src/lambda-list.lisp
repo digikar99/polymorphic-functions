@@ -150,10 +150,12 @@
                                        t)
                          (program-error (c)
                            (declare (ignore c))
-                           nil))))
+                           nil)))
+      (setq processed-untyped-lambda-list
+            (append (nreverse processed-untyped-lambda-list) list)))
     (values untyped-lambda-list-p
             (nreverse typed-param-list)
-            (nreverse processed-untyped-lambda-list))))
+            processed-untyped-lambda-list)))
 
 (deftype untyped-lambda-list ()
   "Examples:

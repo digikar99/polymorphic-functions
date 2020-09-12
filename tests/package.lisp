@@ -22,7 +22,7 @@
     (if (= 0 a)
         ''zero
         form))
-  (defun foo ()
+  (defun my=-caller ()
     (declare (optimize speed))
     (my= 0 5)))
 
@@ -37,7 +37,7 @@
     (is (eq t   (my= obj4 obj5)))
     (is (typep (catch-condition (my= obj1 obj4))
                'error))
-    (is (eq 'zero (foo)))))
+    (is (eq 'zero (my=-caller)))))
 
 (progn ; This requires SBCL version > 2.0.8: there's a commit after 2.0.8 was released.
   (define-typed-function bar (a &optional b c))
@@ -46,7 +46,7 @@
   (define-compiler-macro-typed bar (string &optional integer integer) (&whole form &rest args)
     (declare (ignore args))
     `(list ,form)) ; This usage of FORM also tests infinite recursion
-  (defun foobar ()
+  (defun bar-caller ()
     (declare (optimize speed))
     (bar "hello" 9)))
 
@@ -57,7 +57,7 @@
               '("hello" 6 7)))
   (is (equalp (bar "hello" 6 9)
               '("hello" 6 9)))
-  (is (equalp (foobar)
+  (is (equalp (bar-caller)
               '(("hello" 9 7)))))
 
 (let ((a "hello")
@@ -76,8 +76,44 @@
            (optimize speed))
   (baz a1 a2))
 
-(def-test hairy-environment-correctness ()
+(def-test non-null-environment-correctness ()
   (is (equalp (baz-caller "world" 7)
               '("hello" 7)))
   (is (equalp (baz-caller-inline "world" 7)
               '("hello" 7))))
+
+(progn
+  (define-typed-function foo (a &optional b &rest args))
+  (defun-typed foo ((str1 string) &optional ((str2 string) "str2") &rest args)
+    (declare (ignore str1 str2 args))
+    'string)
+  (defun-typed foo ((num1 number) &optional ((num2 number) pi)  &rest args)
+    (declare (ignore num1 num2 args))
+    'number))
+
+(def-test untyped-rest-correctness ()
+  (is (eq 'string (foo "hello")))
+  (is (eq 'string (foo "hello" "world")))
+  (is (eq 'string (foo "hello" "world" "goodbye")))
+  (is (eq 'string (foo "hello" "world" 5.6)))
+  (is (eq 'number (foo 5.6)))
+  (is (eq 'number (foo 5.6 6)))
+  (is (eq 'number (foo 5.6 6 8.4d0)))
+  (is (eq 'number (foo 5.6 6 8.4d0 "hello"))))
+
+(progn
+  (define-typed-function foobar (a &rest args &key key))
+  (defun-typed foobar ((str string) &rest args &key key)
+    (declare (ignore str args key))
+    'string)
+  (defun-typed foobar ((num number) &rest args &key key)
+    (declare (ignore num args key))
+    'number))
+
+(def-test untyped-key-correctness ()
+  (is (eq 'string (foobar "hello")))
+  (is (eq 'string (foobar "hello" :key "world")))
+  (is (eq 'string (foobar "hello" :key 5.6)))
+  (is (eq 'number (foobar 5.6)))
+  (is (eq 'number (foobar 5.6 :key 6)))
+  (is (eq 'number (foobar 5.6 :key "hello"))))

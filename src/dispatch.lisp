@@ -40,7 +40,8 @@
        (register-typed-function-wrapper ',name ',lambda-list)
        
        (defun ,name ,processed-lambda-list
-         (declare (ignorable ,@(loop :for arg :in typed-args
+         (declare (ignorable ,@(loop :for arg :in processed-lambda-list
+                                     :unless (member arg lambda-list-keywords)
                                      :appending (etypecase arg
                                                   (symbol (list arg))
                                                   (list (list (first arg) (third arg)))))))
