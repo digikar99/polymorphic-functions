@@ -22,6 +22,24 @@
                   (nreverse undeclared-args))
           type-list))))
 
+;; As per the discussion at https://github.com/Bike/introspect-environment/issues/4
+;; the FREE-VARIABLES-P cannot be substituted by a simple CLOSUREP (sb-kernel:closurep)
+;; TODO: Find the limitations of HU.DWIM.WALKER (one known is MACROLET)
+;; See the discussion at
+;; https://www.reddit.com/r/lisp/comments/itf0gv/determining_freevariables_in_a_form/
+(defun free-variables-p (form)
+  (let (free-variables)
+    (with-output-to-string (*error-output*)
+      (setq free-variables 
+            (remove-if-not (lambda (elt)
+                             (typep elt 'hu.dwim.walker:free-variable-reference-form))
+                           (hu.dwim.walker:collect-variable-references 
+                            (hu.dwim.walker:walk-form
+                             form)))))
+    (mapcar (lambda (free-var-reference-form)
+              (slot-value free-var-reference-form 'hu.dwim.walker::name))
+            free-variables)))
+
 (defmacro define-typed-function (name untyped-lambda-list)
   "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
   (declare (type function-name       name)
@@ -42,9 +60,9 @@
        (defun ,name ,processed-lambda-list
          (declare (ignorable ,@(loop :for arg :in processed-lambda-list
                                      :unless (member arg lambda-list-keywords)
-                                     :appending (etypecase arg
-                                                  (symbol (list arg))
-                                                  (list (list (first arg) (third arg)))))))
+                                       :appending (etypecase arg
+                                                    (symbol (list arg))
+                                                    (list (list (first arg) (third arg)))))))
          ,(let ((typed-args  typed-args)
                 (type-list-code nil)
                 (arg-list-code  nil))
@@ -77,10 +95,12 @@
                                                               (min (length (cdr form))
                                                                    (length ',typed-args)))
                                                       env)))
-                       (multiple-value-bind (body function)
+                       (multiple-value-bind (body function dispatch-type-list)
                            (retrieve-typed-function ',name type-list)
-                         (when (closurep function)
-                           (signal "~%~D ~D is a closure" ',name type-list))
+                         (declare (ignore function))
+                         (unless body
+                           ;; TODO: Here the reason concerning free-variables is hardcoded
+                           (signal "~%~D with TYPE-LIST ~D cannot be inlined due to free-variables" ',name dispatch-type-list))
                          (if-let ((compiler-function (retrieve-typed-function-compiler-macro
                                                       ',name type-list)))
                            (funcall compiler-function
@@ -93,7 +113,7 @@
                      (format *error-output* "~%~%; Unable to optimize ~D because:" form)
                      (write-string
                       (str:replace-all (string #\newline)
-                                       (uiop:strcat #\newline #\; "  ")
+                                       (uiop:strcat #\newline #\; "   ")
                                        (format nil "~D" condition)))
                      form))
                  (progn
@@ -125,7 +145,9 @@
            (type typed-lambda-list typed-lambda-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
   (let* ((lambda-list        typed-lambda-list)
-         (processed-lambda-list (process-typed-lambda-list lambda-list)))
+         (processed-lambda-list (process-typed-lambda-list lambda-list))
+         (free-variable-analysis-form `(lambda ,processed-lambda-list ,@body))
+         (form `(defun-typed ,name ,typed-lambda-list ,@body)))
     (multiple-value-bind (param-list type-list)
         (remove-untyped-args lambda-list :typed t)
       (let* ((lambda-body `(named-lambda ,name ,processed-lambda-list
@@ -141,7 +163,24 @@
         ;; TODO: We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files. TODO: Is that an issue after 2.0.8+ as well?
         `(eval-when (:compile-toplevel :load-toplevel :execute)
            (register-typed-function ',name ',type-list
-                                    ',lambda-body
+                                    ',(if-let (free-variables
+                                               (free-variables-p
+                                                ;; TODO: should not contain declarations
+                                                free-variable-analysis-form))
+                                        (progn
+                                          (terpri *error-output*)
+                                          (format *error-output* "; Will not inline ~%;   ")
+                                          (write-string
+                                           (str:replace-all
+                                            (string #\newline)
+                                            (uiop:strcat #\newline #\; "  ")
+                                            (format nil "~D~%" form))
+                                           *error-output*)
+                                          (format *error-output*
+                                                  "because free variables ~D were found"
+                                                  free-variables)
+                                          nil)
+                                        lambda-body)
                                     ,lambda-body)
            ',name)))))
 

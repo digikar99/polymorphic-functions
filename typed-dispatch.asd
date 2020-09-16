@@ -6,17 +6,16 @@
   :depends-on ("alexandria"
                "introspect-environment"
                "trivial-types"
+               "hu.dwim.walker"
                "str")
   :pathname #P"src/"
   :components ((:file "package")
                (:file "typed-function"      :depends-on ("package"))
                (:file "lambda-list"         :depends-on ("package"))
-               (:file "closurep"            :depends-on ("package"))
                (:file "lambda-list-parsers" :depends-on ("lambda-list"))
                (:file "compiler-note"       :depends-on ("package"))
                (:file "dispatch" :depends-on ("typed-function"
                                               "lambda-list-parsers"
-                                              "closurep"
                                               "compiler-note"))))
 
 (asdf:defsystem "typed-dispatch/tests"

@@ -92,7 +92,10 @@
           :collect expected-type-list))
 
 (defun retrieve-typed-function (name type-list)
-  "If successful, returns 2 values: the first object is the function body, while the second is the function itself."
+  "If successful, returns 3 values:
+  the first object is the function body,
+  the second is the function itself,
+  the third is the type list corresponding to the typed function that will be used for dispatch"
   (declare (type function-name name)
            (type type-list type-list))
   (let* ((typed-function-wrapper-hash-table (typed-function-wrapper-hash-table
@@ -105,7 +108,7 @@
     (case (length applicable-function-type-lists)
       (1 (with-slots (body function)
              (gethash (first applicable-function-type-lists) typed-function-wrapper-hash-table)
-           (values body function)))
+           (values body function (first applicable-function-type-lists))))
       (0 (error "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~D~^~%   ~}"
                 supplied-type-list
                 type-lists))
