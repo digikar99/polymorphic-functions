@@ -113,10 +113,18 @@
                                           nil))))
                         (setq supplied-type-list (rest supplied-type-list))
                         (setq expected-type-list (rest expected-type-list)))
-              ;; (when (and list-valid-p (eq '&key (first expected-type-list)))
-              ;;   (loop :initially (setq expected-type-list (rest expected-type-list))
-              ;;         ;; TODO: Work here
-              ;;         ))
+              (when (and list-valid-p
+                         (eq '&key (first expected-type-list))
+                         (eq '&key (first supplied-type-list)))
+                (loop :initially (setq expected-type-list (rest expected-type-list))
+                                 (setq supplied-type-list (rest supplied-type-list))
+                      :while supplied-type-list
+                      :for key  := (first supplied-type-list)
+                      :for supplied-type := (second supplied-type-list)
+                      :do (setq list-valid-p
+                                (and list-valid-p
+                                     (subtypep supplied-type (getf expected-type-list key))))
+                          (setq supplied-type-list (cddr supplied-type-list))))
               list-valid-p)
           :collect expected-type-list))
 

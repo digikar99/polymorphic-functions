@@ -72,7 +72,9 @@
                       (push (first (first param))  untyped-lambda-list)
                       (push (first (first param))  typed-param-list)
                       (when (eq '&key keyword)
-                        (push (first (first param)) type-list))
+                        (push (intern (symbol-name (first (first param)))
+                                      :keyword)
+                              type-list))
                       (push (second (first param)) type-list))
                     (next list))))
       (update-with-and (handler-case (progn
