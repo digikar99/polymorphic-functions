@@ -74,7 +74,7 @@ Signals a MALFORMED-(UN)TYPED-LAMBDA-LIST error if the parsing fails."
                              keyword-args)))))
 
 (defun process-untyped-lambda-list (list)
-  "Assuming LIST is an UNTYPED-LAMBDA-LIST, it returns the third return value of UNTYPED-LAMBDA-LIST-P."
+  "Assuming LIST is an UNTYPED-LAMBDA-LIST, it returns the third return value of UNTYPED-LAMBDA-LIST-P"
   (nth-value 2 (untyped-lambda-list-p list)))
 
 (defun process-typed-lambda-list (list)

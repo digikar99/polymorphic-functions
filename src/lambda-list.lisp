@@ -41,7 +41,7 @@
                   (push (second param) type-list))
                 (next list))
       ;; optionally the &optional args
-      (loop :for keyword :in '(&optional) :do
+      (loop :for keyword :in '(&optional &key) :do
         ;; TODO: Processing &allow-other-keys and &rest
         (when (eq keyword (first list))
           (push keyword untyped-lambda-list)
@@ -71,6 +71,8 @@
                     (when typed-lambda-list-p
                       (push (first (first param))  untyped-lambda-list)
                       (push (first (first param))  typed-param-list)
+                      (when (eq '&key keyword)
+                        (push (first (first param)) type-list))
                       (push (second (first param)) type-list))
                     (next list))))
       (update-with-and (handler-case (progn
@@ -102,8 +104,8 @@
 (defun untyped-lambda-list-p (list)
   "Returns three values:
   the first value indicates if the given LIST is an UNTYPED-LAMBDA-LIST,
-  if the first value is T, that is, if the LIST is an UNTYPED-LAMBDA-LIST, the second value is the list of PARAMETERs that will be considered for typed dispatch.
-  the third value is the processed typed lambda-list; in particular, it adds an \"argp\" to the optional args, to help the DEFINE-TYPED-FUNCTION produce the correct function. In the absence of &optional args, this is the same as the given LIST whenever LIST is a valid UNTYPED-LAMBDA-LIST"
+  if the first value is T, that is, if the LIST is an UNTYPED-LAMBDA-LIST, the second value is the list of PARAMETERs that will be considered for typed dispatch
+  the third value is the processed typed lambda-list; in particular, it adds an \"argp\" to the &optional and &key args, to help the DEFINE-TYPED-FUNCTION produce the correct function. In the absence of both &optional and &key args, this is the same as the given LIST whenever LIST is a valid UNTYPED-LAMBDA-LIST"
   (declare (type list list))
   (let ((untyped-lambda-list-p t)
         (typed-param-list    nil)
@@ -125,7 +127,7 @@
                   (push param processed-untyped-lambda-list))
                 (next list))
       ;; optionally the &optional args
-      (loop :for keyword :in '(&optional) :do
+      (loop :for keyword :in '(&optional &key) :do
         (when (eq keyword (first list))
           (push keyword processed-untyped-lambda-list)
           (next list)
