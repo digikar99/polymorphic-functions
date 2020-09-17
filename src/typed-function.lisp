@@ -1,10 +1,30 @@
 (in-package typed-dispatch)
 
 (defun type-list-p (list)
-  (every (lambda (obj)
-           (or (eq '&optional obj)
-               (type-specifier-p obj)))
-         list))
+  ;; TODO: what parameter-names are valid?
+  (let ((valid-p t))
+    (loop :for elt := (first list)
+          :while (and list valid-p) ; we don't want list to be empty
+          :until (eq '&key elt)
+          :do (setq valid-p
+                    (and valid-p
+                         (cond ((eq '&optional elt)
+                                t)
+                               ((type-specifier-p elt)
+                                t)
+                               (t
+                                nil))))
+              (setq list (rest list)))
+    (cond ((and valid-p list (eq '&key (first list)) (oddp (length list)))
+           (loop :initially (setq list (rest list))
+                 :while list
+                 :for param := (first  list)
+                 :for type  := (second list)
+                 :do (setq valid-p (type-specifier-p type))
+                 (setq list (cddr list))))
+          ((and valid-p list)
+           (setq valid-p nil)))
+    valid-p))
 
 (deftype type-list () `(satisfies type-list-p))
 
@@ -57,12 +77,16 @@
                                      :function function))))))
 
 (defun compute-applicable-function-type-lists (supplied-type-list expected-type-lists)
+  ;; TODO: Prepare (regression) tests for this function
   (loop :for expected-type-list :in expected-type-lists
-        :if (let ((supplied-type-list supplied-type-list))
+        :if (let ((supplied-type-list supplied-type-list)
+                  (expected-type-list expected-type-list)
+                  (list-valid-p       t))
               (loop :for idx :from 0
                     :with supplied-type-list-length := (length supplied-type-list)
-                    :for expected-type :in expected-type-list
-                    :with list-valid-p := t
+                    :while expected-type-list
+                    :for expected-type := (first expected-type-list)
+                    :until (eq expected-type '&key)
                     :while list-valid-p
                     :with optional-args-p := nil
                     :do ;; (print (list expected-type supplied-type-list
@@ -70,7 +94,8 @@
                         ;;              idx))
                         (setq list-valid-p
                               (and list-valid-p
-                                   (cond ((eq expected-type '&optional)
+                                   (cond ((and (eq '&optional expected-type)
+                                               (eq '&optional (first supplied-type-list)))
                                           (setq optional-args-p t)
                                           t)
                                          ((and (first supplied-type-list)
@@ -86,9 +111,13 @@
                                           t)
                                          (t
                                           nil))))
-                        (unless (eq expected-type '&optional)
-                          (setq supplied-type-list (rest supplied-type-list)))
-                    :finally (return list-valid-p)))
+                        (setq supplied-type-list (rest supplied-type-list))
+                        (setq expected-type-list (rest expected-type-list)))
+              ;; (when (and list-valid-p (eq '&key (first expected-type-list)))
+              ;;   (loop :initially (setq expected-type-list (rest expected-type-list))
+              ;;         ;; TODO: Work here
+              ;;         ))
+              list-valid-p)
           :collect expected-type-list))
 
 (defun retrieve-typed-function (name type-list)

@@ -5,6 +5,8 @@
        (not (eq t name))
        (not (eq nil name))))
 
+;; &key args would be stored in the form of a plist - that is: the cdr of the type-list
+;; following the &key word should be a plist
 (defun typed-lambda-list-p (list)
   "Returns five values:
   the first value indicates whether the given LIST is a TYPED-LAMBDA-LIST,
@@ -39,36 +41,38 @@
                   (push (second param) type-list))
                 (next list))
       ;; optionally the &optional args
-      (when (eq '&optional (first list)) 
-        (push '&optional untyped-lambda-list)
-        (push '&optional processed-lambda-list)
-        (push '&optional type-list) ; require the &optional keyword in RETRIEVE-TYPED-FUNCTION
-        (next list)
-        (loop :while (and typed-lambda-list-p list)
-              :for param := (first list)
-              :until (member param lambda-list-keywords)
-              :do (update-with-and (listp param))
-                  (update-with-and (listp (first param)))
-                  (update-with-and (null (cdddr param))) ; max-length 3
-                  (update-with-and (destructuring-bind ((name type)
-                                                        &optional default-value
-                                                          (given-p nil given-p-p))
-                                       param
-                                     (if given-p-p
-                                         (push (list name default-value given-p)
-                                               processed-lambda-list)
-                                         (push (list name default-value)
-                                               processed-lambda-list))
-                                     (and (valid-parameter-name-p name)
-                                          (type-specifier-p type)
-                                          (if given-p-p
-                                              (valid-parameter-name-p given-p)
-                                              t))))
-                  (when typed-lambda-list-p
-                    (push (first (first param))  untyped-lambda-list)
-                    (push (first (first param))  typed-param-list)
-                    (push (second (first param)) type-list))
-                  (next list)))
+      (loop :for keyword :in '(&optional) :do
+        ;; TODO: Processing &allow-other-keys and &rest
+        (when (eq keyword (first list))
+          (push keyword untyped-lambda-list)
+          (push keyword processed-lambda-list)
+          (push keyword type-list) ; require the &optional keyword in RETRIEVE-TYPED-FUNCTION
+          (next list)
+          (loop :while (and typed-lambda-list-p list)
+                :for param := (first list)
+                :until (member param lambda-list-keywords)
+                :do (update-with-and (listp param))
+                    (update-with-and (listp (first param)))
+                    (update-with-and (null (cdddr param))) ; max-length 3
+                    (update-with-and (destructuring-bind ((name type)
+                                                          &optional default-value
+                                                            (given-p nil given-p-p))
+                                         param
+                                       (if given-p-p
+                                           (push (list name default-value given-p)
+                                                 processed-lambda-list)
+                                           (push (list name default-value)
+                                                 processed-lambda-list))
+                                       (and (valid-parameter-name-p name)
+                                            (type-specifier-p type)
+                                            (if given-p-p
+                                                (valid-parameter-name-p given-p)
+                                                t))))
+                    (when typed-lambda-list-p
+                      (push (first (first param))  untyped-lambda-list)
+                      (push (first (first param))  typed-param-list)
+                      (push (second (first param)) type-list))
+                    (next list))))
       (update-with-and (handler-case (progn
                                        (parse-ordinary-lambda-list list)
                                        t)
@@ -121,30 +125,31 @@
                   (push param processed-untyped-lambda-list))
                 (next list))
       ;; optionally the &optional args
-      (when (eq '&optional (first list))
-        (push '&optional processed-untyped-lambda-list)
-        (next list)
-        (loop :while (and untyped-lambda-list-p list)
-              :for param := (first list)
-              :until (member param lambda-list-keywords)
-              :for param-list-p := (listp param)
-              :for param-symbol := (etypecase param
-                                     (symbol param)
-                                     (list (first param)))
-              :do (update-with-and (valid-parameter-name-p param-symbol))
-                  (when untyped-lambda-list-p
-                    (let ((optional-param (list param-symbol
-                                                nil
-                                                (gensym (symbol-name param-symbol)))))
-                      (push (if param-list-p
-                                param
-                                optional-param)
-                            typed-param-list)
-                      (push (if param-list-p
-                                param
-                                optional-param)
-                            processed-untyped-lambda-list)))
-                  (next list)))
+      (loop :for keyword :in '(&optional) :do
+        (when (eq keyword (first list))
+          (push keyword processed-untyped-lambda-list)
+          (next list)
+          (loop :while (and untyped-lambda-list-p list)
+                :for param := (first list)
+                :until (member param lambda-list-keywords)
+                :for param-list-p := (listp param)
+                :for param-symbol := (etypecase param
+                                       (symbol param)
+                                       (list (first param)))
+                :do (update-with-and (valid-parameter-name-p param-symbol))
+                    (when untyped-lambda-list-p
+                      (let ((optional-param (list param-symbol
+                                                  nil
+                                                  (gensym (symbol-name param-symbol)))))
+                        (push (if param-list-p
+                                  param
+                                  optional-param)
+                              typed-param-list)
+                        (push (if param-list-p
+                                  param
+                                  optional-param)
+                              processed-untyped-lambda-list)))
+                    (next list))))
       (update-with-and (handler-case (progn
                                        (parse-ordinary-lambda-list list)
                                        t)

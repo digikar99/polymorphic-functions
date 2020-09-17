@@ -1,21 +1,29 @@
 (in-package typed-dispatch)
 
-(defun get-type-list (arg-list &optional env)
+(defun get-type-list (num-required-args arg-list env &key optional)
   ;; TODO: Improve this
   (flet ((type-declared-p (var)
            (cdr (assoc 'type (nth-value 2 (variable-information var env))))))
     (let* ((undeclared-args ())
-           (type-list
-             (loop :for arg :in arg-list
-                   :collect (cond ((symbolp arg)
-                                   (unless (type-declared-p arg)
-                                     (push arg undeclared-args))
-                                   (variable-type arg env))
-                                  ((constantp arg) (type-of arg))
-                                  ((and (listp arg)
-                                        (eq 'the (first arg)))
-                                   (second arg))
-                                  (t (signal 'compiler-note "Cannot optimize this case!"))))))
+           (type-list       ())
+           (idx             0))
+      (loop :for arg :in arg-list
+            :do (when (and (= idx num-required-args) optional)
+                  (push '&optional type-list))
+                (push (cond ((symbolp arg)
+                             (unless (type-declared-p arg)
+                               (push arg undeclared-args))
+                             (variable-type arg env))
+                            ((constantp arg) (type-of arg))
+                            ((and (listp arg)
+                                  (eq 'the (first arg)))
+                             (second arg))
+                            (t (signal 'compiler-note "Cannot optimize this case!")))
+                      type-list)
+                (incf idx))
+      (when (and (= idx num-required-args) optional)
+        (push '&optional type-list))
+      (nreversef type-list)
       (if undeclared-args
           (mapcar (lambda (arg)
                     (signal 'undeclared-type :var arg))
@@ -45,9 +53,11 @@
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
-  (let* ((lambda-list untyped-lambda-list)
+  (let* ((lambda-list           untyped-lambda-list)
          (processed-lambda-list (process-untyped-lambda-list untyped-lambda-list))
-         (typed-args  (remove-untyped-args processed-lambda-list :typed nil))
+         (typed-args            (remove-untyped-args processed-lambda-list :typed nil))
+         (num-required-args     0)
+         (optional-args-p       nil)
          ;; TODO: Handle the case of parsed-args better
          ;; (parsed-args (parse-lambda-list   lambda-list :typed nil))
          )
@@ -70,16 +80,19 @@
                   :while (and typed-arg (symbolp typed-arg))
                   :do (push `(type-of ,typed-arg) type-list-code)
                   :do (push typed-arg arg-list-code)
-                  :do (setq typed-args (rest typed-args)))
+                  :do (setq typed-args (rest typed-args))
+                  :do (incf num-required-args))
             `(let ((type-list (list ,@type-list-code))
                    (arg-list  (list ,@arg-list-code)))
                ,@(when (and typed-args (listp (first typed-args)))
                    ;; some typed-args are still pending
                    ;; - these should be the &optional ones
-                   (loop :for (typed-arg default argp) :in typed-args
-                         :collect `(when ,argp
-                                     (push (type-of ,typed-arg) type-list)
-                                     (push ,typed-arg arg-list))))
+                   (setq optional-args-p t)
+                   `((push '&optional type-list)
+                     ,@(loop :for (typed-arg default argp) :in typed-args
+                             :collect `(when ,argp
+                                         (push (type-of ,typed-arg) type-list)
+                                         (push ,typed-arg arg-list)))))
                (nreversef type-list)
                (nreversef arg-list)
                (apply (nth-value 1 (retrieve-typed-function ',name type-list))
@@ -88,49 +101,50 @@
        (define-compiler-macro ,name (&whole form &rest args &environment env)
          (declare (ignorable args))
          (if (eq (car form) ',name)
-             (if (< 1 (policy-quality 'speed env)) ; optimize for speed
-                 (handler-case
-                     (let* ((type-list (get-type-list (subseq (cdr form)
-                                                              0
-                                                              (min (length (cdr form))
-                                                                   (length ',typed-args)))
-                                                      env)))
-                       (multiple-value-bind (body function dispatch-type-list)
-                           (retrieve-typed-function ',name type-list)
-                         (declare (ignore function))
-                         (unless body
-                           ;; TODO: Here the reason concerning free-variables is hardcoded
-                           (signal "~%~D with TYPE-LIST ~D cannot be inlined due to free-variables" ',name dispatch-type-list))
-                         (if-let ((compiler-function (retrieve-typed-function-compiler-macro
-                                                      ',name type-list)))
-                           (funcall compiler-function
-                                    (cons `(lambda ,@(subseq body 2)) (rest form))
-                                    env)
-                           ;; TODO: Use some other declaration for inlining as well
-                           ;; Optimized for speed and type information available
-                           `((lambda ,@(subseq body 2)) ,@(cdr form)))))
-                   (condition (condition)
-                     (format *error-output* "~%~%; Unable to optimize ~D because:" form)
-                     (write-string
-                      (str:replace-all (string #\newline)
-                                       (uiop:strcat #\newline #\; "   ")
-                                       (format nil "~D" condition)))
-                     form))
-                 (progn
-                   (handler-case
-                       (let ((type-list (get-type-list (subseq (cdr form)
-                                                               0
-                                                               (min (length (cdr form))
-                                                                    (length ',typed-args)))
-                                                       env)))
-                         (retrieve-typed-function ',name type-list))
-                     (condition (condition)
-                       (format *error-output* "~%~%; While compiling ~D: " form)
-                       (write-string
-                        (str:replace-all (string #\newline)
-                                         (uiop:strcat #\newline #\; "   ")
-                                         (format nil "~D" condition)))))
-                   form))
+             ,(let ((type-list-code `(get-type-list ,num-required-args
+                                                    (subseq (cdr form)
+                                                           0
+                                                           (min (length (cdr form))
+                                                                (length ',typed-args)))
+                                                    env
+                                                    :optional ,optional-args-p)))
+                ;; The call to GET-TYPE-LIST needs to be surrounded by HANDLER-CASE
+                ;; to report any failures that arise
+                `(if (< 1 (policy-quality 'speed env)) ; optimize for speed
+                     (handler-case
+                         (let ((type-list ,type-list-code))
+                           (multiple-value-bind (body function dispatch-type-list)
+                               (retrieve-typed-function ',name type-list)
+                             (declare (ignore function))
+                             (unless body
+                               ;; TODO: Here the reason concerning free-variables is hardcoded
+                               (signal "~%~D with TYPE-LIST ~D cannot be inlined due to free-variables" ',name dispatch-type-list))
+                             (if-let ((compiler-function (retrieve-typed-function-compiler-macro
+                                                          ',name type-list)))
+                               (funcall compiler-function
+                                        (cons `(lambda ,@(subseq body 2)) (rest form))
+                                        env)
+                               ;; TODO: Use some other declaration for inlining as well
+                               ;; Optimized for speed and type information available
+                               `((lambda ,@(subseq body 2)) ,@(cdr form)))))
+                       (condition (condition)
+                         (format *error-output* "~%~%; Unable to optimize ~D because:" form)
+                         (write-string
+                          (str:replace-all (string #\newline)
+                                           (uiop:strcat #\newline #\; "   ")
+                                           (format nil "~D" condition)))
+                         form))
+                     (progn
+                       (handler-case
+                           (let ((type-list ,type-list-code))
+                             (retrieve-typed-function ',name type-list))
+                         (condition (condition)
+                           (format *error-output* "~%~%; While compiling ~D: " form)
+                           (write-string
+                            (str:replace-all (string #\newline)
+                                             (uiop:strcat #\newline #\; "   ")
+                                             (format nil "~D" condition)))))
+                       form)))
              (progn
                (signal 'optimize-speed-note
                        :form form
@@ -144,10 +158,10 @@
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
-  (let* ((lambda-list        typed-lambda-list)
-         (processed-lambda-list (process-typed-lambda-list lambda-list))
+  (let* ((lambda-list                 typed-lambda-list)
+         (processed-lambda-list       (process-typed-lambda-list lambda-list))
          (free-variable-analysis-form `(lambda ,processed-lambda-list ,@body))
-         (form `(defun-typed ,name ,typed-lambda-list ,@body)))
+         (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
     (multiple-value-bind (param-list type-list)
         (remove-untyped-args lambda-list :typed t)
       (let* ((lambda-body `(named-lambda ,name ,processed-lambda-list
