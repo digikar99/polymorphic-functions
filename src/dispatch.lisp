@@ -67,6 +67,14 @@
               (slot-value free-var-reference-form 'hu.dwim.walker::name))
             free-variables)))
 
+(defun recursive-function-p (name body)
+  (when body
+    (cond ((listp body)
+           (if (eq name (car body))
+               t
+               (some (curry 'recursive-function-p name) (cdr body))))
+          (t nil))))
+
 ;;; - run-time correctness requires
 ;;;   - DEFINE-TYPED-FUNCTION -> DEFUN
 ;;;   - DEFUN-TYPED
@@ -167,17 +175,21 @@
                              (if-let ((compiler-function (retrieve-typed-function-compiler-macro
                                                           ',name type-list)))
                                (funcall compiler-function
-                                        (cons `(lambda ,@(subseq body 2)) (rest form))
+                                        (cons body (rest form))
                                         env)
                                ;; TODO: Use some other declaration for inlining as well
                                ;; Optimized for speed and type information available
-                               `((lambda ,@(subseq body 2)) ,@(cdr form)))))
+                               (if (recursive-function-p ',name body)
+                                   (signal "~%Inlining ~S results in (potentially infinite) recursive expansion"
+                                           form)
+                                   `(,body ,@(cdr form))))))
                        (condition (condition)
-                         (format *error-output* "~%~%; Unable to optimize ~S because:" form)
+                         (format *error-output* "~%; Unable to optimize ~S because:" form)
                          (write-string
                           (str:replace-all (string #\newline)
                                            (uiop:strcat #\newline #\; "   ")
                                            (format nil "~A" condition)))
+                         (terpri *error-output*)
                          form))
                      (progn
                        (handler-case
@@ -185,11 +197,12 @@
                              (retrieve-typed-function ',name type-list))
                          (condition (condition)
                            (unless (typep condition 'undeclared-type)
-                             (format *error-output* "~%~%; While compiling ~S: " form)
+                             (format *error-output* "~%; While compiling ~S: " form)
                              (write-string
                               (str:replace-all (string #\newline)
                                                (uiop:strcat #\newline #\; "   ")
-                                               (format nil "~A" condition))))))
+                                               (format nil "~A" condition)))
+                             (terpri *error-output*))))
                        form)))
              (progn
                (signal 'optimize-speed-note
@@ -206,11 +219,12 @@
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
   (let* ((lambda-list                 typed-lambda-list)
          (processed-lambda-list       (process-typed-lambda-list lambda-list))
+         ;; no declaraionts in FREE-VARIABLE-ANALYSIS-FORM
          (free-variable-analysis-form `(lambda ,processed-lambda-list ,@body))
          (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
     (multiple-value-bind (param-list type-list)
         (remove-untyped-args lambda-list :typed t)
-      (let* ((lambda-body `(named-lambda ,name ,processed-lambda-list
+      (let* ((lambda-body `(lambda ,processed-lambda-list
                              (declare
                               ,@(let ((type-declarations   nil)
                                       (processing-key-args nil)
@@ -275,5 +289,6 @@
                                            ',compiler-macro-lambda-list
                                            ',body)))
        ',name)))
+
 
 

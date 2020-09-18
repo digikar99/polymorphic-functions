@@ -120,3 +120,28 @@
   (is (equalp '((number 10 "world")) (foobar-caller)))
   (is (equalp '(number 6 "bye")      (foobar 5.6 :b "bye")))
   (is (equalp '(number 4.4 "bye")    (foobar 5.6 :b "bye" :key 4.4))))
+
+(progn
+  (define-typed-function foz (a))
+  (defun-typed foz ((a number))
+    (declare (optimize speed))
+    (if (= a 5)
+        'number
+        (foz "hello")))
+  (defun-typed foz ((a string))
+    (declare (optimize speed))
+    (if (string= a "hello")
+        'string
+        (foz 5)))
+  ;; Will result in infinite expansion upon redefinition, if compilation is not done correctly
+  (defun-typed foz ((a number))
+    (declare (optimize speed))
+    (if (= a 5)
+        'number
+        (foz "hello"))))
+
+(def-test recursive-correctness ()
+  (is (eq 'number (foz 5)))
+  (is (eq 'string (foz "hello")))
+  (is (eq 'number (foz "world")))
+  (is (eq 'string (foz 7))))

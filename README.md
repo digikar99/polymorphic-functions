@@ -1,7 +1,6 @@
 # typed-dispatch
 
->WARNING: No tests have been set up yet. The below worked as of the commit the README was updated.
->Requires latest SBCL (post 2.0.8 even) due to a [local call context dumping](https://github.com/sbcl/sbcl/commit/135afdf39381266ffd4baeeeb285fb11868fd57b).
+>Requires latest SBCL (post 2.0.8 even) to run the tests `(5am:run :typed-dispatch)` due to a [local call context dumping](https://github.com/sbcl/sbcl/commit/135afdf39381266ffd4baeeeb285fb11868fd57b).
 
 
 ## Why?
@@ -88,20 +87,20 @@ CL-USER> (my= 5 "hello")
 
 I know of exactly one: [specialization-store](https://github.com/markcox80/specialization-store). It does a [few more things](https://github.com/markcox80/specialization-store/wiki):
 
-- Dispatch on &rest args; `typed-dispatch` only supports required, or required and optional, or required and keyword arguments. I will be inclined to not add support for other things, unless I find a complexity-scalable way to support more complex arg lists. (See `alexandria:parse-ordinary-lambda-list` for instance.)
+- Dispatch on combinations of &optional and &key, as well as &rest args; `typed-dispatch` only supports required, or required and optional, or required and keyword arguments. I will be inclined to not add support for other things, until I find a complexity-scalable way to support more complex arg lists. (See `alexandria:parse-ordinary-lambda-list` for instance. [sandalphon.lambda-list](https://github.com/Bike/sandalphon.lambda-list) seems to be a nice starting point.)
 - Allow for explicitly naming "specialized function"
-- "Specialized" dispatch; by contrast, `typed-dispatch` checks that only a single type list is applicable, and signals an error otherwise
+- Ability to dispatch on the most "specialized" `specialization`; by contrast, `typed-dispatch` checks that only a single type list is applicable, and signals an error otherwise
 - More tested in some aspects
 - Has its own MOP to aid extensibility
-- `specialization-store` is more than an order of magnitude faster than `typed-dispatch`, without compiler macros; though, both are ridiculously slow than native functions without compiler macros. In the absence of compiler-macros, `specialization-store` is about as fast as python.
+- `specialization-store` is more than an order of magnitude faster than `typed-dispatch`, without compiler macros; though, both are ridiculously slower than native functions without compiler macros. In the absence of compiler-macros, `specialization-store` is about as fast as python.
 
 Honestly, I'd be on the lookout for something based on the CLOS MOP. I spent half an hour on the book; then, gave up, and spent two hours on the first commit of this.
 
 **What does this do differently?**
 
-- Current implementation in <800 lines vs 3400+ for specialization-store, albeit with no extensibility or dispatch on &rest args
+- Current implementation in <800 lines vs 3400+ for specialization-store, albeit with lesser features
 - I (actually [we](https://github.com/commander-trashdin/cl-overload)) wanted some better compile time reporting; I spent 1.5+ hours on specialization-store, and then gave up
-- I wanted a bit better compile time warnings/suggestions/notes
+- I wanted better compile time warnings/suggestions/notes
 
 ## Dependencies outside quicklisp
 
