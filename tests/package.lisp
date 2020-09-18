@@ -83,23 +83,19 @@
               '("hello" 7))))
 
 (progn
-  (define-typed-function foo (a &optional b &rest args))
-  (defun-typed foo ((str1 string) &optional ((str2 string) "str2") &rest args)
-    (declare (ignore str1 str2 args))
+  (define-typed-function foo (a &optional b))
+  (defun-typed foo ((str1 string) &optional ((str2 string) "str2"))
+    (declare (ignore str1 str2))
     'string)
-  (defun-typed foo ((num1 number) &optional ((num2 number) pi)  &rest args)
-    (declare (ignore num1 num2 args))
+  (defun-typed foo ((num1 number) &optional ((num2 number) pi))
+    (declare (ignore num1 num2))
     'number))
 
 (def-test untyped-rest-correctness ()
   (is (eq 'string (foo "hello")))
   (is (eq 'string (foo "hello" "world")))
-  (is (eq 'string (foo "hello" "world" "goodbye")))
-  (is (eq 'string (foo "hello" "world" 5.6)))
   (is (eq 'number (foo 5.6)))
-  (is (eq 'number (foo 5.6 6)))
-  (is (eq 'number (foo 5.6 6 8.4d0)))
-  (is (eq 'number (foo 5.6 6 8.4d0 "hello"))))
+  (is (eq 'number (foo 5.6 6))))
 
 (progn
   (define-typed-function foobar (a &key key b))
@@ -116,7 +112,7 @@
     (declare (optimize speed))
     (foobar 7 :key 10)))
 
-(def-test untyped-key-correctness ()
+(def-test typed-key-correctness ()
   (is (equalp '(string 5 "world")    (foobar "hello")))
   (is (equalp '(string 5.6 "world")  (foobar "hello" :key 5.6)))
   (is (equalp '(number 6 "world")    (foobar 5.6)))
@@ -124,15 +120,3 @@
   (is (equalp '((number 10 "world")) (foobar-caller)))
   (is (equalp '(number 6 "bye")      (foobar 5.6 :b "bye")))
   (is (equalp '(number 4.4 "bye")    (foobar 5.6 :b "bye" :key 4.4))))
-
-(progn
-  (define-typed-function foz (a &rest args &key key b))
-  (defun-typed foz ((str string) &rest args &key ((key number) 5) ((b string) "world"))
-    (declare (ignore str))
-    (list 'string key b args))
-  ;; (define-compiler-macro-typed foz (number &key :key number :b string) (&whole form &rest args)
-  ;;   (declare (ignore args))
-  ;;   `(list ,form))
-  (defun-typed foz ((num number) &rest args &key ((key number) 5) ((b string) "world"))
-    (declare (ignore str))
-    (list 'number key b args)))

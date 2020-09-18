@@ -7,6 +7,7 @@
 
 ;; &key args would be stored in the form of a plist - that is: the cdr of the type-list
 ;; following the &key word should be a plist
+
 (defun typed-lambda-list-p (list)
   "Returns five values:
   the first value indicates whether the given LIST is a TYPED-LAMBDA-LIST,
@@ -20,6 +21,10 @@
         (type-list           nil)
         (typed-param-list    nil)
         (processed-lambda-list nil))
+    (when (or (intersection list (set-difference lambda-list-keywords '(&optional &key)))
+              (and (member '&optional list)
+                   (member '&key list)))
+      (return-from typed-lambda-list-p nil))
     (macrolet ((update-with-and (obj)
                  `(if typed-lambda-list-p
                       (setq typed-lambda-list-p
@@ -108,10 +113,21 @@
   the first value indicates if the given LIST is an UNTYPED-LAMBDA-LIST,
   if the first value is T, that is, if the LIST is an UNTYPED-LAMBDA-LIST, the second value is the list of PARAMETERs that will be considered for typed dispatch
   the third value is the processed typed lambda-list; in particular, it adds an \"argp\" to the &optional and &key args, to help the DEFINE-TYPED-FUNCTION produce the correct function. In the absence of both &optional and &key args, this is the same as the given LIST whenever LIST is a valid UNTYPED-LAMBDA-LIST"
+  (multiple-value-bind () (parse-ordinary-lambda-list )))
+
+(defun untyped-lambda-list-p (list)
+  "Returns three values:
+  the first value indicates if the given LIST is an UNTYPED-LAMBDA-LIST,
+  if the first value is T, that is, if the LIST is an UNTYPED-LAMBDA-LIST, the second value is the list of PARAMETERs that will be considered for typed dispatch
+  the third value is the processed typed lambda-list; in particular, it adds an \"argp\" to the &optional and &key args, to help the DEFINE-TYPED-FUNCTION produce the correct function. In the absence of both &optional and &key args, this is the same as the given LIST whenever LIST is a valid UNTYPED-LAMBDA-LIST"
   (declare (type list list))
   (let ((untyped-lambda-list-p t)
         (typed-param-list    nil)
         (processed-untyped-lambda-list nil))
+    (when (or (intersection list (set-difference lambda-list-keywords '(&optional &key)))
+              (and (member '&optional list)
+                   (member '&key list)))
+      (return-from untyped-lambda-list-p nil))
     (macrolet ((update-with-and (obj)
                  `(if untyped-lambda-list-p
                       (setq untyped-lambda-list-p

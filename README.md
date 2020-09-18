@@ -88,8 +88,9 @@ CL-USER> (my= 5 "hello")
 
 I know of exactly one: [specialization-store](https://github.com/markcox80/specialization-store). It does a [few more things](https://github.com/markcox80/specialization-store/wiki):
 
-- Dispatch on &rest args
+- Dispatch on &rest args; `typed-dispatch` only supports required, or required and optional, or required and keyword arguments. I will be inclined to not add support for other things, unless I find a complexity-scalable way to support more complex arg lists. (See `alexandria:parse-ordinary-lambda-list` for instance.)
 - Allow for explicitly naming "specialized function"
+- "Specialized" dispatch; by contrast, `typed-dispatch` checks that only a single type list is applicable, and signals an error otherwise
 - More tested in some aspects
 - Has its own MOP to aid extensibility
 - `specialization-store` is more than an order of magnitude faster than `typed-dispatch`, without compiler macros; though, both are ridiculously slow than native functions without compiler macros. In the absence of compiler-macros, `specialization-store` is about as fast as python.
