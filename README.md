@@ -12,12 +12,12 @@ Well...
 ```lisp
 (use-package :typed-dispatch)
 (define-typed-function my= (a b))
-(defun-typed my= ((a string) (b string))
+(defun-typed my= ((a string) (b string)) boolean
   (string= a b))
-(defun-typed my= ((a character) (b character))
+(defun-typed my= ((a character) (b character)) boolean
   (char= a b))
 (defun-typed my= ((a (simple-array single-float))
-                  (b (simple-array single-float)))
+                  (b (simple-array single-float))) symbol
   ;; possible here; not possible with cl:defmethod without some MOP-fu
   ;; do something
   'hello)
@@ -119,7 +119,7 @@ CL-USER> (use-package :typed-dispatch)
 T
 CL-USER> (define-typed-function my= (a b))
 MY=
-CL-USER> (defun-typed my= ((a string) (b string))
+CL-USER> (defun-typed my= ((a string) (b string)) boolean  
            (string= a b))
 MY=
 CL-USER> (defun foo (a b)
@@ -158,7 +158,7 @@ CL-USER> (defun foo (a b)
 ;     (STRING STRING)
 WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
 FOO
-CL-USER> (defun-typed my= ((a integer) (b integer))
+CL-USER> (defun-typed my= ((a integer) (b integer)) boolean
            (= a b))
 MY=
 CL-USER> (defun foo (a b)
@@ -180,7 +180,7 @@ CL-USER> (defun foo (a b)
 Inside compiler macro ((LAMBDA (A B)
                          (DECLARE (TYPE INTEGER B)
                                   (TYPE INTEGER A))
-                         (= A B))
+                         (THE BOOLEAN (= A B)))
                        A B)
 WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
 FOO
@@ -195,14 +195,14 @@ Note that while the compiler macro of the typed function checks the types during
 ```lisp
 CL-USER> (define-typed-function bar (a &optional b))
 BAR
-CL-USER> (defun-typed bar ((a string) &optional (b integer)) 
+CL-USER> (defun-typed bar ((a string) &optional (b integer)) list
            (list a b))
 ; Evaluation aborted on #<TYPE-ERROR expected-type: (SATISFIES TYPED-DISPATCH::TYPED-LAMBDA-LIST-P)
              datum: ((A STRING) &OPTIONAL (B INTEGER))>.
-CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5))
+CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5)) list
            (list a b))
 BAR
-CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5 bp))
+CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5 bp)) list
            (declare (ignore bp))
            (list a b))
 BAR

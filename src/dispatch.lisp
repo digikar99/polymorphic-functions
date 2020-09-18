@@ -212,7 +212,7 @@
                form))))))
 
 
-(defmacro defun-typed (name typed-lambda-list &body body)
+(defmacro defun-typed (name typed-lambda-list return-type &body body)
   "  Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
@@ -249,7 +249,8 @@
                                                         (member type lambda-list-keywords))
                                               (setq param-list (rest param-list))))
                                   type-declarations))
-                             ,@body)))
+                             ,@(butlast body)
+                             (the ,return-type ,@(last body)))))
         ;; TODO: We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files. TODO: Is that an issue after 2.0.8+ as well?
         `(eval-when (:compile-toplevel :load-toplevel :execute)
            (register-typed-function ',name ',type-list

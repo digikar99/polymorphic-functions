@@ -13,9 +13,9 @@
 
 (progn
   (define-typed-function my= (a b))
-  (defun-typed my= ((a string) (b string))
+  (defun-typed my= ((a string) (b string)) boolean
     (string= a b))
-  (defun-typed my= ((a number) (b number))
+  (defun-typed my= ((a number) (b number)) boolean
     (= a b))
   (define-compiler-macro-typed my= (number number) (&whole form a b)
     (declare (ignore b))
@@ -41,7 +41,7 @@
 
 (progn ; This requires SBCL version > 2.0.8: there's a commit after 2.0.8 was released.
   (define-typed-function bar (a &optional b c))
-  (defun-typed bar ((str string) &optional ((b integer) 5) ((c integer) 7))
+  (defun-typed bar ((str string) &optional ((b integer) 5) ((c integer) 7)) t
     (list str b c))
   (define-compiler-macro-typed bar (string &optional integer integer) (&whole form &rest args)
     (declare (ignore args))
@@ -63,7 +63,7 @@
 (let ((a "hello")
       (b 5))
   (define-typed-function baz (c &optional d))
-  (defun-typed baz ((c string) &optional ((d integer) b))
+  (defun-typed baz ((c string) &optional ((d integer) b)) t
     (declare (ignore c))
     (list a d)))
 
@@ -84,10 +84,10 @@
 
 (progn
   (define-typed-function foo (a &optional b))
-  (defun-typed foo ((str1 string) &optional ((str2 string) "str2"))
+  (defun-typed foo ((str1 string) &optional ((str2 string) "str2")) t
     (declare (ignore str1 str2))
     'string)
-  (defun-typed foo ((num1 number) &optional ((num2 number) pi))
+  (defun-typed foo ((num1 number) &optional ((num2 number) pi)) t
     (declare (ignore num1 num2))
     'number))
 
@@ -99,13 +99,13 @@
 
 (progn
   (define-typed-function foobar (a &key key b))
-  (defun-typed foobar ((str string) &key ((key number) 5) ((b string) "world"))
+  (defun-typed foobar ((str string) &key ((key number) 5) ((b string) "world")) t
     (declare (ignore str))
     (list 'string key b))
   (define-compiler-macro-typed foobar (number &key :key number :b string) (&whole form &rest args)
     (declare (ignore args))
     `(list ,form))
-  (defun-typed foobar ((num number) &key ((key number) 6) ((b string) "world"))
+  (defun-typed foobar ((num number) &key ((key number) 6) ((b string) "world")) t
     (declare (ignore num))
     (list 'number key b))
   (defun foobar-caller ()
@@ -123,18 +123,18 @@
 
 (progn
   (define-typed-function foz (a))
-  (defun-typed foz ((a number))
+  (defun-typed foz ((a number)) t
     (declare (optimize speed))
     (if (= a 5)
         'number
         (foz "hello")))
-  (defun-typed foz ((a string))
+  (defun-typed foz ((a string)) t
     (declare (optimize speed))
     (if (string= a "hello")
         'string
         (foz 5)))
   ;; Will result in infinite expansion upon redefinition, if compilation is not done correctly
-  (defun-typed foz ((a number))
+  (defun-typed foz ((a number)) t
     (declare (optimize speed))
     (if (= a 5)
         'number
