@@ -121,7 +121,7 @@
                    (loop :for keyword :in '(&optional &key)
                          :if (or (and optional-arg-start-idx (eq keyword '&optional))
                                  (and key-arg-start-idx      (eq keyword '&key)))
-                         :appending
+                           :appending
                          `((push ',keyword type-list)
                            ,@(loop :for (typed-arg default argp) :in typed-args
                                    :appending
@@ -163,7 +163,7 @@
                              (declare (ignore function))
                              (unless body
                                ;; TODO: Here the reason concerning free-variables is hardcoded
-                               (signal "~%~D with TYPE-LIST ~D cannot be inlined due to free-variables" ',name dispatch-type-list))
+                               (signal "~%~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
                              (if-let ((compiler-function (retrieve-typed-function-compiler-macro
                                                           ',name type-list)))
                                (funcall compiler-function
@@ -177,7 +177,7 @@
                          (write-string
                           (str:replace-all (string #\newline)
                                            (uiop:strcat #\newline #\; "   ")
-                                           (format nil "~D" condition)))
+                                           (format nil "~A" condition)))
                          form))
                      (progn
                        (handler-case
@@ -185,16 +185,16 @@
                              (retrieve-typed-function ',name type-list))
                          (condition (condition)
                            (unless (typep condition 'undeclared-type)
-                             (format *error-output* "~%~%; While compiling ~D: " form)
+                             (format *error-output* "~%~%; While compiling ~S: " form)
                              (write-string
                               (str:replace-all (string #\newline)
                                                (uiop:strcat #\newline #\; "   ")
-                                               (format nil "~D" condition))))))
+                                               (format nil "~A" condition))))))
                        form)))
              (progn
                (signal 'optimize-speed-note
                        :form form
-                       :reason "COMPILER-MACRO of ~D can only optimize raw function calls."
+                       :reason "COMPILER-MACRO of ~S can only optimize raw function calls."
                        :args (list ',name))
                form))))))
 
@@ -250,10 +250,10 @@
                                            (str:replace-all
                                             (string #\newline)
                                             (uiop:strcat #\newline #\; "  ")
-                                            (format nil "~D~%" form))
+                                            (format nil "~A~%" form))
                                            *error-output*)
                                           (format *error-output*
-                                                  "because free variables ~D were found"
+                                                  "because free variables ~S were found"
                                                   free-variables)
                                           nil)
                                         lambda-body)

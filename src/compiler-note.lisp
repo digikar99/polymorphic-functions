@@ -12,7 +12,7 @@
   ((form :reader form :initarg :form))
   (:report (lambda (condition stream)
              (format stream
-                     "~%; Unable to optimize call to ~D because:~%;   ~D"
+                     "~%; Unable to optimize call to ~S because:~%;   ~A"
                      (form condition)
                      (apply #'format nil
                             (reason condition)
@@ -21,7 +21,7 @@
 (define-condition undeclared-type (compiler-note)
   ((var :initarg :var :reader var))
   (:report (lambda (condition stream)
-             (format stream "~%Type of ~D is not declared" (var condition)))))
+             (format stream "~%Type of ~S is not declared" (var condition)))))
 
 
 

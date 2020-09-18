@@ -146,10 +146,10 @@
       (1 (with-slots (body function)
              (gethash (first applicable-function-type-lists) typed-function-wrapper-hash-table)
            (values body function (first applicable-function-type-lists))))
-      (0 (error "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~D~^~%   ~}"
+      (0 (error "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
                 supplied-type-list
                 type-lists))
-      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for TYPE-LIST ~D:~%~{~D~^    ~%~}"
+      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for TYPE-LIST ~S:~%~{~S~^    ~%~}"
                 supplied-type-list
                 applicable-function-type-lists)))))
 
@@ -180,10 +180,10 @@
       (1 (typed-function-compiler-macro
           (gethash (first applicable-function-type-lists)
                    typed-function-wrapper-hash-table)))
-      (0 (error "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~D~^~%   ~}"
+      (0 (error "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
                 supplied-type-list
                 type-lists))
-      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for TYPE-LIST ~D:~%~{~D~^    ~%~}"
+      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for TYPE-LIST ~S:~%~{~S~^    ~%~}"
                 supplied-type-list
                 applicable-function-type-lists)))))
 

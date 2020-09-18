@@ -124,3 +124,15 @@
   (is (equalp '((number 10 "world")) (foobar-caller)))
   (is (equalp '(number 6 "bye")      (foobar 5.6 :b "bye")))
   (is (equalp '(number 4.4 "bye")    (foobar 5.6 :b "bye" :key 4.4))))
+
+(progn
+  (define-typed-function foz (a &rest args &key key b))
+  (defun-typed foz ((str string) &rest args &key ((key number) 5) ((b string) "world"))
+    (declare (ignore str))
+    (list 'string key b args))
+  ;; (define-compiler-macro-typed foz (number &key :key number :b string) (&whole form &rest args)
+  ;;   (declare (ignore args))
+  ;;   `(list ,form))
+  (defun-typed foz ((num number) &rest args &key ((key number) 5) ((b string) "world"))
+    (declare (ignore str))
+    (list 'number key b args)))

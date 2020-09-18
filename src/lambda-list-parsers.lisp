@@ -8,7 +8,7 @@
   ()
   (:report (lambda (condition stream)
              (format stream
-                     "Expected LAMBDA-LIST ~D to be an ~D; but ~D returned NIL as the first value"
+                     "Expected LAMBDA-LIST ~S to be an ~S; but ~S returned NIL as the first value"
                      (lambda-list condition)
                      'UNTYPED-LAMBDA-LIST
                      'UNTYPED-LAMBDA-LIST-P))))
@@ -17,7 +17,7 @@
   ()
   (:report (lambda (condition stream)
              (format stream
-                     "Expected LAMBDA-LIST ~D to be a ~D; but ~D returned NIL as the first value"
+                     "Expected LAMBDA-LIST ~S to be a ~S; but ~S returned NIL as the first value"
                      (lambda-list condition)
                      'TYPED-LAMBDA-LIST
                      'TYPED-LAMBDA-LIST-P))))
