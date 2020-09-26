@@ -57,7 +57,6 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                    "~&;  ~A")))
                (str:join (uiop:strcat #\newline ";  ")
                          (str:split #\newline (format nil "~A" condition))))
-       (signal condition)
        ,form)))
 
 (defmacro define-typed-function (name untyped-lambda-list)
@@ -93,7 +92,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                              (unless body
                                ;; TODO: Here the reason concerning free-variables is hardcoded
                                (signal "~%~S with ARG-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
-                             (if-let ((compiler-function (retrieve-typed-function-compiler-macro
+                             (if-let ((compiler-function (apply
+                                                          'retrieve-typed-function-compiler-macro
                                                           ',name arg-list)))
                                (funcall compiler-function
                                         (cons body (rest form))

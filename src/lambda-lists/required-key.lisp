@@ -182,11 +182,13 @@
                 (setf applicable-p nil))
               ;; TYPE-LIST must contain at least one additional element
               ;; &key than ARG-LIST
-              (setf applicable-p (and (rest type-list)
+              (setf applicable-p (and applicable-p
+                                      (rest type-list)
                                       arg-list)
                     type-list    (rest type-list)
                     arg-list     (rest arg-list)))
-    (when (eq '&key (first type-list))
+    (when (and applicable-p
+               (eq '&key (first type-list)))
       (setf type-list (rest type-list))
       (loop :for key  := (first arg-list)
             :for value := (second arg-list)
@@ -194,7 +196,7 @@
             :while (and applicable-p
                         value
                         type) ; (typep nil nil) returns NIL
-            :do (unless (our-typep arg type)
+            :do (unless (our-typep value type)
                   (setf applicable-p nil))
                 (setf arg-list (cddr arg-list))))
     (and (not arg-list) applicable-p)))
@@ -206,6 +208,9 @@
   (5am:is-true  (type-list-applicable-p 'required-key
                                         '("hello" :b 5)
                                         '(string &key :b number)))
+  (5am:is-false (type-list-applicable-p 'required-key
+                                        '("hello" :b 5)
+                                        '(number &key :b number)))
   (5am:is-false (type-list-applicable-p 'required-key
                                         '("hello" :c 4 :b 5)
                                         '(string &key :b number)))

@@ -1,10 +1,6 @@
-(defpackage :typed-dispatch/tests
-  (:use :cl :fiveam :typed-dispatch))
+(in-package :typed-dispatch)
 
-(in-package :typed-dispatch/tests)
-
-(def-suite :typed-dispatch)
-(in-suite :typed-dispatch)
+(5am:in-suite :typed-dispatch)
 
 (progn
   (define-typed-function my= (a b))
@@ -30,8 +26,7 @@
     (is (eq t   (my= obj1 obj3)))
     (is (eq nil (my= obj1 obj2)))
     (is (eq t   (my= obj4 obj5)))
-    (is (typep (catch-condition (my= obj1 obj4))
-               'error))
+    (is-error (my= obj1 obj4))
     (is (eq 'zero (my=-caller)))))
 
 (progn ; This requires SBCL version > 2.0.8: there's a commit after 2.0.8 was released.

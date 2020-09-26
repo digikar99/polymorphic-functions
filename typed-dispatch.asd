@@ -19,11 +19,8 @@
                              (:file "required")
                              (:file "required-optional")
                              (:file "required-key")))
-               (:file "dispatch" :depends-on ("typed-function"
-                                              "lambda-lists"))))
-
-(asdf:defsystem "typed-dispatch/tests"
-  :depends-on ("typed-dispatch"
-               "fiveam")
-  :pathname #P"tests/"
-  :components ((:file "package")))
+               (:file "dispatch"            :depends-on ("typed-function"
+                                                         "lambda-lists"))
+               (:file "misc-tests"          :depends-on ("dispatch")))
+  :perform (test-op (o c)
+                    (eval (read-from-string "(FIVEAM:RUN :TYPED-DISPATCH)"))))

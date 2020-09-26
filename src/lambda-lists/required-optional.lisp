@@ -176,11 +176,13 @@
                 (setf applicable-p nil))
               ;; TYPE-LIST must contain at least one additional element
               ;; &optional than ARG-LIST
-              (setf applicable-p (and (rest type-list)
+              (setf applicable-p (and applicable-p
+                                      (rest type-list)
                                       arg-list)
                     type-list    (rest type-list)
                     arg-list     (rest arg-list)))
-    (when (eq '&optional (first type-list))
+    (when (and applicable-p
+               (eq '&optional (first type-list)))
       (setf type-list (rest type-list))
       (loop :for arg := (first arg-list)
             :for type :in type-list
@@ -199,6 +201,9 @@
   (5am:is-true  (type-list-applicable-p 'required-optional
                                         '("hello" 5)
                                         '(string &optional number)))
+  (5am:is-false (type-list-applicable-p 'required-optional
+                                        '("hello" 5)
+                                        '(number &optional number)))
   (5am:is-true  (type-list-applicable-p 'required-optional
                                         '("hello")
                                         '(string &optional number)))
