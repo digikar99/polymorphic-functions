@@ -6,11 +6,6 @@
 (def-suite :typed-dispatch)
 (in-suite :typed-dispatch)
 
-(defmacro catch-condition (&body body)
-  `(handler-case (progn
-                   ,@body)
-     (condition (condition) condition)))
-
 (progn
   (define-typed-function my= (a b))
   (defun-typed my= ((a string) (b string)) boolean

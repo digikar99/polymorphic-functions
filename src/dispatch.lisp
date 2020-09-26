@@ -88,128 +88,77 @@
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
-  (let* ((lambda-list             untyped-lambda-list)
-         (processed-lambda-list   (process-untyped-lambda-list untyped-lambda-list))
-         (typed-args              (remove-untyped-args processed-lambda-list :typed nil))
-         (num-required-args       0)
-         (optional-arg-start-idx (position '&optional lambda-list))
-         (key-arg-start-idx       (position '&key lambda-list))
-         ;; TODO: Handle the case of parsed-args better
-         ;; (parsed-args (parse-lambda-list   lambda-list :typed nil))
-         )
+  (let ((*name* name))
+    (multiple-value-bind (body-form lambda-list) (process-for-call untyped-lambda-list)
+      `(eval-when (:compile-toplevel :load-toplevel :execute)
+         (register-typed-function-wrapper ',name ',untyped-lambda-list)
+         (defun ,name ,lambda-list
+           ,body-form)
 
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       ;; Take this out of progn?
-       ;; > Perhaps, keep it inside; helps macroexpanders know better what the macro is doing
-       (register-typed-function-wrapper ',name ',lambda-list)
-       
-       (defun ,name ,processed-lambda-list
-         (declare (ignorable ,@(loop :for arg :in processed-lambda-list
-                                     :unless (member arg lambda-list-keywords)
-                                       :appending (etypecase arg
-                                                    (symbol (list arg))
-                                                    (list (list (first arg) (third arg)))))))
-         ,(let ((typed-args     typed-args)
-                (type-list-code nil)
-                (arg-list-code  nil)
-                (arg-idx        0))
-            (loop :for typed-arg := (first typed-args) ; handling required args
-                  :while (and typed-arg (symbolp typed-arg))
-                  :do (push `(type-of ,typed-arg) type-list-code)
-                      (push typed-arg arg-list-code)
-                      (setq typed-args (rest typed-args))
-                      (incf num-required-args)
-                      (incf arg-idx))
-            `(let ((type-list (list ,@type-list-code))
-                   (arg-list  (list ,@arg-list-code)))
-               ;; handling &optional and &key args
-               ,@(when (and typed-args (listp (first typed-args)))
-                   ;; some typed-args are still pending
-                   ;; - these should be the &optional ones
-                   (loop :for keyword :in '(&optional &key)
-                         :if (or (and optional-arg-start-idx (eq keyword '&optional))
-                                 (and key-arg-start-idx      (eq keyword '&key)))
-                           :appending
-                         `((push ',keyword type-list)
-                           ,@(loop :for (typed-arg default argp) :in typed-args
-                                   :appending
-                                   `(,(when (eq '&key keyword)
-                                        `(when ,argp
-                                           ,@(let ((key-arg (intern (symbol-name typed-arg)
-                                                                    :keyword)))
-                                               `((push ,key-arg type-list)
-                                                 (push ,key-arg arg-list)))))
-                                     (when ,argp
-                                       (push (type-of ,typed-arg) type-list)
-                                       (push ,typed-arg arg-list)))))))
-               (nreversef type-list)
-               (nreversef arg-list)
-               (apply (nth-value 1 (retrieve-typed-function ',name type-list))
-                      arg-list))))
-       
-       (define-compiler-macro ,name (&whole form &rest args &environment env)
-         (declare (ignorable args))
-         (if (eq (car form) ',name)
-             ,(let ((type-list-code `(get-type-list ,(if key-arg-start-idx
-                                                         `(cdr form)
-                                                         `(subseq (cdr form)
-                                                                  0
-                                                                  (min (length (cdr form))
-                                                                       (length ',typed-args))))
-                                                    env
-                                                    :optional-arg-start-idx
-                                                    ,optional-arg-start-idx
-                                                    :key-arg-start-idx
-                                                    ,key-arg-start-idx)))
-                ;; The call to GET-TYPE-LIST needs to be surrounded by HANDLER-CASE
-                ;; to report any failures that arise
-                `(if (< 1 (policy-quality 'speed env)) ; optimize for speed
-                     (handler-case
-                         (let ((type-list ,type-list-code))
-                           (multiple-value-bind (body function dispatch-type-list)
-                               (retrieve-typed-function ',name type-list)
-                             (declare (ignore function))
-                             (unless body
-                               ;; TODO: Here the reason concerning free-variables is hardcoded
-                               (signal "~%~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
-                             (if-let ((compiler-function (retrieve-typed-function-compiler-macro
-                                                          ',name type-list)))
-                               (funcall compiler-function
-                                        (cons body (rest form))
-                                        env)
-                               ;; TODO: Use some other declaration for inlining as well
-                               ;; Optimized for speed and type information available
-                               (if (recursive-function-p ',name body)
-                                   (signal "~%Inlining ~S results in (potentially infinite) recursive expansion"
-                                           form)
-                                   `(,body ,@(cdr form))))))
-                       (condition (condition)
-                         (format *error-output* "~%; Unable to optimize ~S because:" form)
-                         (write-string
-                          (str:replace-all (string #\newline)
-                                           (uiop:strcat #\newline #\; "   ")
-                                           (format nil "~A" condition)))
-                         (terpri *error-output*)
-                         form))
-                     (progn
-                       (handler-case
-                           (let ((type-list ,type-list-code))
-                             (retrieve-typed-function ',name type-list))
-                         (condition (condition)
-                           (unless (typep condition 'undeclared-type)
-                             (format *error-output* "~%; While compiling ~S: " form)
-                             (write-string
-                              (str:replace-all (string #\newline)
-                                               (uiop:strcat #\newline #\; "   ")
-                                               (format nil "~A" condition)))
-                             (terpri *error-output*))))
-                       form)))
-             (progn
-               (signal 'optimize-speed-note
-                       :form form
-                       :reason "COMPILER-MACRO of ~S can only optimize raw function calls."
-                       :args (list ',name))
-               form))))))
+         ;; (define-compiler-macro ,name (&whole form &rest args &environment env)
+         ;;   (declare (ignorable args))
+         ;;   (if (eq (car form) ',name)
+         ;;       ,(let ((type-list-code `(get-type-list ,(if key-arg-start-idx
+         ;;                                                   `(cdr form)
+         ;;                                                   `(subseq (cdr form)
+         ;;                                                            0
+         ;;                                                            (min (length (cdr form))
+         ;;                                                                 (length ',typed-args))))
+         ;;                                              env
+         ;;                                              :optional-arg-start-idx
+         ;;                                              ,optional-arg-start-idx
+         ;;                                              :key-arg-start-idx
+         ;;                                              ,key-arg-start-idx)))
+         ;;          ;; The call to GET-TYPE-LIST needs to be surrounded by HANDLER-CASE
+         ;;          ;; to report any failures that arise
+         ;;          `(if (< 1 (policy-quality 'speed env)) ; optimize for speed
+         ;;               (handler-case
+         ;;                   (let ((type-list ,type-list-code))
+         ;;                     (multiple-value-bind (body function dispatch-type-list)
+         ;;                         (retrieve-typed-function ',name type-list)
+         ;;                       (declare (ignore function))
+         ;;                       (unless body
+         ;;                         ;; TODO: Here the reason concerning free-variables is hardcoded
+         ;;                         (signal "~%~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
+         ;;                       (if-let ((compiler-function (retrieve-typed-function-compiler-macro
+         ;;                                                    ',name type-list)))
+         ;;                         (funcall compiler-function
+         ;;                                  (cons body (rest form))
+         ;;                                  env)
+         ;;                         ;; TODO: Use some other declaration for inlining as well
+         ;;                         ;; Optimized for speed and type information available
+         ;;                         (if (recursive-function-p ',name body)
+         ;;                             (signal "~%Inlining ~S results in (potentially infinite) recursive expansion"
+         ;;                                     form)
+         ;;                             `(,body ,@(cdr form))))))
+         ;;                 (condition (condition)
+         ;;                   (format *error-output* "~%; Unable to optimize ~S because:" form)
+         ;;                   (write-string
+         ;;                    (str:replace-all (string #\newline)
+         ;;                                     (uiop:strcat #\newline #\; "   ")
+         ;;                                     (format nil "~A" condition)))
+         ;;                   (terpri *error-output*)
+         ;;                   form))
+         ;;               (progn
+         ;;                 (handler-case
+         ;;                     (let ((type-list ,type-list-code))
+         ;;                       (retrieve-typed-function ',name type-list))
+         ;;                   (condition (condition)
+         ;;                     (unless (typep condition 'undeclared-type)
+         ;;                       (format *error-output* "~%; While compiling ~S: " form)
+         ;;                       (write-string
+         ;;                        (str:replace-all (string #\newline)
+         ;;                                         (uiop:strcat #\newline #\; "   ")
+         ;;                                         (format nil "~A" condition)))
+         ;;                       (terpri *error-output*))))
+         ;;                 form)))
+         ;;       (progn
+         ;;         (signal 'optimize-speed-note
+         ;;                 :form form
+         ;;                 :reason "COMPILER-MACRO of ~S can only optimize raw function calls."
+         ;;                 :args (list ',name))
+         ;;         form)))
+         ))))
 
 
 (defmacro defun-typed (name typed-lambda-list return-type &body body)

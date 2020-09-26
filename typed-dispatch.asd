@@ -7,6 +7,7 @@
                "introspect-environment"
                "trivial-types"
                "hu.dwim.walker"
+               "fiveam" ;; just keep things together!
                "str")
   :pathname #P"src/"
   :components ((:file "package")
