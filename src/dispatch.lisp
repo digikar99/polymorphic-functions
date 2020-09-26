@@ -89,7 +89,7 @@
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
   (let ((*name* name))
-    (multiple-value-bind (body-form lambda-list) (process-for-call untyped-lambda-list)
+    (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
          (register-typed-function-wrapper ',name ',untyped-lambda-list)
          (defun ,name ,lambda-list
