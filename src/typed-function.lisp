@@ -49,6 +49,7 @@
   ;; TODO: Check if a symbol / list denotes a type
   (name (error "NAME must be supplied.") :type function-name)
   (lambda-list (error "LAMBDA-LIST must be supplied.") :type list)
+  (type-lists nil :type list)
   (hash-table (make-hash-table :test 'equalp) :type hash-table))
 
 (defun register-typed-function-wrapper (name lambda-list)
@@ -65,7 +66,11 @@
   (declare (type function-name name)
            (type function  function)
            (type type-list type-list))
-  (let ((table (typed-function-wrapper-hash-table (gethash name *typed-function-table*))))
+  (let* ((typed-function-wrapper (gethash name *typed-function-table*))
+         (table                  (typed-function-wrapper-hash-table typed-function-wrapper)))
+    (with-slots (type-lists) typed-function-wrapper
+      (unless (member type-list type-lists :test 'equalp)
+        (setf type-lists (cons type-list type-lists))))
     (multiple-value-bind (typed-function exists)
         (gethash type-list table)
       (if exists
@@ -134,16 +139,15 @@
   the second is the function itself,
   the third is the type list corresponding to the typed function that will be used for dispatch"
   (declare (type function-name name))
-  (let* ((typed-function-wrapper-hash-table (typed-function-wrapper-hash-table
-                                             (gethash name
-                                                      *typed-function-table*)))
-         (type-lists                (hash-table-keys typed-function-wrapper-hash-table))
-         (supplied-arg-list        arg-list)
+  (let* ((typed-function-wrapper (gethash name *typed-function-table*))
+         (wrapper-hash-table     (typed-function-wrapper-hash-table typed-function-wrapper))
+         (type-lists             (typed-function-wrapper-type-lists typed-function-wrapper))
+         (supplied-arg-list      arg-list)
          (applicable-function-type-lists
            (compute-applicable-function-type-lists supplied-arg-list type-lists)))
     (case (length applicable-function-type-lists)
       (1 (with-slots (body function)
-             (gethash (first applicable-function-type-lists) typed-function-wrapper-hash-table)
+             (gethash (first applicable-function-type-lists) wrapper-hash-table)
            (values body function (first applicable-function-type-lists))))
       (0 (error "~%No applicable TYPED-FUNCTION discovered for ARG-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
                 supplied-arg-list
