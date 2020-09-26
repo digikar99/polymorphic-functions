@@ -5,7 +5,9 @@
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
                "introspect-environment"
-               "trivial-types"
+               "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
+               "trivial-package-local-nicknames"
+               "compiler-macro" ; https://github.com/Bike/compiler-macro
                "hu.dwim.walker"
                "fiveam" ;; just keep things together!
                "str")
@@ -17,10 +19,8 @@
                              (:file "required")
                              (:file "required-optional")
                              (:file "required-key")))
-               (:file "compiler-note"       :depends-on ("package"))
                (:file "dispatch" :depends-on ("typed-function"
-                                              "lambda-lists"
-                                              "compiler-note"))))
+                                              "lambda-lists"))))
 
 (asdf:defsystem "typed-dispatch/tests"
   :depends-on ("typed-dispatch"

@@ -1,54 +1,5 @@
 (in-package typed-dispatch)
 
-(defun get-type-list (arg-list env &key optional-arg-start-idx key-arg-start-idx)
-  ;; TODO: Improve this
-  (flet ((type-declared-p (var)
-           (cdr (assoc 'type (nth-value 2 (variable-information var env))))))
-    (let* ((undeclared-args     ())
-           (type-list           ())
-           (idx                 0)
-           (processing-key-args nil)
-           ;; ARGP to be used in conjunction with PROCESSING-KEY-ARGS
-           (argp                t))
-      (flet ((type (arg)
-               (incf idx)
-               (cond ((symbolp arg)
-                      (unless (type-declared-p arg)
-                        (push arg undeclared-args))
-                      (variable-type arg env))
-                     ((constantp arg) (type-of arg))
-                     ((and (listp arg)
-                           (eq 'the (first arg)))
-                      (second arg))
-                     (t (signal 'compiler-note "Cannot optimize this case!")))))
-        (loop :for arg :in arg-list
-              :do (when (and optional-arg-start-idx (= idx optional-arg-start-idx))
-                    (push '&optional type-list))
-                  (when (and key-arg-start-idx
-                             (= idx key-arg-start-idx)
-                             (not processing-key-args))
-                    (push '&key type-list)
-                    (setq processing-key-args t))
-                  (if processing-key-args
-                      (progn
-                        (if argp
-                            (push arg type-list)
-                            (push (type arg) type-list))
-                        (setq argp (not argp)))
-                      (push (type arg) type-list))))
-      (when (and optional-arg-start-idx (= idx optional-arg-start-idx))
-        (push '&optional type-list))
-      (when (and key-arg-start-idx
-                 (= idx key-arg-start-idx)
-                 (not processing-key-args))
-        (push '&key type-list))
-      (nreversef type-list)
-      (if undeclared-args
-          (mapcar (lambda (arg)
-                    (signal 'undeclared-type :var arg))
-                  (nreverse undeclared-args))
-          type-list))))
-
 ;; As per the discussion at https://github.com/Bike/introspect-environment/issues/4
 ;; the FREE-VARIABLES-P cannot be substituted by a simple CLOSUREP (sb-kernel:closurep)
 ;; TODO: Find the limitations of HU.DWIM.WALKER (one known is MACROLET)
@@ -83,6 +34,32 @@
 ;;;   - GET-TYPE-LIST
 ;;;   - DEFINE-COMPILER-MACRO-TYPED
 
+(defvar *compiler-macro-expanding-p* nil
+  "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-TYPED-FUNCTION")
+(defvar *environment*)
+(setf (documentation '*environment* 'variable)
+      "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-TYPED-FUNCTION for 
+use by functions like TYPE-LIST-APPLICABLE-P")
+
+(defmacro with-compiler-note (form &body body)
+  `(handler-case (progn ,@body)
+     (condition (condition)
+       (format *error-output*
+               (cond ((< 1 (policy-quality 'speed env))
+                      (uiop:strcat "~&; "
+                                   (format nil "Unable to optimize ~S because:" ,form)
+                                   "~&;  ~A"))
+                     ((eq 'apply (car form))
+                      "~&; ~A")
+                     (t
+                      (uiop:strcat "~%; "
+                                   (format nil "While compiling ~S:" form)
+                                   "~&;  ~A")))
+               (str:join (uiop:strcat #\newline ";  ")
+                         (str:split #\newline (format nil "~A" condition))))
+       (signal condition)
+       ,form)))
+
 (defmacro define-typed-function (name untyped-lambda-list)
   "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
   (declare (type function-name       name)
@@ -90,75 +67,45 @@
   ;; TODO: Handle the case of redefinition
   (let ((*name* name))
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
-      `(eval-when (:compile-toplevel :load-toplevel :execute)
-         (register-typed-function-wrapper ',name ',untyped-lambda-list)
+      `(progn
+         (eval-when (:compile-toplevel :load-toplevel :execute)
+           (register-typed-function-wrapper ',name ',untyped-lambda-list))
          (defun ,name ,lambda-list
            ,body-form)
 
-         ;; (define-compiler-macro ,name (&whole form &rest args &environment env)
-         ;;   (declare (ignorable args))
-         ;;   (if (eq (car form) ',name)
-         ;;       ,(let ((type-list-code `(get-type-list ,(if key-arg-start-idx
-         ;;                                                   `(cdr form)
-         ;;                                                   `(subseq (cdr form)
-         ;;                                                            0
-         ;;                                                            (min (length (cdr form))
-         ;;                                                                 (length ',typed-args))))
-         ;;                                              env
-         ;;                                              :optional-arg-start-idx
-         ;;                                              ,optional-arg-start-idx
-         ;;                                              :key-arg-start-idx
-         ;;                                              ,key-arg-start-idx)))
-         ;;          ;; The call to GET-TYPE-LIST needs to be surrounded by HANDLER-CASE
-         ;;          ;; to report any failures that arise
-         ;;          `(if (< 1 (policy-quality 'speed env)) ; optimize for speed
-         ;;               (handler-case
-         ;;                   (let ((type-list ,type-list-code))
-         ;;                     (multiple-value-bind (body function dispatch-type-list)
-         ;;                         (retrieve-typed-function ',name type-list)
-         ;;                       (declare (ignore function))
-         ;;                       (unless body
-         ;;                         ;; TODO: Here the reason concerning free-variables is hardcoded
-         ;;                         (signal "~%~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
-         ;;                       (if-let ((compiler-function (retrieve-typed-function-compiler-macro
-         ;;                                                    ',name type-list)))
-         ;;                         (funcall compiler-function
-         ;;                                  (cons body (rest form))
-         ;;                                  env)
-         ;;                         ;; TODO: Use some other declaration for inlining as well
-         ;;                         ;; Optimized for speed and type information available
-         ;;                         (if (recursive-function-p ',name body)
-         ;;                             (signal "~%Inlining ~S results in (potentially infinite) recursive expansion"
-         ;;                                     form)
-         ;;                             `(,body ,@(cdr form))))))
-         ;;                 (condition (condition)
-         ;;                   (format *error-output* "~%; Unable to optimize ~S because:" form)
-         ;;                   (write-string
-         ;;                    (str:replace-all (string #\newline)
-         ;;                                     (uiop:strcat #\newline #\; "   ")
-         ;;                                     (format nil "~A" condition)))
-         ;;                   (terpri *error-output*)
-         ;;                   form))
-         ;;               (progn
-         ;;                 (handler-case
-         ;;                     (let ((type-list ,type-list-code))
-         ;;                       (retrieve-typed-function ',name type-list))
-         ;;                   (condition (condition)
-         ;;                     (unless (typep condition 'undeclared-type)
-         ;;                       (format *error-output* "~%; While compiling ~S: " form)
-         ;;                       (write-string
-         ;;                        (str:replace-all (string #\newline)
-         ;;                                         (uiop:strcat #\newline #\; "   ")
-         ;;                                         (format nil "~A" condition)))
-         ;;                       (terpri *error-output*))))
-         ;;                 form)))
-         ;;       (progn
-         ;;         (signal 'optimize-speed-note
-         ;;                 :form form
-         ;;                 :reason "COMPILER-MACRO of ~S can only optimize raw function calls."
-         ;;                 :args (list ',name))
-         ;;         form)))
-         ))))
+         (define-compiler-macro ,name (&whole form &rest args &environment env)
+           (declare (ignore args))
+           (let ((*environment*                 env)
+                 (*compiler-macro-expanding-p*    t)
+                 (original-form                form))
+             (with-compiler-note original-form
+               (when (eq 'funcall (car form))
+                 (setf form (cons (second (cadr form))
+                                  (cddr form))))
+               (if (eq ',name (car form))
+                   (let ((arg-list (rest form)))
+                     (multiple-value-bind (body function dispatch-type-list)
+                         (apply 'retrieve-typed-function ',name arg-list)
+                       (declare (ignore function))
+                       (if (< 1 (policy-quality 'speed env))
+                           (progn
+                             
+                             (unless body
+                               ;; TODO: Here the reason concerning free-variables is hardcoded
+                               (signal "~%~S with ARG-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
+                             (if-let ((compiler-function (retrieve-typed-function-compiler-macro
+                                                          ',name arg-list)))
+                               (funcall compiler-function
+                                        (cons body (rest form))
+                                        env)
+                               ;; TODO: Use some other declaration for inlining as well
+                               ;; Optimized for speed and type information available
+                               (if (recursive-function-p ',name body)
+                                   (signal "~%Inlining ~S results in (potentially infinite) recursive expansion"
+                                           form)
+                                   `(,body ,@(cdr form)))))
+                           original-form)))
+                   (signal "COMPILER-MACRO of ~S can only optimize raw function calls." ',name)))))))))
 
 
 (defmacro defun-typed (name typed-lambda-list return-type &body body)

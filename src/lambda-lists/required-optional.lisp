@@ -172,7 +172,7 @@
           :for arg  := (first arg-list)
           :while applicable-p
           :until (eq type '&optional)
-          :do (unless (typep arg type)
+          :do (unless (our-typep arg type)
                 (setf applicable-p nil))
               ;; TYPE-LIST must contain at least one additional element
               ;; &optional than ARG-LIST
@@ -187,7 +187,7 @@
             :while (and applicable-p
                         arg
                         type) ; (typep nil nil) returns NIL
-            :do (unless (typep arg type)
+            :do (unless (our-typep arg type)
                   (setf applicable-p nil))
                 (setf arg-list (rest arg-list))))
     (and (not arg-list) applicable-p)))

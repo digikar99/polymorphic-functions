@@ -191,3 +191,15 @@ be a TYPED-LAMBDA-LIST"
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
 
 (5am:def-suite type-list-applicable-p :in lambda-list)
+
+(defun our-typep (arg type)
+  (if *compiler-macro-expanding-p*
+      (progn
+        (when (and (symbolp arg) ; type-declared-p
+                   (not (cdr (assoc 'type
+                                    (nth-value 2
+                                               (variable-information arg *environment*))))))
+          (signal "Type of ~S is not declared" arg))
+        (subtypep (cm:form-type arg *environment*) type))
+      (typep arg type)))
+

@@ -7,6 +7,7 @@
            :define-compiler-macro-typed))
 
 (in-package :typed-dispatch)
+(trivial-package-local-nicknames:add-package-local-nickname :cm :sandalphon.compiler-macro)
 
 (5am:def-suite :typed-dispatch)
 

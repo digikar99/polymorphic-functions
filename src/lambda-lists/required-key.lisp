@@ -178,7 +178,7 @@
           :for arg  := (first arg-list)
           :while applicable-p
           :until (eq type '&key)
-          :do (unless (typep arg type)
+          :do (unless (our-typep arg type)
                 (setf applicable-p nil))
               ;; TYPE-LIST must contain at least one additional element
               ;; &key than ARG-LIST
@@ -194,7 +194,7 @@
             :while (and applicable-p
                         value
                         type) ; (typep nil nil) returns NIL
-            :do (unless (typep value type)
+            :do (unless (our-typep arg type)
                   (setf applicable-p nil))
                 (setf arg-list (cddr arg-list))))
     (and (not arg-list) applicable-p)))

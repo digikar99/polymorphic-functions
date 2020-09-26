@@ -120,25 +120,23 @@
                 (make-typed-function :type-list type-list
                                      :compiler-macro function))))))
 
-(defun retrieve-typed-function-compiler-macro (name type-list)
+(defun retrieve-typed-function-compiler-macro (name &rest arg-list)
   ;; TODO: Update this function
-  (declare (type function-name name)
-           (type type-list type-list))
-  (let* ((typed-function-wrapper-hash-table (typed-function-wrapper-hash-table
-                                             (gethash name
-                                                      *typed-function-table*)))
-         (type-lists                (hash-table-keys typed-function-wrapper-hash-table))
-         (supplied-type-list        type-list)
+  (declare (type function-name name))
+  (let* ((function-wrapper       (gethash name *typed-function-table*))
+         (wrapper-hash-table     (typed-function-wrapper-hash-table       function-wrapper))
+         (type-lists             (typed-function-wrapper-type-lists       function-wrapper))
+         (lambda-list-type       (typed-function-wrapper-lambda-list-type function-wrapper))
          (applicable-function-type-lists
-           (compute-applicable-function-type-lists supplied-type-list type-lists)))
+           (remove-if-not (curry 'type-list-applicable-p lambda-list-type arg-list)
+                          type-lists)))
     (case (length applicable-function-type-lists)
       (1 (typed-function-compiler-macro
-          (gethash (first applicable-function-type-lists)
-                   typed-function-wrapper-hash-table)))
-      (0 (error "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
-                supplied-type-list
+          (gethash (first applicable-function-type-lists) wrapper-hash-table)))
+      (0 (error "~%No applicable TYPED-FUNCTION discovered for ARG-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
+                arg-list
                 type-lists))
-      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for TYPE-LIST ~S:~%~{~S~^    ~%~}"
-                supplied-type-list
+      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
+                arg-list
                 applicable-function-type-lists)))))
 
