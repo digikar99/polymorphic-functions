@@ -18,11 +18,11 @@
                              (:file "required-optional")
                              (:file "required-key"))
                            :depends-on ("package"))
-               (:file "lambda-list"         :depends-on ("package"))
-               (:file "lambda-list-parsers" :depends-on ("lambda-list"))
+               ;; (:file "lambda-list"         :depends-on ("package"))
+               ;; (:file "lambda-list-parsers" :depends-on ("lambda-list"))
                (:file "compiler-note"       :depends-on ("package"))
                (:file "dispatch" :depends-on ("typed-function"
-                                              "lambda-list-parsers"
+                                              "lambda-lists"
                                               "compiler-note"))))
 
 (asdf:defsystem "typed-dispatch/tests"

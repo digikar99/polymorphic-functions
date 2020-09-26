@@ -162,42 +162,18 @@
 
 
 (defmacro defun-typed (name typed-lambda-list return-type &body body)
-  "  Expects OPTIONAL args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
+  "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
-  (let* ((lambda-list                 typed-lambda-list)
-         (processed-lambda-list       (process-typed-lambda-list lambda-list))
-         ;; no declaraionts in FREE-VARIABLE-ANALYSIS-FORM
-         (free-variable-analysis-form `(lambda ,processed-lambda-list ,@body))
-         (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
+  (let* ((*name* name))
     (multiple-value-bind (param-list type-list)
-        (remove-untyped-args lambda-list :typed t)
-      (let* ((lambda-body `(lambda ,processed-lambda-list
-                             (declare
-                              ,@(let ((type-declarations   nil)
-                                      (processing-key-args nil)
-                                      ;; To be used in conjunction with processing-key-args.
-                                      ;; Recall that key-args are stored as a PLIST.
-                                      (is-param            nil)) 
-                                  (loop :for type :in type-list
-                                        :with param-list := param-list
-                                        :do ;; (print (list type param-list))
-                                            (cond ((eq type '&optional)) ; pass
-                                                  ((eq type '&key)
-                                                   (setq processing-key-args t))
-                                                  (processing-key-args
-                                                   (when is-param
-                                                     (push `(type ,type ,(first param-list))
-                                                           type-declarations))
-                                                   (setq is-param (not is-param)))
-                                                  (t
-                                                   (push `(type ,type ,(first param-list))
-                                                         type-declarations)))
-                                            (unless (or (and processing-key-args is-param)
-                                                        (member type lambda-list-keywords))
-                                              (setq param-list (rest param-list))))
-                                  type-declarations))
+        (defun-lambda-list typed-lambda-list :typed t)
+      (let (;; no declaraionts in FREE-VARIABLE-ANALYSIS-FORM
+            (free-variable-analysis-form `(lambda ,param-list ,@body))
+            (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
+        (let* ((lambda-body `(lambda ,param-list
+                               ,(lambda-declarations typed-lambda-list :typed t)
                              ,@(butlast body)
                              (the ,return-type ,@(last body)))))
         ;; TODO: We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files. TODO: Is that an issue after 2.0.8+ as well?
@@ -222,7 +198,7 @@
                                           nil)
                                         lambda-body)
                                     ,lambda-body)
-           ',name)))))
+           ',name))))))
 
 (defmacro define-compiler-macro-typed (name type-list compiler-macro-lambda-list
                                        &body body)

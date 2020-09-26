@@ -6,13 +6,27 @@
       (ecase state
         (:required (cond ((eq elt '&optional)
                           (setf state '&optional))
-                         ((and (symbolp elt)
-                               (not (member elt lambda-list-keywords)))
+                         ((and *lambda-list-typed-p*   (listp elt)
+                               (valid-parameter-name-p (first  elt))
+                               (type-specifier-p       (second elt)))
+                          t)
+                         ((and (not *lambda-list-typed-p*)
+                               (valid-parameter-name-p elt))
                           t)
                          (t
                           (return-from %lambda-list-type nil))))
-        (&optional (cond ((and (symbolp elt)
-                               (not (member elt lambda-list-keywords)))
+        (&optional (cond ((and *lambda-list-typed-p*   (listp elt)
+                               (let ((elt (first elt)))
+                                 (and (listp elt)                                    
+                                      (valid-parameter-name-p (first  elt))
+                                      (type-specifier-p       (second elt))))
+                               (if (null (third elt))
+                                   t
+                                   (valid-parameter-name-p (third elt)))
+                               (null (fourth elt)))
+                          t)
+                         ((and (not *lambda-list-typed-p*)
+                               (valid-parameter-name-p elt))
                           t)
                          (t
                           (return-from %lambda-list-type nil))))))
@@ -25,40 +39,84 @@
       "(defun foo (a &optional)) does compile")
   (is (eq 'required-optional (lambda-list-type '(a &optional b))))
   (is-error (lambda-list-type '(a &optional 5)))
-  (is-error (lambda-list-type '(a &optional b &rest))))
+  (is-error (lambda-list-type '(a &optional b &rest)))
+  (is (eq 'required-optional
+          (lambda-list-type '((a string) (b number) &optional 
+                              ((c number))) ; say if it actually is a null-type?
+                            :typed t)))
+  (is (eq 'required-optional
+          (lambda-list-type '((a string) (b number) &optional 
+                              ((c number) 5 c))
+                            :typed t)))
+  (is (eq 'required-optional
+          (lambda-list-type '((a string) (b number) &optional 
+                              ((c number) 5 c))
+                            :typed t)))
+  (is (eq 'required-optional
+          (lambda-list-type '((a string) (b number) &optional 
+                              ((c number) b c))
+                            :typed t)))
+  (is-error (lambda-list-type '((a string) (b number) &optional 
+                                ((c number) 5 6))
+                              :typed t))
+  (is-error (lambda-list-type '((a string) (b number) &optional 
+                                ((c number) 5 6 7))
+                              :typed t))
+  (is-error (lambda-list-type '((a string) (b number) &optional 
+                                (c number))
+                              :typed t)))
 
 (defmethod %defun-lambda-list ((type (eql 'required-optional)) (lambda-list list))
   (let ((state       :required)
-        (return-list ()))
+        (param-list ())
+        (type-list  ()))
     (dolist (elt lambda-list)
       (ecase state
         (:required (cond ((eq elt '&optional)
-                          (push '&optional return-list)
+                          (push '&optional param-list)
+                          (push '&optional type-list)
                           (setf state '&optional))
-                         ((and (symbolp elt)
-                               (not (member elt lambda-list-keywords)))
-                          (push elt return-list))
+                         ((not *lambda-list-typed-p*)
+                          (push elt param-list))
+                         (*lambda-list-typed-p*
+                          (push (first  elt) param-list)
+                          (push (second elt)  type-list))
                          (t
                           (return-from %defun-lambda-list nil))))
-        (&optional (cond ((and (symbolp elt)
-                               (not (member elt lambda-list-keywords)))
-                          (push (list elt nil (gensym (symbol-name elt)))
-                                return-list))
-                         (t
-                          (return-from %defun-lambda-list nil))))))
-    (nreverse return-list)))
+        (&optional (cond ((not *lambda-list-typed-p*)
+                     (push (list elt nil (gensym (symbol-name elt)))
+                           param-list))
+                    (*lambda-list-typed-p*
+                     (push (cons (caar elt) (cdr elt))
+                           param-list)
+                     (push (cadar elt) type-list))
+                    (t
+                     (return-from %defun-lambda-list nil))))))
+    (values (nreverse param-list)
+            (nreverse  type-list))))
 
 (def-test defun-lambda-list-optional (:suite defun-lambda-list)
   (is (equalp '(a b &optional)
               (defun-lambda-list '(a b &optional))))
-  (5am:is-true (destructuring-bind (first second third fourth)
-                   (defun-lambda-list '(a &optional c d))
-                 (and (eq first 'a)
-                      (eq second '&optional)
-                      (eq 'c (first third))
-                      (eq 'd (first fourth))))))
+  (is-error (defun-lambda-list '(a b &optional &rest)))
+  (destructuring-bind (first second third fourth)
+      (defun-lambda-list '(a &optional c d))
+    (is (eq first 'a))
+    (is (eq second '&optional))
+    (is (eq 'c (first third)))
+    (is (eq 'd (first fourth))))
+  (destructuring-bind ((first second third fourth) type-list)
+      (multiple-value-list (defun-lambda-list '((a string) (b number) &optional 
+                                                ((c number) 5))
+                             :typed t))
+    (is (eq first 'a))
+    (is (eq second 'b))
+    (is (eq third '&optional))
+    (is (equalp '(c 5) fourth))
+    (is (equalp type-list '(string number &optional number)))))
 
 (defmethod %defun-body ((type (eql 'required-optional)) (defun-lambda-list list))
+  (assert (not *lambda-list-typed-p*))
   (let ((state       :required)
         (return-list ()))
     (loop :for elt := (first defun-lambda-list)
@@ -89,3 +147,19 @@
                             apply-list))
                   defun-lambda-list))))))
 
+(defmethod %lambda-declarations ((type (eql 'required-optional)) (typed-lambda-list list))
+  (assert *lambda-list-typed-p*)
+  (let ((state        :required)
+        (declarations ()))
+    (loop :for elt := (first typed-lambda-list)
+          :until (eq elt '&optional)
+          :do (push `(type ,(second elt) ,(first elt)) declarations)
+              (setf typed-lambda-list (rest typed-lambda-list)))
+    (when (eq '&optional (first typed-lambda-list))
+      (setf state             '&optional
+            typed-lambda-list (rest typed-lambda-list))
+      (loop :for elt := (first (first typed-lambda-list))
+            :while elt
+            :do (push `(type ,(second elt) ,(first elt)) declarations)
+                (setf typed-lambda-list (rest typed-lambda-list))))
+    `(declare ,@(nreverse declarations))))
