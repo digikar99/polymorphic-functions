@@ -87,24 +87,25 @@ CL-USER> (my= 5 "hello")
 
 I know of exactly one: [specialization-store](https://github.com/markcox80/specialization-store). It does a [few more things](https://github.com/markcox80/specialization-store/wiki):
 
-- Dispatch on combinations of &optional and &key, as well as &rest args; `typed-dispatch` only supports required, or required and optional, or required and keyword arguments. I will be inclined to not add support for other things, until I find a complexity-scalable way to support more complex arg lists. (See `alexandria:parse-ordinary-lambda-list` for instance. [sandalphon.lambda-list](https://github.com/Bike/sandalphon.lambda-list) seems to be a nice starting point.)
+- Dispatch on (possibly?) combinations of &optional and &key, as well as &rest args; `typed-dispatch` only supports required, or required and optional, or required and keyword arguments, or required and rest, simply because I felt those were enough. If you need more, raise an issue!
 - Allow for explicitly naming "specialized function"
 - Ability to dispatch on the most "specialized" `specialization`; by contrast, `typed-dispatch` checks that only a single type list is applicable, and signals an error otherwise
 - More tested in some aspects
 - Has its own MOP to aid extensibility
-- `specialization-store` is more than an order of magnitude faster than `typed-dispatch`, without compiler macros; though, both are ridiculously slower than native functions without compiler macros. In the absence of compiler-macros, `specialization-store` is about as fast as python.
+- `specialization-store` is more than an order of magnitude faster than `typed-dispatch`, without compiler macros; though, both are ridiculously slower than native functions without compiler macros. In the absence of compiler-macros, `specialization-store` seems to be about as fast as python.
 
 Honestly, I'd be on the lookout for something based on the CLOS MOP. I spent half an hour on the book; then, gave up, and spent two hours on the first commit of this.
 
 **What does this do differently?**
 
-- Current implementation in <800 lines vs 3400+ for specialization-store, albeit with lesser features
-- I (actually [we](https://github.com/commander-trashdin/cl-overload)) wanted some better compile time reporting; I spent 1.5+ hours on specialization-store, and then gave up
-- I wanted better compile time warnings/suggestions/notes
+- Current implementation in <1300 lines with tests vs 3400+ for specialization-store excluding code for tests, albeit `typed-dispatch` has lesser features. With `typed-dispatch`, we have some 800/1300 LOC devoted to processing lambda lists. There, too, lambda-lists occupy a good 840 LOC.
+- I (actually [we](https://github.com/commander-trashdin/cl-overload)) wanted some compile time dispatch checks; I spent 1.5+ hours on specialization-store, and then gave up
+- Besides simple checks, I wanted some good compile time warnings/suggestions/notes
 
 ## Dependencies outside quicklisp
 
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
+- [compiler-macro](https://github.com/Bike/compiler-macro)
 
 ## Examples
 

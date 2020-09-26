@@ -135,3 +135,26 @@
   (is (eq 'string (foz "hello")))
   (is (eq 'number (foz "world")))
   (is (eq 'string (foz 7))))
+
+(progn
+  (define-typed-function my+ (arg &rest args))
+  (defun-typed my+ ((num number) &rest numbers) number
+    (if numbers
+        (+ num (apply 'my+ numbers))
+        num))
+  (define-compiler-macro-typed my+ (number) (&whole form &rest args)
+    (declare (ignore args))
+    `(list (+ ,@(cdr form))))
+  (defun my+-number-caller ()
+    (declare (optimize speed))
+    (my+ 3 2 8))
+  (defun-typed my+ ((str string) &rest strings) string
+    (apply 'concatenate 'string str strings))
+  (defun-typed my+ ((l list) &rest lists) list
+    (apply 'append l lists)))
+
+(def-test untyped-rest-correctness ()
+  (is (eq 9 (my+ 2 3 4)))
+  (is (string= "helloworld" (my+ "hello" "world")))
+  (is (equalp '(1 2 3) (my+ '(1 2) '(3))))
+  (is (equalp '(13) (my+-number-caller))))

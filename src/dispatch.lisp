@@ -48,7 +48,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                (cond ((< 1 (policy-quality 'speed env))
                       (uiop:strcat "~&; "
                                    (format nil "Unable to optimize ~S because:" ,form)
-                                   "~&;  ~A"))
+                                   "~A"))
                      ((eq 'apply (car form))
                       "~&; ~A")
                      (t

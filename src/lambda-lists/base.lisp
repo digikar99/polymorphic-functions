@@ -1,18 +1,20 @@
 (in-package typed-dispatch)
 
 ;; In this file, our main functions/macros are
-;; DEFINE-LAMBDA-LIST-HELPER
+;; - DEFINE-LAMBDA-LIST-HELPER
 ;; - LAMBDA-LIST-TYPE
 ;; - DEFUN-LAMBDA-LIST
 ;; - DEFUN-BODY
 ;; - LAMBDA-DECLARATIONS
+;; - TYPE-LIST-APPLICABLE-P
 
 ;; THE BASICS ==================================================================
 
 (define-constant +lambda-list-types+
     (list 'required
           'required-optional
-          'required-key)
+          'required-key
+          'required-untyped-rest)
   :test #'equalp)
 
 (defun lambda-list-type-p (object)
@@ -42,6 +44,9 @@
                ((and (car intersection) (null (cdr intersection)) ; length is 1
                      (member '&key intersection))
                 'required-key)
+               ((and (car intersection) (null (cdr intersection)) ; length is 1
+                     (member '&rest intersection))
+                'required-untyped-rest)
                (t
                 (error "Neither of ~A types" +lambda-list-types+))))))
 

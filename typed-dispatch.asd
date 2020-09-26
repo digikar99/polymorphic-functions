@@ -18,7 +18,8 @@
                 :components ((:file "base")
                              (:file "required")
                              (:file "required-optional")
-                             (:file "required-key")))
+                             (:file "required-key")
+                             (:file "required-untyped-rest")))
                (:file "dispatch"            :depends-on ("typed-function"
                                                          "lambda-lists"))
                (:file "misc-tests"          :depends-on ("dispatch")))
