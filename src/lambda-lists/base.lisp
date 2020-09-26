@@ -173,3 +173,21 @@ be a TYPED-LAMBDA-LIST"
   (progn
     (assert (typed-lambda-list-p *lambda-list*))
     (%lambda-declarations *potential-type* *lambda-list*)))
+
+;; TYPE-LIST-APPLICABLE-P ======================================================
+
+(defgeneric type-list-applicable-p (lambda-list-type arg-list type-list))
+
+(defmethod type-list-applicable-p ((type t)
+                                   (arg-list t)
+                                   (typed-lambda-list t))
+  (assert (typep type 'lambda-list-type) nil
+          "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
+          +lambda-list-types+ type)
+  (assert (typep type-list 'type-list) nil
+          "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
+  (assert (typep arg-list 'list) nil
+          "Expected ARG-LIST to be a LIST but is ~a" arg-list)
+  (error "This code shouldn't have reached here; perhaps file a bug report!"))
+
+(5am:def-suite type-list-applicable-p :in lambda-list)

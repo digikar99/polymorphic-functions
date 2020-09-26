@@ -29,3 +29,6 @@
   `(declare ,(mapcar (lambda (elt)
                        `(type ,(second elt) ,(first elt)))
                      typed-lambda-list)))
+
+(defmethod type-list-applicable-p ((type (eql 'required)) (arg-list list) (type-list list))
+  (every 'typep arg-list type-list))

@@ -90,7 +90,9 @@
                     (*lambda-list-typed-p*
                      (push (cons (caar elt) (cdr elt))
                            param-list)
-                     (push (caar  elt) type-list)
+                     (push (intern (symbol-name (caar  elt))
+                                   :keyword)
+                           type-list)
                      (push (cadar elt) type-list))
                     (t
                      (return-from %defun-lambda-list nil))))))
@@ -115,7 +117,7 @@
     (is (eq second 'b))
     (is (eq third '&key))
     (is (equalp '(c 5) fourth))
-    (is (equalp type-list '(string number &key c number)))))
+    (is (equalp type-list '(string number &key :c number)))))
 
 (defmethod %defun-body ((type (eql 'required-key)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
@@ -167,3 +169,46 @@
             :do (push `(type ,(second elt) ,(first elt)) declarations)
                 (setf typed-lambda-list (rest typed-lambda-list))))
     `(declare ,@(nreverse declarations))))
+
+(defmethod type-list-applicable-p ((type (eql 'required-key))
+                                   (arg-list list)
+                                   (type-list list))
+  (let ((applicable-p t))
+    (loop :for type := (first type-list)
+          :for arg  := (first arg-list)
+          :while applicable-p
+          :until (eq type '&key)
+          :do (unless (typep arg type)
+                (setf applicable-p nil))
+              ;; TYPE-LIST must contain at least one additional element
+              ;; &key than ARG-LIST
+              (setf applicable-p (and (rest type-list)
+                                      arg-list)
+                    type-list    (rest type-list)
+                    arg-list     (rest arg-list)))
+    (when (eq '&key (first type-list))
+      (setf type-list (rest type-list))
+      (loop :for key  := (first arg-list)
+            :for value := (second arg-list)
+            :for type := (getf type-list key)
+            :while (and applicable-p
+                        value
+                        type) ; (typep nil nil) returns NIL
+            :do (unless (typep value type)
+                  (setf applicable-p nil))
+                (setf arg-list (cddr arg-list))))
+    (and (not arg-list) applicable-p)))
+
+(def-test type-list-key (:suite type-list-applicable-p)
+  (5am:is-true  (type-list-applicable-p 'required-key
+                                        '("hello")
+                                        '(string &key :b number)))
+  (5am:is-true  (type-list-applicable-p 'required-key
+                                        '("hello" :b 5)
+                                        '(string &key :b number)))
+  (5am:is-false (type-list-applicable-p 'required-key
+                                        '("hello" :c 4 :b 5)
+                                        '(string &key :b number)))
+  (5am:is-true  (type-list-applicable-p 'required-key
+                                        '("hello" :c "world" :b 7)
+                                        '(string &key :b number :c string))))

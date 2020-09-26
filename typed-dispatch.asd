@@ -12,14 +12,11 @@
   :pathname #P"src/"
   :components ((:file "package")
                (:file "typed-function"      :depends-on ("package"))
-               (:module "lambda-lists"
+               (:module "lambda-lists"      :depends-on ("package")
                 :components ((:file "base")
                              (:file "required")
                              (:file "required-optional")
-                             (:file "required-key"))
-                           :depends-on ("package"))
-               ;; (:file "lambda-list"         :depends-on ("package"))
-               ;; (:file "lambda-list-parsers" :depends-on ("lambda-list"))
+                             (:file "required-key")))
                (:file "compiler-note"       :depends-on ("package"))
                (:file "dispatch" :depends-on ("typed-function"
                                               "lambda-lists"
