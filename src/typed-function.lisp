@@ -109,6 +109,13 @@
                     arg-list
                     applicable-function-type-lists)))))))
 
+(defun remove-typed-function (name type-list)
+  (let ((wrapper (retrieve-typed-function-wrapper name)))
+    (when wrapper
+      (remhash type-list
+               (typed-function-wrapper-hash-table wrapper))
+      (removef (typed-function-wrapper-type-lists wrapper) type-list :test 'equalp))))
+
 (define-compiler-macro retrieve-typed-function (&whole form name &rest arg-list
                                                        &environment env)
   (cond ((= 3 (policy-quality 'debug env))

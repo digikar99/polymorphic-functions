@@ -163,5 +163,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                            ',body)))
        ',name)))
 
+(defun fmakunbound-typed (name type-list)
+  "Remove the TYPED-FUNCTION associated with NAME with TYPE-LIST"
+  (remove-typed-function name type-list))
 
-
+(defun delete-typed-function (name)
+  "Remove the TYPED-FUNCTION(-WRAPPER) defined by DEFINE-TYPED-FUNCTION"
+  (remhash name *typed-function-table*)
+  (fmakunbound name))

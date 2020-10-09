@@ -158,3 +158,37 @@
   (is (string= "helloworld" (my+ "hello" "world")))
   (is (equalp '(1 2 3) (my+ '(1 2) '(3))))
   (is (equalp '(13) (my+-number-caller))))
+
+(def-test fmakunbound-typed ()
+  (with-output-to-string (*error-output*)
+    (eval '(progn
+            (define-typed-function fmakunbound-tester (a))
+            (defun-typed fmakunbound-tester ((a list)) symbol
+              (declare (ignore a))
+              'list)
+            (defun-typed fmakunbound-tester ((a string)) symbol
+              (declare (ignore a))
+              'string)))
+    (locally (declare (notinline fmakunbound-tester))
+      (is (equalp 'list   (fmakunbound-tester '(a))))
+      (is (equalp 'string (fmakunbound-tester "hello")))
+      (fmakunbound-typed 'fmakunbound-tester '(list))
+      (is-error (fmakunbound-tester '(a)))
+      (is (equalp 'string (fmakunbound-tester "hello"))))))
+
+(with-output-to-string (*error-output*)
+  (def-test delete-typed-function ()
+    (eval '(progn
+            (define-typed-function delete-typed-function-tester (a))
+            (defun-typed delete-typed-function-tester ((a list)) symbol
+              (declare (ignore a))
+              'list)
+            (defun-typed delete-typed-function-tester ((a string)) symbol
+              (declare (ignore a))
+              'string)))
+    (locally (declare (notinline delete-typed-function-tester))
+      (is (equalp 'list   (delete-typed-function-tester '(a))))
+      (is (equalp 'string (delete-typed-function-tester "hello")))
+      (delete-typed-function 'delete-typed-function-tester)
+      (is-error (delete-typed-function-tester '(a)))
+      (is-error (delete-typed-function-tester "hello")))))

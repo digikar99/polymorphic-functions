@@ -3,8 +3,10 @@
   (:mix :trivial-types :cl :alexandria :introspect-environment)
   (:import-from :5am :is :def-test)
   (:export :define-typed-function
-   :defun-typed
-           :define-compiler-macro-typed))
+           :defun-typed
+           :define-compiler-macro-typed
+           :fmakunbound-typed
+           :delete-typed-function))
 
 (in-package :typed-dispatch)
 (trivial-package-local-nicknames:add-package-local-nickname :cm :sandalphon.compiler-macro)
