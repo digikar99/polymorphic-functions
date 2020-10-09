@@ -29,7 +29,7 @@
 (deftype type-list () `(satisfies type-list-p))
 
 ;; equalp: need to allow for symbols and (setf symbol) "function-name" more strictly
-(defvar *typed-function-table* (make-hash-table :test 'equalp))
+(defparameter *typed-function-table* (make-hash-table :test 'equalp))
 
 (defstruct (typed-function)
   (type-list nil :type (proper-list type-specifier))
@@ -56,11 +56,10 @@
 (defun register-typed-function-wrapper (name lambda-list)
   (declare (type function-name name)
            (type list   lambda-list))
-  (unless (gethash name *typed-function-table*)
-    (setf (gethash name *typed-function-table*)
-          (make-typed-function-wrapper :name name
-                                       :lambda-list lambda-list
-                                       :lambda-list-type (lambda-list-type lambda-list)))))
+  (setf (gethash name *typed-function-table*)
+        (make-typed-function-wrapper :name name
+                                     :lambda-list lambda-list
+                                     :lambda-list-type (lambda-list-type lambda-list))))
 
 (defun retrieve-typed-function-wrapper (name)
   (gethash name *typed-function-table*))
@@ -165,9 +164,8 @@
         (gethash type-list table)
       (if exists
           (setf (typed-function-compiler-macro typed-function) function)
-          (setf (gethash type-list table)
-                (make-typed-function :type-list type-list
-                                     :compiler-macro function))))))
+          (error "No TYPED-FUNCTION is associated with TYPE-LIST ~%  ~A~%and NAME ~A"
+                 type-list name)))))
 
 (defun retrieve-typed-function-compiler-macro (name &rest arg-list)
   ;; TODO: Update this function

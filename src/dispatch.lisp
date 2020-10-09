@@ -131,8 +131,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                ,(lambda-declarations typed-lambda-list :typed t)
                                ,@(butlast body)
                                (the ,return-type ,@(last body)))))
-
-          ;; TODO: We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files. TODO: Is that an issue after 2.0.8+ as well?
+          ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
+          ;; and "objects of type FUNCTION can't be dumped into fasl files
           `(eval-when (:compile-toplevel :load-toplevel :execute)
              (register-typed-function ',name ',type-list
                                       ',(if-let (free-variables
