@@ -148,7 +148,10 @@
                                 (return-from retrieve-typed-function
                                   (let ((typed-function (gethash type-list wrapper-hash-table)))
                                     (values (typed-function-body     typed-function)
-                                            (typed-function-function typed-function)))))))))
+                                            (typed-function-function typed-function))))))
+                    (error "~%No applicable TYPED-FUNCTION discovered for ARG-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
+                           arg-list
+                           type-lists))))
              form))
         (t form)))
 
