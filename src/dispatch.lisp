@@ -59,19 +59,19 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                          (str:split #\newline (format nil "~A" condition))))
        ,form)))
 
-(defmacro define-typed-function (name untyped-lambda-list)
+(defmacro define-typed-function (name untyped-lambda-list &environment env)
   "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
-  (let ((*name* name))
+  (let ((*name*        name)
+        (*environment*  env))
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
       `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (register-typed-function-wrapper ',name ',untyped-lambda-list))
          (defun ,name ,lambda-list
            ,body-form)
-
          (define-compiler-macro ,name (&whole form &rest args &environment env)
            (declare (ignore args))
            (let ((*environment*                 env)
@@ -116,7 +116,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (let* ((*name* name))
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
-      (let (;; no declaraionts in FREE-VARIABLE-ANALYSIS-FORM
+      (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
             (free-variable-analysis-form `(lambda ,param-list ,@body))
             (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
         (let* ((lambda-body `(lambda ,param-list
