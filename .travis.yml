@@ -1,0 +1,21 @@
+language: lisp
+sudo: required
+
+env:
+  matrix:
+    - LISP=sbcl
+    - LISP=ccl
+
+install:
+  - bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
+  - git clone https://github.com/Bike/compiler-macro
+  - git clone https://github.com/digikar99/trivial-types
+
+script:
+  - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
+                      (ql:quickload "typed-dispatch")
+                      (asdf:test-system :typed-dispatch)
+                      (uiop:quit 0))'
+
+notifications:
+  email: false
