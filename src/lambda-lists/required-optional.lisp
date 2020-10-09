@@ -164,6 +164,38 @@
                 (setf typed-lambda-list (rest typed-lambda-list))))
     `(declare ,@(nreverse declarations))))
 
+(defmethod %untyped-lambda-list ((type (eql 'required-optional)) (typed-lambda-list list))
+  (assert *lambda-list-typed-p*)
+  (let ((state        :required)
+        (untyped-lambda-list ()))
+    (loop :for elt := (first typed-lambda-list)
+          :until (eq elt '&optional)
+          :do (push (first elt) untyped-lambda-list)
+              (setf typed-lambda-list (rest typed-lambda-list)))
+    (when (eq '&optional (first typed-lambda-list))
+      (setf state             '&optional
+            typed-lambda-list (rest typed-lambda-list))
+      (push '&optional untyped-lambda-list)
+      (loop :for elt := (first (first typed-lambda-list))
+            :while elt
+            :do (push (first elt) untyped-lambda-list)
+                (setf typed-lambda-list (rest typed-lambda-list))))
+    (the untyped-lambda-list (nreverse untyped-lambda-list))))
+
+(def-test untyped-lambda-list-optional (:suite untyped-lambda-list)
+  (5am:is-true  (equalp '(a &optional b)
+                        (untyped-lambda-list '((a string) &optional ((b string) "hello"))
+                                             :typed t)))
+  (5am:is-false (equalp '(a)
+                        (untyped-lambda-list '((a string) &optional ((b string) "hello"))
+                                             :typed t))))
+
+(defmethod %lambda-list-= ((type (eql 'required-optional)) (list-1 list) (list-2 list))
+  (assert (not *lambda-list-typed-p*) nil "Not yet implemented!")
+  (and (length= list-1 list-2)
+       (= (position '&optional list-1)
+          (position '&optional list-2))))
+
 (defmethod type-list-applicable-p ((type (eql 'required-optional))
                                    (arg-list list)
                                    (type-list list))
@@ -188,7 +220,7 @@
             :for type :in type-list
             :while (and applicable-p
                         arg
-                        type) ; (typep nil nil) returns NIL
+                        type)           ; (typep nil nil) returns NIL
             :do (unless (our-typep arg type)
                   (setf applicable-p nil))
                 (setf arg-list (rest arg-list))))

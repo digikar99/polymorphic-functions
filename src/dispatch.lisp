@@ -8,10 +8,10 @@
 (defun free-variables-p (form)
   (let (free-variables)
     (with-output-to-string (*error-output*)
-      (setq free-variables 
+      (setq free-variables
             (remove-if-not (lambda (elt)
                              (typep elt 'hu.dwim.walker:free-variable-reference-form))
-                           (hu.dwim.walker:collect-variable-references 
+                           (hu.dwim.walker:collect-variable-references
                             (hu.dwim.walker:walk-form
                              form)))))
     (mapcar (lambda (free-var-reference-form)
@@ -38,7 +38,7 @@
   "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-TYPED-FUNCTION")
 (defvar *environment*)
 (setf (documentation '*environment* 'variable)
-      "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-TYPED-FUNCTION for 
+      "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-TYPED-FUNCTION for
 use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defmacro with-compiler-note (form &body body)
@@ -66,6 +66,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   ;; TODO: Handle the case of redefinition
   (let ((*name*        name)
         (*environment*  env))
+    (register-typed-function-wrapper name untyped-lambda-list)
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
       `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -88,7 +89,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                        (declare (ignore function))
                        (if (< 1 (policy-quality 'speed env))
                            (progn
-                             
+
                              (unless body
                                ;; TODO: Here the reason concerning free-variables is hardcoded
                                (signal "~%~S with ARG-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
@@ -112,8 +113,15 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
-  ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
-  (let* ((*name* name))
+  (let* ((*name*               name)
+         (untyped-lambda-list  (untyped-lambda-list typed-lambda-list :typed t))
+         (expected-lambda-list (typed-function-wrapper-lambda-list
+                                (retrieve-typed-function-wrapper
+                                 name))))
+    (assert (lambda-list-= untyped-lambda-list expected-lambda-list)
+            ()
+            "TYPED-LAMBDA-LIST ~%  ~A~%is not compatible with the LAMBDA-LIST associated with the TYPED-FUNCTION-WRAPPER~%  ~A"
+            typed-lambda-list expected-lambda-list)
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
       (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
@@ -121,31 +129,32 @@ use by functions like TYPE-LIST-APPLICABLE-P")
             (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
         (let* ((lambda-body `(lambda ,param-list
                                ,(lambda-declarations typed-lambda-list :typed t)
-                             ,@(butlast body)
-                             (the ,return-type ,@(last body)))))
-        ;; TODO: We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files. TODO: Is that an issue after 2.0.8+ as well?
-        `(eval-when (:compile-toplevel :load-toplevel :execute)
-           (register-typed-function ',name ',type-list
-                                    ',(if-let (free-variables
-                                               (free-variables-p
-                                                ;; TODO: should not contain declarations
-                                                free-variable-analysis-form))
-                                        (progn
-                                          (terpri *error-output*)
-                                          (format *error-output* "; Will not inline ~%;   ")
-                                          (write-string
-                                           (str:replace-all
-                                            (string #\newline)
-                                            (uiop:strcat #\newline #\; "  ")
-                                            (format nil "~A~%" form))
-                                           *error-output*)
-                                          (format *error-output*
-                                                  "because free variables ~S were found"
-                                                  free-variables)
-                                          nil)
-                                        lambda-body)
-                                    ,lambda-body)
-           ',name))))))
+                               ,@(butlast body)
+                               (the ,return-type ,@(last body)))))
+
+          ;; TODO: We need the LAMBDA-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files. TODO: Is that an issue after 2.0.8+ as well?
+          `(eval-when (:compile-toplevel :load-toplevel :execute)
+             (register-typed-function ',name ',type-list
+                                      ',(if-let (free-variables
+                                                 (free-variables-p
+                                                  ;; TODO: should not contain declarations
+                                                  free-variable-analysis-form))
+                                          (progn
+                                            (terpri *error-output*)
+                                            (format *error-output* "; Will not inline ~%;   ")
+                                            (write-string
+                                             (str:replace-all
+                                              (string #\newline)
+                                              (uiop:strcat #\newline #\; "  ")
+                                              (format nil "~A~%" form))
+                                             *error-output*)
+                                            (format *error-output*
+                                                    "because free variables ~S were found"
+                                                    free-variables)
+                                            nil)
+                                          lambda-body)
+                                      ,lambda-body)
+             ',name))))))
 
 (defmacro define-compiler-macro-typed (name type-list compiler-macro-lambda-list
                                        &body body)
@@ -153,12 +162,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (declare (type function-name name)
            (type type-list type-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
-
   (let ((gensym (gensym)))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (register-typed-function-compiler-macro
         ',name ',type-list
-        (compile nil (parse-compiler-macro ',gensym
+        (compile nil (parse-compiler-macro nil
                                            ',compiler-macro-lambda-list
                                            ',body)))
        ',name)))

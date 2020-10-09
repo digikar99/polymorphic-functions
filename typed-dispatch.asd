@@ -24,4 +24,6 @@
                                                          "lambda-lists"))
                (:file "misc-tests"          :depends-on ("dispatch")))
   :perform (test-op (o c)
-                    (eval (read-from-string "(FIVEAM:RUN :TYPED-DISPATCH)"))))
+                    (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
+                                                   (5AM:*ON-ERROR* :DEBUG))
+                                               (FIVEAM:RUN :TYPED-DISPATCH))"))))
