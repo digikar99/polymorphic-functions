@@ -180,7 +180,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   "Remove the TYPED-FUNCTION associated with NAME with TYPE-LIST"
   (remove-typed-function name type-list))
 
-(defun delete-typed-function (name)
+(defun undefine-typed-function (name)
   "Remove the TYPED-FUNCTION(-WRAPPER) defined by DEFINE-TYPED-FUNCTION"
   (remhash name *typed-function-table*)
   (fmakunbound name))

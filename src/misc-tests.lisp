@@ -177,18 +177,18 @@
       (is (equalp 'string (fmakunbound-tester "hello"))))))
 
 (with-output-to-string (*error-output*)
-  (def-test delete-typed-function ()
+  (def-test undefine-typed-function ()
     (eval '(progn
-            (define-typed-function delete-typed-function-tester (a))
-            (defun-typed delete-typed-function-tester ((a list)) symbol
+            (define-typed-function undefine-typed-function-tester (a))
+            (defun-typed undefine-typed-function-tester ((a list)) symbol
               (declare (ignore a))
               'list)
-            (defun-typed delete-typed-function-tester ((a string)) symbol
+            (defun-typed undefine-typed-function-tester ((a string)) symbol
               (declare (ignore a))
               'string)))
-    (locally (declare (notinline delete-typed-function-tester))
-      (is (equalp 'list   (delete-typed-function-tester '(a))))
-      (is (equalp 'string (delete-typed-function-tester "hello")))
-      (delete-typed-function 'delete-typed-function-tester)
-      (is-error (delete-typed-function-tester '(a)))
-      (is-error (delete-typed-function-tester "hello")))))
+    (locally (declare (notinline undefine-typed-function-tester))
+      (is (equalp 'list   (undefine-typed-function-tester '(a))))
+      (is (equalp 'string (undefine-typed-function-tester "hello")))
+      (undefine-typed-function 'undefine-typed-function-tester)
+      (is-error (undefine-typed-function-tester '(a)))
+      (is-error (undefine-typed-function-tester "hello")))))

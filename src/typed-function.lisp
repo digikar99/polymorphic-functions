@@ -29,7 +29,7 @@
 (deftype type-list () `(satisfies type-list-p))
 
 ;; equalp: need to allow for symbols and (setf symbol) "function-name" more strictly
-(defparameter *typed-function-table* (make-hash-table :test 'equalp))
+(defvar *typed-function-table* (make-hash-table :test 'equalp))
 
 (defstruct (typed-function)
   (type-list nil :type (proper-list type-specifier))
@@ -56,10 +56,11 @@
 (defun register-typed-function-wrapper (name lambda-list)
   (declare (type function-name name)
            (type list   lambda-list))
-  (setf (gethash name *typed-function-table*)
-        (make-typed-function-wrapper :name name
-                                     :lambda-list lambda-list
-                                     :lambda-list-type (lambda-list-type lambda-list))))
+  (unless (gethash name *typed-function-table*)
+    (setf (gethash name *typed-function-table*)
+          (make-typed-function-wrapper :name name
+                                       :lambda-list lambda-list
+                                       :lambda-list-type (lambda-list-type lambda-list)))))
 
 (defun retrieve-typed-function-wrapper (name)
   (gethash name *typed-function-table*))

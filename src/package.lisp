@@ -2,11 +2,11 @@
 (uiop:define-package :typed-dispatch
   (:mix :trivial-types :cl :alexandria :introspect-environment)
   (:import-from :5am :is :def-test)
-  (:export :define-typed-function
+  (:export :define-typed-function           
+           :undefine-typed-function
            :defun-typed
            :define-compiler-macro-typed
-           :fmakunbound-typed
-           :delete-typed-function))
+           :fmakunbound-typed))
 
 (in-package :typed-dispatch)
 (trivial-package-local-nicknames:add-package-local-nickname :cm :sandalphon.compiler-macro)
