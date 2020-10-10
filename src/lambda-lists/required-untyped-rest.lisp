@@ -1,4 +1,4 @@
-(in-package :typed-dispatch)
+(in-package :typed-functions)
 
 (defmethod %lambda-list-type ((type (eql 'required-untyped-rest)) (lambda-list list))
   (let ((state :required))

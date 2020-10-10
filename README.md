@@ -1,6 +1,6 @@
-# typed-dispatch
+# typed-functions
 
->Requires latest SBCL (post 2.0.8 even) to run the tests `(5am:run :typed-dispatch)` due to a [local call context dumping](https://github.com/sbcl/sbcl/commit/135afdf39381266ffd4baeeeb285fb11868fd57b).
+>Requires latest SBCL (post 2.0.8 even) to run the tests `(5am:run :typed-functions)` due to a [local call context dumping](https://github.com/sbcl/sbcl/commit/135afdf39381266ffd4baeeeb285fb11868fd57b).
 
 
 ## Why?
@@ -10,7 +10,7 @@
 - With MOP, it might be possible to enable `cl:defmethod` on parametric types. No one I know of has tried this yet. I'm unfamiliar with MOP, and felt it might just be quicker to put this together. There also exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for parametric-types (or just the more-than-class types).
 - `specialization-store` has its own MOP and runs into about 3.5k LOC without tests. Besides the seeming code complexity, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
 - `fast-generic-functions` runs into about 900 LOC without tests.
-- `typed-dispatch` takes about 1.5k LOC with tests and, to me, it seems that is also fulfils the goal of `fast-generic-functions`.
+- `typed-functions` takes about 1.5k LOC with tests and, to me, it seems that is also fulfils the goal of `fast-generic-functions`.
 
 ## Comparison with specialization-store
 
@@ -34,9 +34,9 @@ This does not allow for a default-value for `b` in the specialization, without r
 
 If you do not require extensibility on anything other than `required` arguments, you should be happy with `specialization-store`. It also provides great-enough run-time performance comparable to the standard `cl:generic-function`s. (See the next section.)
 
-Further, at the moment, `typed-dispatch` provides no support for dispatching on `&rest` arguments. Raise an issue if this support is needed!
+Further, at the moment, `typed-functions` provides no support for dispatching on `&rest` arguments. Raise an issue if this support is needed!
 
-`typed-dispatch` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
+`typed-functions` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
 
 # Comparison of generics, specializations and typed-functions
 
@@ -44,7 +44,7 @@ For the run-time performance, consider the below definitions
 
 ```lisp
 (defpackage :perf-test
-  (:use :cl :specialization-store :typed-dispatch))
+  (:use :cl :specialization-store :typed-functions))
 (in-package :perf-test)
 
 (defmethod generic-= ((a string) (b string))
@@ -86,9 +86,9 @@ the performance results come out as:
 1.170 sec   | typed-=-key
 ```
 
-However, both `specialization-store` and `typed-dispatch` (as well as `fast-generic-functions`) provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
+However, both `specialization-store` and `typed-functions` (as well as `fast-generic-functions`) provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
 
-| Feature                         | cl:generic-function | specialization-store | typed-dispatch |
+| Feature                         | cl:generic-function | specialization-store | typed-functions |
 |:--------------------------------|:--------------------|:---------------------|:---------------|
 | Method combination              | Yes                 | No                   | No             |
 | Precedence                      | Yes                 | Partial*             | No             |
@@ -96,7 +96,7 @@ However, both `specialization-store` and `typed-dispatch` (as well as `fast-gene
 | Run-time Speed                  | Fast                | Fast                 | Slow           |
 | Compile-time support            | Partial**           | Yes                  | Yes            |
 
-\*`specialization-store` allows dispatching on the most specialized specialization; `typed-dispatch` provides no such support.
+\*`specialization-store` allows dispatching on the most specialized specialization; `typed-functions` provides no such support.
 
 ^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
@@ -114,7 +114,7 @@ Well...
 See [src/misc-tests.lisp](src/misc-tests.lisp) for some more examples.
 
 ```lisp
-(use-package :typed-dispatch)
+(use-package :typed-functions)
 (define-typed-function my= (a b))
 (defun-typed my= ((a string) (b string)) boolean
   (string= a b))
@@ -191,6 +191,6 @@ CL-USER> (my= 5 "hello")
 ## Other Usage Notes
 
 - `define-typed-function` (should) have no effect if the name is already registered as a `typed-function(-wrapper)`. Use `undefinne-typed-function` to deregister the name.
-- At `(debug 3)`, typed-dispatch (should) checks for the existence of multiple applicable `typed-function`s; otherwise, the first applicable `typed-function` is chosen.
+- At `(debug 3)`, typed-functions (should) checks for the existence of multiple applicable `typed-function`s; otherwise, the first applicable `typed-function` is chosen.
 
 

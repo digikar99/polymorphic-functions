@@ -1,4 +1,4 @@
-(in-package typed-dispatch)
+(in-package typed-functions)
 
 ;; In this file, our main functions/macros are
 ;; - DEFINE-LAMBDA-LIST-HELPER
@@ -23,7 +23,7 @@
 
 (deftype lambda-list-type () `(satisfies lambda-list-type-p))
 
-(5am:def-suite lambda-list :in :typed-dispatch)
+(5am:def-suite lambda-list :in :typed-functions)
 
 (defun valid-parameter-name-p (name)
   (and (symbolp name)

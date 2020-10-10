@@ -1,6 +1,6 @@
-(in-package :typed-dispatch)
+(in-package :typed-functions)
 
-(5am:in-suite :typed-dispatch)
+(5am:in-suite :typed-functions)
 
 (progn
   (define-typed-function my= (a b))

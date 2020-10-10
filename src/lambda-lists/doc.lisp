@@ -1,4 +1,4 @@
-(in-package :typed-dispatch)
+(in-package :typed-functions)
 
 ;; LAMBDA-LIST-TYPE ============================================================
 

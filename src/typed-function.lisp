@@ -1,4 +1,4 @@
-(in-package typed-dispatch)
+(in-package typed-functions)
 
 (defun type-list-p (list)
   ;; TODO: what parameter-names are valid?

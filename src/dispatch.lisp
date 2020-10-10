@@ -1,4 +1,4 @@
-(in-package typed-dispatch)
+(in-package typed-functions)
 
 ;; As per the discussion at https://github.com/Bike/introspect-environment/issues/4
 ;; the FREE-VARIABLES-P cannot be substituted by a simple CLOSUREP (sb-kernel:closurep)

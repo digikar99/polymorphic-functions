@@ -1,4 +1,4 @@
-(asdf:defsystem "typed-dispatch"
+(asdf:defsystem "typed-functions"
   :license "MIT"
   :version "0.0.0" ; alpha
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"

@@ -1,5 +1,5 @@
 
-(uiop:define-package :typed-dispatch
+(uiop:define-package :typed-functions
   (:mix :trivial-types :cl :alexandria :introspect-environment)
   (:import-from :5am :is :def-test)
   (:export :define-typed-function           
@@ -8,10 +8,10 @@
            :define-compiler-macro-typed
            :fmakunbound-typed))
 
-(in-package :typed-dispatch)
+(in-package :typed-functions)
 (trivial-package-local-nicknames:add-package-local-nickname :cm :sandalphon.compiler-macro)
 
-(5am:def-suite :typed-dispatch)
+(5am:def-suite :typed-functions)
 
 (defmacro catch-condition (form)
   `(handler-case ,form

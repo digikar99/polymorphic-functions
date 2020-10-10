@@ -1,4 +1,4 @@
-(in-package :typed-dispatch)
+(in-package :typed-functions)
 
 (defmethod %lambda-list-type ((type (eql 'required)) (lambda-list list))
   (if *lambda-list-typed-p*

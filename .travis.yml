@@ -13,8 +13,8 @@ install:
 
 script:
   - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
-                      (ql:quickload "typed-dispatch")
-                      (asdf:test-system :typed-dispatch)
+                      (ql:quickload "typed-functions")
+                      (asdf:test-system :typed-functions)
                       (uiop:quit 0))'
 
 notifications:
