@@ -5,9 +5,113 @@
 
 ## Why?
 
-(Also see the section on [Examples](#examples))
+- ANSI standard provided generic functions work do not work on parametric types `(array double-float)`. 
+- As of 2020, there exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast. 
+- With MOP, it might be possible to enable `cl:defmethod` on parametric types. No one I know of has tried this yet. I'm unfamiliar with MOP, and felt it might just be quicker to put this together. There also exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for parametric-types (or just the more-than-class types).
+- `specialization-store` has its own MOP and runs into about 3.5k LOC without tests. Besides the seeming code complexity, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
+- `fast-generic-functions` runs into about 900 LOC without tests.
+- `typed-dispatch` takes about 1.5k LOC with tests and, to me, it seems that is also fulfils the goal of `fast-generic-functions`.
 
+## Comparison with specialization-store
+
+A more broader concern is the premise of specialization-store: no matter what specialization is invoked, the final-result should be the same. What may differ is the *process* in which the result is computed.
+
+This [manifests itself](https://github.com/markcox80/specialization-store/issues/8) in differing approaches about how the `&optional` and `&key` dispatching plays out. For instance, consider 
+
+```lisp
+(defstore foo (a &key b))
+(defspecialization foo ((a string) &key (b string)) t
+  'hello)
+```
+
+This does not allow for a default-value for `b` in the specialization, without redefining the `(defstore foo ...)` form to include a newer `init-form` for `b`.
+
+```lisp
+(define-typed-function foo (a &key b))
+(defun-typed foo ((a string) &key ((b string) "hello")) t
+  'hello)
+```
+
+If you do not require extensibility on anything other than `required` arguments, you should be happy with `specialization-store`. It also provides great-enough run-time performance comparable to the standard `cl:generic-function`s. (See the next section.)
+
+Further, at the moment, `typed-dispatch` provides no support for dispatching on `&rest` arguments. Raise an issue if this support is needed!
+
+`typed-dispatch` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
+
+# Comparison of generics, specializations and typed-functions
+
+For the run-time performance, consider the below definitions
+
+```lisp
+(defpackage :perf-test
+  (:use :cl :specialization-store :typed-dispatch))
+(in-package :perf-test)
+
+(defmethod generic-= ((a string) (b string))
+  (string= a b))
+
+(defstore specialized-= (a b))
+(defspecialization (specialized-= :inline t) ((a string) (b string)) t
+  (string= a b))
+
+(defstore specialized-=-key (&key a b))
+(defspecialization (specialized-=-key :inline t) (&key (a string) (b string)) t
+(string= a b))
+
+(define-typed-function typed-= (a b))
+(defun-typed typed-= ((a string) (b string)) t
+  (string= a b))
+
+(define-typed-function typed-=-key (&key a b))
+(defun-typed typed-=-key (&key ((a string) "") ((b string) "")) t
+  (string= a b))
+```
+
+For a 1,000,000 calls to each in the format
+
+```lisp
+(let ((a "hello")
+      (b "world"))
+  (time (loop repeat 1000000 do (string= a b))))
+```
+
+the performance results come out as:
+
+```
+0.001 sec   | naive string=
+0.110 sec   | generic-=
+0.120 sec   | specialized-=
+0.323 sec   | specialized-=-key
+0.748 sec   | typed-=
+1.170 sec   | typed-=-key
+```
+
+However, both `specialization-store` and `typed-dispatch` (as well as `fast-generic-functions`) provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
+
+| Feature                         | cl:generic-function | specialization-store | typed-dispatch |
+|:--------------------------------|:--------------------|:---------------------|:---------------|
+| Method combination              | Yes                 | No                   | No             |
+| Precedence                      | Yes                 | Partial*             | No             |
+| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^           |
+| Run-time Speed                  | Fast                | Fast                 | Slow           |
+| Compile-time support            | Partial**           | Yes                  | Yes            |
+
+\*`specialization-store` allows dispatching on the most specialized specialization; `typed-dispatch` provides no such support.
+
+^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
+
+\*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries. 
+
+## An Ideal Way Forward
+
+- The designer should know MOP to extend `cl:generic-function` to provide dispatching based on typed
+- The resulting work should not have the above limitation of `fast-generic-functions`
+- Should provide compile-time optimizations, as well as compiler-notes to help user optimize / debug their code
+
+## Examples
+- 
+See [src/misc-tests.lisp](src/misc-tests.lisp) for some more examples.
 
 ```lisp
 (use-package :typed-dispatch)
@@ -32,18 +136,16 @@ CL-USER> (defun foo (a b)
 FOO
 CL-USER> (disassemble 'foo)
 ; disassembly for FOO
-; Size: 47 bytes. Origin: #x52D405E3                          ; FOO
-; 5E3:       498B4510         MOV RAX, [R13+16]               ; thread.binding-stack-pointer
-; 5E7:       488945F8         MOV [RBP-8], RAX
-; 5EB:       31F6             XOR ESI, ESI
-; 5ED:       48C745F017011050 MOV QWORD PTR [RBP-16], #x50100117  ; NIL
-; 5F5:       488975E8         MOV [RBP-24], RSI
-; 5F9:       48C745E017011050 MOV QWORD PTR [RBP-32], #x50100117  ; NIL
-; 601:       B90C000000       MOV ECX, 12
-; 606:       FF7508           PUSH QWORD PTR [RBP+8]
-; 609:       B8E2E83450       MOV EAX, #x5034E8E2             ; #<FDEFN SB-KERNEL:STRING=*>
-; 60E:       FFE0             JMP RAX
-; 610:       CC10             INT3 16                         ; Invalid argument count trap
+; Size: 39 bytes. Origin: #x5300D1B3                          ; FOO
+; B3:       31F6             XOR ESI, ESI
+; B5:       48C745F017011050 MOV QWORD PTR [RBP-16], #x50100117  ; NIL
+; BD:       488975E8         MOV [RBP-24], RSI
+; C1:       48C745E017011050 MOV QWORD PTR [RBP-32], #x50100117  ; NIL
+; C9:       B90C000000       MOV ECX, 12
+; CE:       FF7508           PUSH QWORD PTR [RBP+8]
+; D1:       B8E25A3550       MOV EAX, #x50355AE2              ; #<FDEFN SB-KERNEL:STRING=*>
+; D6:       FFE0             JMP RAX
+; D8:       CC10             INT3 16                          ; Invalid argument count trap
 NIL
 CL-USER> (defun bar (a b)
            (declare (optimize speed)
@@ -52,18 +154,16 @@ CL-USER> (defun bar (a b)
 BAR
 CL-USER> (disassemble 'bar)
 ; disassembly for BAR
-; Size: 47 bytes. Origin: #x52D40883                          ; BAR
-; 83:       498B4510         MOV RAX, [R13+16]                ; thread.binding-stack-pointer
-; 87:       488945F8         MOV [RBP-8], RAX
-; 8B:       31F6             XOR ESI, ESI
-; 8D:       48C745F017011050 MOV QWORD PTR [RBP-16], #x50100117  ; NIL
-; 95:       488975E8         MOV [RBP-24], RSI
-; 99:       48C745E017011050 MOV QWORD PTR [RBP-32], #x50100117  ; NIL
-; A1:       B90C000000       MOV ECX, 12
-; A6:       FF7508           PUSH QWORD PTR [RBP+8]
-; A9:       B8E2E83450       MOV EAX, #x5034E8E2              ; #<FDEFN SB-KERNEL:STRING=*>
-; AE:       FFE0             JMP RAX
-; B0:       CC10             INT3 16                          ; Invalid argument count trap
+; Size: 39 bytes. Origin: #x5300D283                          ; BAR
+; 83:       31F6             XOR ESI, ESI
+; 85:       48C745F017011050 MOV QWORD PTR [RBP-16], #x50100117  ; NIL
+; 8D:       488975E8         MOV [RBP-24], RSI
+; 91:       48C745E017011050 MOV QWORD PTR [RBP-32], #x50100117  ; NIL
+; 99:       B90C000000       MOV ECX, 12
+; 9E:       FF7508           PUSH QWORD PTR [RBP+8]
+; A1:       B8E25A3550       MOV EAX, #x50355AE2              ; #<FDEFN SB-KERNEL:STRING=*>
+; A6:       FFE0             JMP RAX
+; A8:       CC10             INT3 16                          ; Invalid argument count trap
 NIL
 CL-USER> (my= (make-array 1 :element-type 'single-float)
               (make-array 1 :element-type 'single-float))
@@ -80,135 +180,17 @@ CL-USER> (defun baz (a b)
 ;      (STRING STRING)
 BAZ
 CL-USER> (my= 5 "hello")
-; Evaluation aborted on #<SIMPLE-ERROR "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~D~^~%   ~}" {1004FC50D3}>.
+; Evaluation aborted on #<SIMPLE-ERROR "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}" {1004FC50D3}>.
 ```
-
-## Hmm... Aren't there existing works?
-
-I know of exactly one: [specialization-store](https://github.com/markcox80/specialization-store). It does a [few more things](https://github.com/markcox80/specialization-store/wiki):
-
-- Dispatch on (possibly?) combinations of &optional and &key, as well as &rest args; `typed-dispatch` only supports required, or required and optional, or required and keyword arguments, or required and rest, simply because I felt those were enough. If you need more, raise an issue!
-- Allow for explicitly naming "specialized function"
-- Ability to dispatch on the most "specialized" `specialization`; by contrast, `typed-dispatch` checks that only a single type list is applicable, and signals an error otherwise
-- More tested in some aspects
-- Has its own MOP to aid extensibility
-- `specialization-store` is more than an order of magnitude faster than `typed-dispatch`, without compiler macros; though, both are ridiculously slower than native functions without compiler macros. In the absence of compiler-macros, `specialization-store` seems to be about as fast as python.
-
-Honestly, I'd be on the lookout for something based on the CLOS MOP. I spent half an hour on the book; then, gave up, and spent two hours on the first commit of this.
-
-**What does this do differently?**
-
-- Current implementation in <1300 lines with tests vs 3400+ for specialization-store excluding code for tests, albeit `typed-dispatch` has lesser features. With `typed-dispatch`, we have some 800/1300 LOC devoted to processing lambda lists. There, too, lambda-lists occupy a good 840 LOC.
-- I (actually [we](https://github.com/commander-trashdin/cl-overload)) wanted some compile time dispatch checks; I spent 1.5+ hours on specialization-store, and then gave up
-- Besides simple checks, I wanted some good compile time warnings/suggestions/notes
 
 ## Dependencies outside quicklisp
 
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
 - [compiler-macro](https://github.com/Bike/compiler-macro)
 
-## Examples
+## Other Usage Notes
 
-As of this commit, there are exactly three exported symbols:
+- `define-typed-function` (should) have no effect if the name is already registered as a `typed-function(-wrapper)`. Use `undefinne-typed-function` to deregister the name.
+- At `(debug 3)`, typed-dispatch (should) checks for the existence of multiple applicable `typed-function`s; otherwise, the first applicable `typed-function` is chosen.
 
-- define-typed-function
-- defun-typed
-- define-compiler-macro-typed
 
-```lisp
-CL-USER> (use-package :typed-dispatch)
-T
-CL-USER> (define-typed-function my= (a b))
-MY=
-CL-USER> (defun-typed my= ((a string) (b string)) boolean  
-           (string= a b))
-MY=
-CL-USER> (defun foo (a b)
-           (declare (optimize speed))
-           (my= a b))
-
-; Unable to optimize (MY= A B) because:
-;  Type of A is not declared
-FOO
-CL-USER> (defun foo (a b)
-           (declare (optimize speed)
-                    (type string a b))
-           (my= a b))
-WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
-FOO
-CL-USER> (defun foo (a b)
-           (declare (type string a)
-                    (type integer b))
-           (my= a b))
-
-; While compiling (MY= A B): 
-;   No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
-;   Available TYPE-LISTs include:
-;      (STRING STRING)
-WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
-FOO
-CL-USER> (defun foo (a b)
-           (declare (optimize speed)
-                    (type string a)
-                    (type integer b))
-           (my= a b))
-
-; Unable to optimize (MY= A B) because:
-;  No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
-;  Available TYPE-LISTs include:
-;     (STRING STRING)
-WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
-FOO
-CL-USER> (defun-typed my= ((a integer) (b integer)) boolean
-           (= a b))
-MY=
-CL-USER> (defun foo (a b)
-           (declare (optimize speed)
-                    (type integer a b))
-           (my= a b))
-WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
-FOO
-CL-USER> (define-compiler-macro-typed my= (integer integer)
-             (&whole form &rest args)
-           (declare (ignore args))
-           (format t "Inside compiler macro ~D" form)
-           form)
-MY=
-CL-USER> (defun foo (a b)
-           (declare (optimize speed)
-                    (type integer a b))
-           (my= a b))
-Inside compiler macro ((LAMBDA (A B)
-                         (DECLARE (TYPE INTEGER B)
-                                  (TYPE INTEGER A))
-                         (THE BOOLEAN (= A B)))
-                       A B)
-WARNING: redefining COMMON-LISP-USER::FOO in DEFUN
-FOO
-```
-
-Note that while the compiler macro of the typed function checks the types during compilation, and signals a note if a compatible type-list is not registered, it does not error. And it will not error, to handle the case for circular dependencies.
-
-**A note about &optional args**
-
-(Note the lambda-lists.)
-
-```lisp
-CL-USER> (define-typed-function bar (a &optional b))
-BAR
-CL-USER> (defun-typed bar ((a string) &optional (b integer)) list
-           (list a b))
-; Evaluation aborted on #<TYPE-ERROR expected-type: (SATISFIES TYPED-DISPATCH::TYPED-LAMBDA-LIST-P)
-             datum: ((A STRING) &OPTIONAL (B INTEGER))>.
-CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5)) list
-           (list a b))
-BAR
-CL-USER> (defun-typed bar ((a string) &optional ((b integer) 5 bp)) list
-           (declare (ignore bp))
-           (list a b))
-BAR
-CL-USER> (bar "hello")
-("hello" 5)
-CL-USER> (bar "hello" 7)
-("hello" 7)
-```

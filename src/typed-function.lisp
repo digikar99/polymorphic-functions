@@ -89,8 +89,7 @@
   the first object is the function body,
   the second is the function itself,
   the third is the type list corresponding to the typed function that will be used for dispatch"
-  (declare (type function-name name)
-           (dynamic-extent arg-list))
+  (declare (type function-name name))
   (let* ((function-wrapper       (gethash name *typed-function-table*))
          (wrapper-hash-table     (typed-function-wrapper-hash-table       function-wrapper))
          (type-lists             (typed-function-wrapper-type-lists       function-wrapper))
