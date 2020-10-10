@@ -213,6 +213,6 @@ Non-examples:
                                     (nth-value 2
                                                (variable-information arg *environment*))))))
           (signal "Type of ~S is not declared" arg))
-        (subtypep (cm:form-type arg *environment*) type))
+        (subtypep (form-type arg *environment*) type))
       (typep arg type)))
 

@@ -37,7 +37,7 @@ Further, at the moment, `typed-functions` provides no support for dispatching on
 
 `typed-functions` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
 
-# Comparison of generics, specializations and typed-functions
+## Comparison of generics, specializations and typed-functions
 
 For the run-time performance, consider the below definitions
 
@@ -193,4 +193,37 @@ CL-USER> (my= 5 "hello")
 - `define-typed-function` (should) have no effect if the name is already registered as a `typed-function(-wrapper)`. Use `undefinne-typed-function` to deregister the name.
 - At `(debug 3)`, typed-functions (should) checks for the existence of multiple applicable `typed-function`s; otherwise, the first applicable `typed-function` is chosen.
 
+### Limitations
+
+At least one limitation stems from the limitations of the implementations (and CL?) themselves:
+
+```lisp
+CL-USER> (defun bar ()
+           (declare (optimize speed))
+           (my= "hello" (macrolet ((a () "hello"))
+                          (a))))
+; Unable to optimize (MY= "hello"
+                        (MACROLET ((A ()
+                                     "hello"))
+                          (A))) because ... (the reason may change from time to time)
+BAR
+CL-USER> (defun bar ()
+           (declare (optimize speed))
+           (my= "hello" (the string
+                             (macrolet ((a () "hello"))
+                               (a)))))
+BAR
+CL-USER> (disassemble 'bar)
+; disassembly for BAR
+; Size: 13 bytes. Origin: #x5300799B                          ; BAR
+; 9B:       BA4F011050       MOV EDX, #x5010014F              ; T
+; A0:       488BE5           MOV RSP, RBP
+; A3:       F8               CLC
+; A4:       5D               POP RBP
+; A5:       C3               RET
+; A6:       CC10             INT3 16                          ; Invalid argument count trap
+NIL
+```
+
+And while this is a simpler case that could possibly be optimizable, a nuanced discussion pertaining to the same is at [https://github.com/Bike/compiler-macro/pull/6#issuecomment-643613503](https://github.com/Bike/compiler-macro/pull/6#issuecomment-643613503).
 

@@ -9,7 +9,6 @@
            :fmakunbound-typed))
 
 (in-package :typed-functions)
-(trivial-package-local-nicknames:add-package-local-nickname :cm :sandalphon.compiler-macro)
 
 (5am:def-suite :typed-functions)
 

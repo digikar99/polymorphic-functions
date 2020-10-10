@@ -6,8 +6,6 @@
   :depends-on ("alexandria"
                "introspect-environment"
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
-               "trivial-package-local-nicknames"
-               "compiler-macro" ; https://github.com/Bike/compiler-macro
                "hu.dwim.walker"
                "fiveam" ;; just keep things together!
                "str")
@@ -16,7 +14,8 @@
                (:file "typed-function"      :depends-on ("package"))
                (:module "lambda-lists"      :depends-on ("package")
                 :components ((:file "doc")
-                             (:file "base")
+                             (:file "form-type")
+                             (:file "base"  :depends-on ("doc" "form-type"))
                              (:file "required")
                              (:file "required-optional")
                              (:file "required-key")

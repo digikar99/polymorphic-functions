@@ -51,10 +51,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                    "~A"))
                      ((eq 'apply (car form))
                       "~&; ~A")
-                     (t
+                     ((= 3 (policy-quality 'debug env))
                       (uiop:strcat "~%; "
                                    (format nil "While compiling ~S:" form)
-                                   "~&;  ~A")))
+                                   "~&;  ~A"))
+                     (t ""))
                (str:join (uiop:strcat #\newline ";  ")
                          (str:split #\newline (format nil "~A" condition))))
        ,form)))
