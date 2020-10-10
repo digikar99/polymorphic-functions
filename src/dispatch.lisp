@@ -114,16 +114,15 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
   (let* ((*name*               name)
-         (untyped-lambda-list  (untyped-lambda-list typed-lambda-list :typed t))
-         (expected-lambda-list (typed-function-wrapper-lambda-list
+         (untyped-lambda-list (typed-function-wrapper-lambda-list
                                 (retrieve-typed-function-wrapper
                                  name))))
-    (assert (lambda-list-= untyped-lambda-list expected-lambda-list)
-            ()
-            "TYPED-LAMBDA-LIST ~%  ~A~%is not compatible with the LAMBDA-LIST associated with the TYPED-FUNCTION-WRAPPER~%  ~A"
-            typed-lambda-list expected-lambda-list)
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
+      (assert (type-list-compatible-p type-list untyped-lambda-list)
+              nil
+              "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the TYPED-FUNCTIONs associated with ~S"
+              type-list untyped-lambda-list name)
       (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
             (free-variable-analysis-form `(lambda ,param-list ,@body))
             (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
@@ -146,7 +145,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                              (str:replace-all
                                               (string #\newline)
                                               (uiop:strcat #\newline #\; "  ")
-                                              (format nil "~A~%" form))
+                                              (format nil "~S~%" form))
                                              *error-output*)
                                             (format *error-output*
                                                     "because free variables ~S were found"
@@ -162,7 +161,13 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (declare (type function-name name)
            (type type-list type-list))
   ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
-  (let ((gensym (gensym)))
+  (let ((lambda-list (typed-function-wrapper-lambda-list
+                      (retrieve-typed-function-wrapper
+                       name))))
+    (assert (type-list-compatible-p type-list lambda-list)
+            nil
+            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the TYPED-FUNCTIONs associated with ~S"
+            type-list lambda-list name)
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (register-typed-function-compiler-macro
         ',name ',type-list

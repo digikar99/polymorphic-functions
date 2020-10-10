@@ -179,72 +179,43 @@ be a TYPED-LAMBDA-LIST"
     (assert (typed-lambda-list-p *lambda-list*))
     (%lambda-declarations *potential-type* *lambda-list*)))
 
-;; UNTYPED-LAMBDA-LIST =========================================================
+;; TYPE-LIST-COMPATIBLE-P ======================================================
 
-(define-constant +untyped-lambda-list+
-  "Returns the UNTYPED-LAMBDA-LIST associated with the given (TYPED-)LAMBDA-LIST."
-  :test 'string=)
-
-(define-lambda-list-helper
-    (untyped-lambda-list  #.+untyped-lambda-list+)
-    (%untyped-lambda-list #.+untyped-lambda-list+)
-  (progn
-    (assert (typed-lambda-list-p *lambda-list*))
-    (%untyped-lambda-list *potential-type* *lambda-list*)))
-
-(5am:def-suite untyped-lambda-list :in lambda-list)
-
-;; TYPE-LIST-= =================================================================
-
-(defun lambda-list-= (lambda-list-1 lambda-list-2 &key typed)
-  "Returns T if the two LAMBDA-LISTs are equal.
-Raises an error if TYPED is incompatible with the given LAMBDA-LIST."
-  (declare (type list lambda-list-1 lambda-list-2))
-  (let ((*lambda-list-typed-p* typed)
-        (*potential-type* (potential-type-of-lambda-list lambda-list-1)))
-    (if (%lambda-list-type *potential-type* lambda-list-1)
-        (let ((*potential-type* (if (eq *potential-type*
-                                        (potential-type-of-lambda-list lambda-list-2))
-                                    *potential-type*
-                                    (return-from lambda-list-= nil))))
-          (if (%lambda-list-type *potential-type* lambda-list-2)
-              (%lambda-list-= *potential-type* lambda-list-1 lambda-list-2)
-              (error "LAMBDA-LIST ~A is neither of ~%  ~A" lambda-list-2
-                     +lambda-list-types+)))
-        (error "LAMBDA-LIST ~A is neither of ~%  ~A" lambda-list-1
+(defun type-list-compatible-p (type-list untyped-lambda-list)
+  "Returns T if the given TYPE-LIST is compatible with the given UNTYPED-LAMBDA-LIST."
+  (declare (type type-list                     type-list)
+           (type untyped-lambda-list untyped-lambda-list))
+  (let ((*lambda-list-typed-p* nil)
+        (*potential-type* (potential-type-of-lambda-list untyped-lambda-list)))
+    (if (%lambda-list-type *potential-type* untyped-lambda-list)
+        (%type-list-compatible-p *potential-type* type-list untyped-lambda-list)
+        (error "UNTYPED-LAMBDA-LIST ~A is neither of ~%  ~A" untyped-lambda-list
                +lambda-list-types+))))
 
-(defgeneric %lambda-list-=
-    (potential-lambda-list-type lambda-list-1 lambda-list-2))
+(defgeneric %type-list-compatible-p
+    (potential-lambda-list-type type-list untyped-lambda-list))
 
-(defmethod %lambda-list-= ((type t)
-                           (list-1 t)
-                           (list-2 t))
+(defmethod %type-list-compatible-p ((type t)
+                                    (type-list t)
+                                    (untyped-lambda-list t))
   (assert (typep type 'lambda-list-type) nil
           "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
           +lambda-list-types+ type)
-  (if *lambda-list-typed-p*
-      (progn
-        (assert (typep list-1 'typed-lambda-list) nil
-                "Expected ~A to be a TYPED-LAMBDA-LIST" list-1)
-        (assert (typep list-2 'typed-lambda-list) nil
-                "Expected ~A to be a TYPED-LAMBDA-LIST" list-2))
-      (progn
-        (assert (typep list-1 'untyped-lambda-list) nil
-                "Expected ~A to be a UNTYPED-LAMBDA-LIST" list-1)
-        (assert (typep list-2 'untyped-lambda-list) nil
-                "Expected ~A to be a UNTYPED-LAMBDA-LIST" list-2)))
+  (assert (typep type-list 'type-list) nil
+          "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
+  (assert (typep untyped-lambda-list 'untyped-lambda-list) nil
+                "Expected ~A to be a UNTYPED-LAMBDA-LIST" untyped-lambda-list)
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
 
-(def-test lambda-list-= (:suite lambda-list)
-  (5am:is-true  (lambda-list-= '(a b) '(c d)))
-  (5am:is-false (lambda-list-= '(a) '(c d)))
-  (5am:is-true  (lambda-list-= '(a b &optional d) '(c d &optional e)))
-  (5am:is-false (lambda-list-= '(a) '(c d &optional d)))
-  (5am:is-true  (lambda-list-= '(a &key d) '(c &key d)))
-  (5am:is-false (lambda-list-= '(a &key d) '(c &key e)))
-  (5am:is-true  (lambda-list-= '(a &rest d) '(c &rest e)))
-  (5am:is-false (lambda-list-= '(a &rest d) '(c &optional e))))
+(def-test type-list-compatible-p (:suite lambda-list)
+  (5am:is-true  (type-list-compatible-p '(string string) '(c d)))
+  (5am:is-false (type-list-compatible-p '(string) '(c d)))
+  (5am:is-true  (type-list-compatible-p '(string number &optional t) '(c d &optional e)))
+  (5am:is-false (type-list-compatible-p '(number) '(c d &optional d)))
+  (5am:is-true  (type-list-compatible-p '(string &key :d number :e string) '(c &key d e)))
+  (5am:is-false (type-list-compatible-p '(string &key :d number) '(c &key d e)))
+  (5am:is-true  (type-list-compatible-p '(string) '(c &rest e)))
+  (5am:is-false (type-list-compatible-p '(number string) '(c &rest e))))
 
 ;; TYPE-LIST-APPLICABLE-P ======================================================
 

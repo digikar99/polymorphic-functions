@@ -30,13 +30,10 @@
                         `(type ,(second elt) ,(first elt)))
                       typed-lambda-list)))
 
-(defmethod %untyped-lambda-list ((type (eql 'required)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  (mapcar 'first typed-lambda-list))
-
-(defmethod %lambda-list-= ((type (eql 'required)) (list-1 list) (list-2 list))
-  (assert (not *lambda-list-typed-p*) nil "Not yet implemented!")
-  (length= list-1 list-2))
+(defmethod %type-list-compatible-p ((type (eql 'required))
+                                    (type-list list)
+                                    (untyped-lambda-list list))
+  (length= type-list untyped-lambda-list))
 
 (defmethod type-list-applicable-p ((type (eql 'required)) (arg-list list) (type-list list))
   (every 'our-typep arg-list type-list))

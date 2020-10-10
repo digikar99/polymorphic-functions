@@ -74,25 +74,10 @@
                               0
                               (position '&rest typed-lambda-list)))))
 
-(defmethod %untyped-lambda-list ((type (eql 'required-untyped-rest)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  (let ((rest-position (position '&rest typed-lambda-list)))
-    (append (mapcar 'first (subseq typed-lambda-list 0 rest-position))
-            (subseq typed-lambda-list rest-position))))
-
-(def-test untyped-lambda-list-untyped-rest (:suite untyped-lambda-list)
-  (5am:is-true  (equalp '(a &rest b)
-                        (untyped-lambda-list '((a string) &rest b)
-                                             :typed t)))
-  (5am:is-false (equalp '(a)
-                        (untyped-lambda-list '((a string) &rest b)
-                                             :typed t))))
-
-(defmethod %lambda-list-= ((type (eql 'required-untyped-rest)) (list-1 list) (list-2 list))
-  (assert (not *lambda-list-typed-p*) nil "Not yet implemented!")
-  (and (length= list-1 list-2)
-       (= (position '&rest list-1)
-          (position '&rest list-2))))
+(defmethod %type-list-compatible-p ((type (eql 'required-untyped-rest))
+                                    (type-list list)
+                                    (untyped-lambda-list list))
+  (= (length type-list) (position '&rest untyped-lambda-list)))
 
 (defmethod type-list-applicable-p ((type (eql 'required-untyped-rest))
                                    (arg-list list)

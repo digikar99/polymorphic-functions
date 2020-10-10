@@ -164,8 +164,10 @@
         (gethash type-list table)
       (if exists
           (setf (typed-function-compiler-macro typed-function) function)
-          (error "No TYPED-FUNCTION is associated with TYPE-LIST ~%  ~A~%and NAME ~A"
-                 type-list name)))))
+          ;; Need below instead of error-ing to define the compiler macro simultaneously
+          (setf (gethash type-list table)
+                (make-typed-function :type-list type-list
+                                     :compiler-macro function))))))
 
 (defun retrieve-typed-function-compiler-macro (name &rest arg-list)
   ;; TODO: Update this function
