@@ -1,7 +1,6 @@
 # typed-functions
 
->Requires latest SBCL (post 2.0.8 even) to run the tests `(5am:run :typed-functions)` due to a [local call context dumping](https://github.com/sbcl/sbcl/commit/135afdf39381266ffd4baeeeb285fb11868fd57b).
-
+Provides {macro, structures and hash-table}-based wrappers around normal functions to allow for dispatching on types instead of classes. See [examples](#examples).
 
 ## Why?
 
@@ -185,6 +184,7 @@ CL-USER> (my= 5 "hello")
 
 ## Dependencies outside quicklisp
 
+- SBCL 2.0.9+
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
 - [compiler-macro](https://github.com/Bike/compiler-macro)
 
