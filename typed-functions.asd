@@ -27,4 +27,4 @@
   :perform (test-op (o c)
                     (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
                                                    (5AM:*ON-ERROR* :DEBUG))
-                                               (FIVEAM:RUN :TYPED-DISPATCH))"))))
+                                               (FIVEAM:RUN :TYPED-FUNCTIONS))"))))

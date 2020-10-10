@@ -53,12 +53,12 @@
 (defvar *potential-type*)
 (setf (documentation '*potential-type* 'variable)
       "POTENTIAL-TYPE of the LAMBDA-LIST of the typed function being compiled.
-Bound inside the functions defined by TYPED-DISPATCH::DEFINE-LAMBDA-LIST-HELPER")
+Bound inside the functions defined by TYPED-FUNCTIONS::DEFINE-LAMBDA-LIST-HELPER")
 
 (defvar *lambda-list*)
 (setf (documentation '*lambda-list* 'variable)
       "LAMBDA-LIST of the typed function being compiled. Bound inside the functions
-defined by TYPED-DISPATCH::DEFINE-LAMBDA-LIST-HELPER")
+defined by TYPED-FUNCTIONS::DEFINE-LAMBDA-LIST-HELPER")
 
 (defvar *name*)
 (setf (documentation '*name* 'variable)
@@ -67,7 +67,7 @@ defined by TYPED-DISPATCH::DEFINE-LAMBDA-LIST-HELPER")
 (defvar *lambda-list-typed-p*)
 (setf (documentation '*lambda-list-typed-p* 'variable)
       "Is T if the *LAMBDA-LIST* being processed is to be treated as if it had type
-specifiers. Bound inside the functions defined by TYPED-DISPATCH::DEFINE-LAMBDA-LIST-HELPER")
+specifiers. Bound inside the functions defined by TYPED-FUNCTIONS::DEFINE-LAMBDA-LIST-HELPER")
 
 (defmacro define-lambda-list-helper ((outer-name outer-documentation)
                                      (inner-name inner-documentation)
