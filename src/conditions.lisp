@@ -12,3 +12,10 @@
                      "~%No applicable TYPED-FUNCTION discovered for ARG-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
                      (arg-list condition)
                      (type-lists condition)))))
+
+(define-condition form-type-failure (condition)
+  ((form :initarg :form
+         :initform (error "FORM not specified")
+         :reader form))
+  (:report (lambda (condition stream)
+             (format stream "~%Type of ~%  ~S~%could not be determined" (form condition)))))

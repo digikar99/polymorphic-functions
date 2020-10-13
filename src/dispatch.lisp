@@ -50,12 +50,24 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                (str:join (uiop:strcat #\newline ";  ")
                          (str:split #\newline (format nil "~A" condition))))
        ,form)
+     (form-type-failure (condition)
+       (declare (ignorable condition))
+       #-sbcl
+       (when (< 1 (policy-quality 'speed env))
+         (format *error-output*
+                 (uiop:strcat "~%; Unable to optimize~%; "
+                              (str:join (uiop:strcat #\newline ";  ")
+                                        (str:split #\newline (format nil " ~S" ,form)))
+                              "~%; because ~&; ~A")
+                 (str:join (uiop:strcat #\newline ";  ")
+                           (str:split #\newline (format nil "~A" condition)))))
+       ,form)
      (condition (condition)
        (format *error-output*
                (cond ((< 1 (policy-quality 'speed env))
                       (uiop:strcat "~&; "
                                    (format nil "Unable to optimize ~S because:" ,form)
-                                   "~A"))
+                                   "~&;  ~A"))
                      ((eq 'apply (car form))
                       "~&; ~A")
                      ((= 3 (policy-quality 'debug env))
@@ -98,10 +110,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                        (declare (ignore function))
                        (if (< 1 (policy-quality 'speed env))
                            (progn
-
                              (unless body
                                ;; TODO: Here the reason concerning free-variables is hardcoded
-                               (signal "~%~S with ARG-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
+                               (signal "~&~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
                              (if-let ((compiler-function (apply
                                                           'retrieve-typed-function-compiler-macro
                                                           ',name arg-list)))
@@ -111,7 +122,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                ;; TODO: Use some other declaration for inlining as well
                                ;; Optimized for speed and type information available
                                (if (recursive-function-p ',name body)
-                                   (signal "~%Inlining ~S results in (potentially infinite) recursive expansion"
+                                   (signal "~&Inlining ~S results in (potentially infinite) recursive expansion"
                                            form)
                                    `(,body ,@(cdr form)))))
                            original-form)))
@@ -143,7 +154,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                (free-variables (free-variables-p free-variable-analysis-form))
                #+sbcl
                (sbcl-transform `(sb-c:deftransform ,name (,param-list ,type-list *
-                                                          :policy (= speed 3))
+                                                          :policy (> speed 1))
                                   `(apply ,',lambda-body ,@',(sbcl-transform-body-args typed-lambda-list
                                                                                        :typed t)))))
           ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
@@ -166,7 +177,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                                  (str:replace-all
                                                   (string #\newline)
                                                   (uiop:strcat #\newline #\; "  ")
-                                                  (format nil "~S~%" form))
+                                                  (format nil "~S~&" form))
                                                  *error-output*)
                                                 (format *error-output*
                                                         "because free variables ~S were found"

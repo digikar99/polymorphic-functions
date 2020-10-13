@@ -2,24 +2,24 @@
 
 Provides {macro, structures and hash-table}-based wrappers around normal functions to allow for dispatching on types instead of classes. See [examples](#examples).
 
->This library is still experimental. The interface itself hasn't changed much since the start. 
+>This library is still experimental. The interface itself hasn't changed much since the start.
 >
 >I might rename the library later. `overloaded-functions` is one possible name. Please suggest a better name! It is recommended that users either `:use` it, or alias it with package-local-nicknames to avoid renaming troubles later.
 
 ## Why?
 
-- ANSI standard provided generic functions work do not work on parametric types `(array double-float)`. 
-- As of 2020, there exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast. 
+- ANSI standard provided generic functions work do not work on parametric types `(array double-float)`.
+- As of 2020, there exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast.
 - With MOP, it might be possible to enable `cl:defmethod` on parametric types. No one I know of has tried this yet. I'm unfamiliar with MOP, and felt it might just be quicker to put this together. There also exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for parametric-types (or just the more-than-class types).
 - `specialization-store` has its own MOP and runs into about 3.5k LOC without tests. Besides the seeming code complexity, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
 - `fast-generic-functions` runs into about 900 LOC without tests.
-- `typed-functions` takes about 1.5k LOC with tests and, to me, it seems that is also fulfils the goal of `fast-generic-functions`.
+- `typed-functions` takes about 1.6k LOC with tests and, to me, it seems that is also fulfils the goal of `fast-generic-functions`.
 
 ## Comparison with specialization-store
 
 A more broader concern is the premise of specialization-store: no matter what specialization is invoked, the final-result should be the same. What may differ is the *process* in which the result is computed.
 
-This [manifests itself](https://github.com/markcox80/specialization-store/issues/8) in differing approaches about how the `&optional` and `&key` dispatching plays out. For instance, consider 
+This [manifests itself](https://github.com/markcox80/specialization-store/issues/8) in differing approaches about how the `&optional` and `&key` dispatching plays out. For instance, consider
 
 ```lisp
 (defstore foo (a &key b))
@@ -104,7 +104,7 @@ However, both `specialization-store` and `typed-functions` (as well as `fast-gen
 ^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
 
-\*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries. 
+\*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries.
 
 ## An Ideal Way Forward
 
@@ -113,7 +113,7 @@ Well...
 - Should provide compile-time optimizations, as well as compiler-notes to help user optimize / debug their code
 
 ## Examples
-- 
+-
 See [src/misc-tests.lisp](src/misc-tests.lisp) for some more examples.
 
 ```lisp
@@ -175,7 +175,7 @@ CL-USER> (defun baz (a b)
            (declare (type string a)
                     (type integer b))
            (my= a b))
-; While compiling (MY= A B): 
+; While compiling (MY= A B):
 ;   No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
 ;   Available TYPE-LISTs include:
 ;      ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
@@ -199,17 +199,20 @@ CL-USER> (my= 5 "hello")
 
 ### Limitations
 
-At least one limitation stems from the limitations of the implementations (and CL?) themselves:
+At least one limitation stems from the limitations of the implementations (and CL?) themselves. On SBCL, this is mitigated by the use of `sb-c:deftransform`:
 
 ```lisp
 CL-USER> (defun bar ()
            (declare (optimize speed))
            (my= "hello" (macrolet ((a () "hello"))
-                          (a))))
-; Unable to optimize (MY= "hello"
-                        (MACROLET ((A ()
-                                     "hello"))
-                          (A))) because ... (the reason may change from time to time)
+                          (a)))) ; on non-SBCL systems
+; Unable to optimize
+;  (MY= "hello" (MACROLET ((A NIL "hello")) (A)))
+; because
+;
+;  Type of
+;    (MACROLET ((A NIL "hello")) (A))
+;  could not be determined
 BAR
 CL-USER> (defun bar ()
            (declare (optimize speed))
@@ -230,4 +233,3 @@ NIL
 ```
 
 And while this is a simpler case that could possibly be optimizable, a nuanced discussion pertaining to the same is at [https://github.com/Bike/compiler-macro/pull/6#issuecomment-643613503](https://github.com/Bike/compiler-macro/pull/6#issuecomment-643613503).
-

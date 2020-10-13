@@ -230,7 +230,7 @@ Non-examples:
                    (not (cdr (assoc 'type
                                     (nth-value 2
                                                (variable-information arg *environment*))))))
-          (signal "Type of ~S is not declared" arg))
+          (signal 'form-type-failure :form arg))
         (subtypep (form-type arg *environment*) type))
       (typep arg type)))
 
