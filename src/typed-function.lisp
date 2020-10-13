@@ -15,16 +15,20 @@
                                (t
                                 nil))))
               (setq list (rest list)))
-    (cond ((and valid-p list (eq '&key (first list)) (oddp (length list)))
-           (loop :initially (setq list (rest list))
-                 :while list
-                 :for param := (first  list)
-                 :for type  := (second list)
-                 :do (setq valid-p (type-specifier-p type))
-                 (setq list (cddr list))))
+    (cond ((and valid-p list (eq '&key (first list)))
+           (loop :for (param type) :in (rest list)
+                 :do (setq valid-p (type-specifier-p type))))
           ((and valid-p list)
            (setq valid-p nil)))
     valid-p))
+
+(def-test type-list (:suite :typed-functions)
+  (5am:is-true (type-list-p '()))
+  (5am:is-true (type-list-p '(number string)))
+  (5am:is-true (type-list-p '(&optional)))
+  (5am:is-true (type-list-p '(&key)))
+  (5am:is-true (type-list-p '(number &optional string)))
+  (5am:is-true (type-list-p '(number &key (:a string)))))
 
 (deftype type-list () `(satisfies type-list-p))
 

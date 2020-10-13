@@ -90,10 +90,10 @@
                     (*lambda-list-typed-p*
                      (push (cons (caar elt) (cdr elt))
                            param-list)
-                     (push (intern (symbol-name (caar  elt))
-                                   :keyword)
-                           type-list)
-                     (push (cadar elt) type-list))
+                     (push (list (intern (symbol-name (caar  elt))
+                                         :keyword)
+                                 (cadar elt))
+                           type-list))
                     (t
                      (return-from %defun-lambda-list nil))))))
     (values (nreverse param-list)
@@ -117,7 +117,7 @@
     (is (eq second 'b))
     (is (eq third '&key))
     (is (equalp '(c 5) fourth))
-    (is (equalp type-list '(string number &key :c number)))))
+    (is (equalp type-list '(string number &key (:c number))))))
 
 (defmethod %defun-body ((type (eql 'required-key)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
@@ -187,9 +187,9 @@
     (unless (and (numberp pos-key)
                  (= pos-key (position '&key untyped-lambda-list)))
       (return-from %type-list-compatible-p nil))
-    (let ((plist (subseq type-list (1+ pos-key))))
+    (let ((assoc-list (subseq type-list (1+ pos-key))))
       (loop :for param :in (subseq untyped-lambda-list (1+ pos-key))
-            :do (unless (getf plist (intern (symbol-name param) :keyword))
+            :do (unless (assoc-value assoc-list (intern (symbol-name param) :keyword))
                   (return-from %type-list-compatible-p nil))))
     t))
 
@@ -215,7 +215,7 @@
       (setf type-list (rest type-list))
       (loop :for key  := (first arg-list)
             :for value := (second arg-list)
-            :for type := (getf type-list key)
+            :for type := (second (assoc key type-list))
             :while (and applicable-p
                         value
                         type)           ; (typep nil nil) returns NIL
@@ -227,16 +227,16 @@
 (def-test type-list-key (:suite type-list-applicable-p)
   (5am:is-true  (type-list-applicable-p 'required-key
                                         '("hello")
-                                        '(string &key :b number)))
+                                        '(string &key (:b number))))
   (5am:is-true  (type-list-applicable-p 'required-key
                                         '("hello" :b 5)
-                                        '(string &key :b number)))
+                                        '(string &key (:b number))))
   (5am:is-false (type-list-applicable-p 'required-key
                                         '("hello" :b 5)
-                                        '(number &key :b number)))
+                                        '(number &key (:b number))))
   (5am:is-false (type-list-applicable-p 'required-key
                                         '("hello" :c 4 :b 5)
-                                        '(string &key :b number)))
+                                        '(string &key (:b number))))
   (5am:is-true  (type-list-applicable-p 'required-key
                                         '("hello" :c "world" :b 7)
-                                        '(string &key :b number :c string))))
+                                        '(string &key (:b number) (:c string)))))

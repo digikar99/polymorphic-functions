@@ -136,16 +136,17 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                #+sbcl
                (sbcl-transform `(sb-c:deftransform ,name (,param-list ,type-list ,return-type
                                                           :policy (= speed 3))
-                                  `(,',lambda-body ,@',(sbcl-transform-body-args typed-lambda-list
+                                  `(apply ,',lambda-body ,@',(sbcl-transform-body-args typed-lambda-list
                                                                                  :typed t)))))
           ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
           ;; and "objects of type FUNCTION can't be dumped into fasl files
           `(progn
-             #+sbcl ,(if (= 3 (policy-quality 'debug env))
-                         sbcl-transform
-                         `(locally (declare (sb-ext:muffle-conditions style-warning))
-                            (handler-bind ((style-warning #'muffle-warning))
-                              ,sbcl-transform)))
+             #+sbcl ,(unless (recursive-function-p name lambda-body)
+                       (if (= 3 (policy-quality 'debug env))
+                           sbcl-transform
+                           `(locally (declare (sb-ext:muffle-conditions style-warning))
+                              (handler-bind ((style-warning #'muffle-warning))
+                                ,sbcl-transform))))
              (eval-when (:compile-toplevel :load-toplevel :execute)
                (register-typed-function ',name ',type-list
                                         ',(if-let (free-variables

@@ -92,7 +92,7 @@
   (defun-typed foobar ((str string) &key ((key number) 5) ((b string) "world")) t
     (declare (ignore str))
     (list 'string key b))
-  (define-compiler-macro-typed foobar (number &key :key number :b string) (&whole form &rest args)
+  (define-compiler-macro-typed foobar (number &key (:key number) (:b string)) (&whole form &rest args)
     (declare (ignore args))
     `(list ,form))
   (defun-typed foobar ((num number) &key ((key number) 6) ((b string) "world")) t
