@@ -146,12 +146,22 @@
         (let ((key-p-tree (key-p-tree defun-lambda-list)))
           (values `(let ((apply-list ,key-p-tree))
                      (apply (nth-value 1 (apply 'retrieve-typed-function
-                                              ',*name*
-                                              ,@(reverse return-list)
-                                              apply-list))
+                                                ',*name*
+                                                ,@(reverse return-list)
+                                                apply-list))
                             ,@(reverse return-list)
                             apply-list))
                   defun-lambda-list))))))
+
+(defmethod %sbcl-transform-body-args ((type (eql 'required-key)) (typed-lambda-list list))
+  (assert *lambda-list-typed-p*)
+  (let ((key-position (position '&key typed-lambda-list)))
+    (append (mapcar 'first (subseq typed-lambda-list 0 key-position))
+            (loop :for ((param-name type) default) :in (subseq typed-lambda-list
+                                                               (1+ key-position))
+                  :appending `(,(intern (symbol-name param-name) :keyword)
+                               ,param-name))
+            '(nil))))
 
 (defmethod %lambda-declarations ((type (eql 'required-key)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)

@@ -24,6 +24,11 @@
   `(funcall (nth-value 1 (retrieve-typed-function ',*name* ,@defun-lambda-list))
             ,@defun-lambda-list))
 
+(defmethod %sbcl-transform-body-args ((type (eql 'required)) (typed-lambda-list list))
+  (assert *lambda-list-typed-p*)
+  (append (mapcar #'first typed-lambda-list)
+          '(nil)))
+
 (defmethod %lambda-declarations ((type (eql 'required)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
   `(declare ,@(mapcar (lambda (elt)

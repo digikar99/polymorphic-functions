@@ -18,6 +18,12 @@ Raises an ERROR otherwise."
 the second value is the type-list corresponding to the LAMBDA-LIST"
   :test 'string=)
 
+;; SBCL-TRANSFORM-BODY-ARGS ====================================================
+
+(define-constant +sbcl-transform-body-args-doc+
+  "Processes LAMBDA-LIST to return the argument list (not parameters) of SB-C:DEFTRANSFORM in DEFUN-TYPED"
+  :test 'string=)
+
 ;; DEFUN-BODY ==================================================================
 
 (define-constant +defun-body-doc+

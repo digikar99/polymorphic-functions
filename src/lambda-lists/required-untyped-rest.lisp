@@ -66,6 +66,12 @@
                                                           (position '&rest defun-lambda-list))))
           ,@(remove '&rest defun-lambda-list)))
 
+(defmethod %sbcl-transform-body-args ((type (eql 'required-untyped-rest)) (typed-lambda-list list))
+  (assert *lambda-list-typed-p*)
+  (let ((rest-position (position '&rest typed-lambda-list)))
+    (append (mapcar 'first (subseq typed-lambda-list 0 rest-position))
+            (last typed-lambda-list))))
+
 (defmethod %lambda-declarations ((type (eql 'required-untyped-rest)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
   `(declare ,@(mapcar (lambda (elt)

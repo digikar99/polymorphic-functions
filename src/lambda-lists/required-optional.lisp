@@ -147,6 +147,15 @@
                             apply-list))
                   defun-lambda-list))))))
 
+(defmethod %sbcl-transform-body-args ((type (eql 'required-optional)) (typed-lambda-list list))
+  (assert *lambda-list-typed-p*)
+  (let ((optional-position (position '&optional typed-lambda-list)))
+    (append (mapcar 'first (subseq typed-lambda-list 0 optional-position))
+            (loop :for ((param-name type) default) :in (subseq typed-lambda-list
+                                                               (1+ optional-position))
+                  :collect param-name)
+            '(nil))))
+
 (defmethod %lambda-declarations ((type (eql 'required-optional)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
   (let ((state        :required)

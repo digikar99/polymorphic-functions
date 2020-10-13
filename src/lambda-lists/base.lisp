@@ -140,6 +140,24 @@ Non-examples:
     (values (%defun-body *potential-type* defun-lambda-list)
             defun-lambda-list)))
 
+;; SBCL-TRANSFORM-BODY-ARGS ====================================================
+
+(define-lambda-list-helper
+    (sbcl-transform-body-args #.+sbcl-transform-body-args-doc+)
+    (%sbcl-transform-body-args #.+sbcl-transform-body-args-doc+)
+  (progn
+    (assert (typed-lambda-list-p *lambda-list*))
+    (%sbcl-transform-body-args *potential-type* *lambda-list*)))
+
+(def-test sbcl-transform-body-args (:suite lambda-list)
+  (is (equalp '(a b nil) (sbcl-transform-body-args '((a number) (b string)) :typed t)))
+  (is (equalp '(a b nil) (sbcl-transform-body-args '((a number) &optional ((b string) "hello"))
+                                               :typed t)))
+  (is (equalp '(a :b b nil) (sbcl-transform-body-args '((a number) &key ((b string) "hello"))
+                                                  :typed t)))
+  (is (equalp '(a args) (sbcl-transform-body-args '((a number) &rest args)
+                                                  :typed t))))
+
 ;; LAMBDA-DECLARATIONS =========================================================
 
 (define-lambda-list-helper
