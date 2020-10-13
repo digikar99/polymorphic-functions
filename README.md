@@ -2,6 +2,10 @@
 
 Provides {macro, structures and hash-table}-based wrappers around normal functions to allow for dispatching on types instead of classes. See [examples](#examples).
 
+>This library is still experimental. The interface itself hasn't changed much since the start. 
+>
+>I might rename the library later. `overloaded-functions` is one possible name. Please suggest a better name! It is recommended that users either `:use` it, or alias it with package-local-nicknames to avoid renaming troubles later.
+
 ## Why?
 
 - ANSI standard provided generic functions work do not work on parametric types `(array double-float)`. 
@@ -179,7 +183,7 @@ CL-USER> (defun baz (a b)
 ;      (STRING STRING)
 BAZ
 CL-USER> (my= 5 "hello")
-; Evaluation aborted on #<SIMPLE-ERROR "~%No applicable TYPED-FUNCTION discovered for TYPE-LIST ~D.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}" {1004FC50D3}>.
+; Evaluation aborted on #<TYPED-FUNCTIONS::NO-APPLICABLE-TYPED-FUNCTION {103A713D13}>.
 ```
 
 ## Dependencies outside quicklisp
@@ -190,7 +194,7 @@ CL-USER> (my= 5 "hello")
 
 ## Other Usage Notes
 
-- `define-typed-function` (should) have no effect if the name is already registered as a `typed-function(-wrapper)`. Use `undefinne-typed-function` to deregister the name.
+- `define-typed-function` (should) have no effect if the name is already registered as a `typed-function(-wrapper)`. Use `undefine-typed-function` to deregister the name.
 - At `(debug 3)`, typed-functions (should) checks for the existence of multiple applicable `typed-function`s; otherwise, the first applicable `typed-function` is chosen.
 
 ### Limitations

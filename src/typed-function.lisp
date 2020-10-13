@@ -106,9 +106,7 @@
           (1 (with-slots (body function)
                  (gethash (first applicable-function-type-lists) wrapper-hash-table)
                (values body function (first applicable-function-type-lists))))
-          (0 (error "~%No applicable TYPED-FUNCTION discovered for ARG-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
-                    arg-list
-                    type-lists))
+          (0 (error 'no-applicable-typed-function :arg-list arg-list :type-lists type-lists))
           (t (error "Multiple applicable TYPED-FUNCTIONs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
                     arg-list
                     applicable-function-type-lists)))))))
@@ -153,9 +151,8 @@
                                   (let ((typed-function (gethash type-list wrapper-hash-table)))
                                     (values (typed-function-body     typed-function)
                                             (typed-function-function typed-function))))))
-                    (error "~%No applicable TYPED-FUNCTION discovered for ARG-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
-                           arg-list
-                           type-lists))))
+                    (error 'no-applicable-typed-function
+                           :arg-list arg-list :type-lists  type-lists))))
              form))
         (t form)))
 
@@ -186,9 +183,8 @@
     (case (length applicable-function-type-lists)
       (1 (typed-function-compiler-macro
           (gethash (first applicable-function-type-lists) wrapper-hash-table)))
-      (0 (error "~%No applicable TYPED-FUNCTION discovered for ARG-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
-                arg-list
-                type-lists))
+      (0 (error 'no-applicable-typed-function
+                :arg-list arg-list :type-lists type-lists))
       (t (error "Multiple applicable TYPED-FUNCTIONs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
                 arg-list
                 applicable-function-type-lists)))))

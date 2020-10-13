@@ -20,8 +20,10 @@
                              (:file "required-optional")
                              (:file "required-key")
                              (:file "required-untyped-rest")))
+               (:file "conditions"          :depends-on ("package"))
                (:file "dispatch"            :depends-on ("typed-function"
-                                                         "lambda-lists"))
+                                                         "lambda-lists"
+                                                         "conditions"))
                (:file "misc-tests"          :depends-on ("dispatch")))
   :perform (test-op (o c)
                     (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)

@@ -43,6 +43,13 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defmacro with-compiler-note (form &body body)
   `(handler-case (progn ,@body)
+     (no-applicable-typed-function (condition)
+       (format *error-output*
+               "~%; While compiling ~S: ~&; ~A"
+               form
+               (str:join (uiop:strcat #\newline ";  ")
+                         (str:split #\newline (format nil "~A" condition))))
+       ,form)
      (condition (condition)
        (format *error-output*
                (cond ((< 1 (policy-quality 'speed env))
@@ -75,7 +82,6 @@ use by functions like TYPE-LIST-APPLICABLE-P")
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
          (defun ,name ,lambda-list
            ,body-form)
-         #-sbcl
          (define-compiler-macro ,name (&whole form &rest args &environment env)
            (declare (ignore args))
            (let ((*environment*                 env)
@@ -133,15 +139,18 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                ,(lambda-declarations typed-lambda-list :typed t)
                                ,@(butlast body)
                                (the ,return-type ,@(last body))))
+               ;; TODO: should not contain declarations
+               (free-variables (free-variables-p free-variable-analysis-form))
                #+sbcl
-               (sbcl-transform `(sb-c:deftransform ,name (,param-list ,type-list ,return-type
+               (sbcl-transform `(sb-c:deftransform ,name (,param-list ,type-list *
                                                           :policy (= speed 3))
                                   `(apply ,',lambda-body ,@',(sbcl-transform-body-args typed-lambda-list
-                                                                                 :typed t)))))
+                                                                                       :typed t)))))
           ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
           ;; and "objects of type FUNCTION can't be dumped into fasl files
           `(progn
-             #+sbcl ,(unless (recursive-function-p name lambda-body)
+             #+sbcl ,(unless (or free-variables
+                                 (recursive-function-p name lambda-body))
                        (if (= 3 (policy-quality 'debug env))
                            sbcl-transform
                            `(locally (declare (sb-ext:muffle-conditions style-warning))
@@ -149,24 +158,21 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                 ,sbcl-transform))))
              (eval-when (:compile-toplevel :load-toplevel :execute)
                (register-typed-function ',name ',type-list
-                                        ',(if-let (free-variables
-                                                   (free-variables-p
-                                                    ;; TODO: should not contain declarations
-                                                    free-variable-analysis-form))
-                                            (progn
-                                              (terpri *error-output*)
-                                              (format *error-output* "; Will not inline ~%;   ")
-                                              (write-string
-                                               (str:replace-all
-                                                (string #\newline)
-                                                (uiop:strcat #\newline #\; "  ")
-                                                (format nil "~S~%" form))
-                                               *error-output*)
-                                              (format *error-output*
-                                                      "because free variables ~S were found"
-                                                      free-variables)
-                                              nil)
-                                            lambda-body)
+                                        ',(if free-variables
+                                              (progn
+                                                (terpri *error-output*)
+                                                (format *error-output* "; Will not inline ~%;   ")
+                                                (write-string
+                                                 (str:replace-all
+                                                  (string #\newline)
+                                                  (uiop:strcat #\newline #\; "  ")
+                                                  (format nil "~S~%" form))
+                                                 *error-output*)
+                                                (format *error-output*
+                                                        "because free variables ~S were found"
+                                                        free-variables)
+                                                nil)
+                                              lambda-body)
                                         ,lambda-body)
                ',name)))))))
 
