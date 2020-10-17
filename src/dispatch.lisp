@@ -79,18 +79,22 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                          (str:split #\newline (format nil "~A" condition))))
        ,form)))
 
-(defmacro define-typed-function (name untyped-lambda-list &environment env)
+(defmacro define-typed-function (name untyped-lambda-list &key override &environment env)
   "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
   (let ((*name*        name)
         (*environment*  env))
-    (register-typed-function-wrapper name untyped-lambda-list)
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
       `(progn
-         (eval-when (:compile-toplevel :load-toplevel :execute)
+         (eval-when (:compile-toplevel)
+           ,(when override
+              `(undefine-typed-function ',name))
            (register-typed-function-wrapper ',name ',untyped-lambda-list))
+         (eval-when (:load-toplevel :execute)
+           (unless (gethash ',name *typed-function-table*)
+             (register-typed-function-wrapper ',name ',untyped-lambda-list :override ,override)))
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
          (defun ,name ,lambda-list
            ,body-form)

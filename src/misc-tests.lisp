@@ -29,7 +29,7 @@
     (is-error (my= obj1 obj4))
     (is (eq 'zero (my=-caller)))))
 
-(progn ; This requires SBCL version > 2.0.8: there's a commit after 2.0.8 was released.
+(progn ; This requires SBCL version 2.0.9+
   (define-typed-function bar (a &optional b c))
   (defun-typed bar ((str string) &optional ((b integer) 5) ((c integer) 7)) t
     (list str b c))
@@ -50,9 +50,9 @@
   (is (equalp (bar-caller)
               '(("hello" 9 7)))))
 
+(define-typed-function baz (c &optional d))
 (let ((a "hello")
       (b 5))
-  (define-typed-function baz (c &optional d))
   (defun-typed baz ((c string) &optional ((d integer) b)) t
     (declare (ignore c))
     (list a d)))
@@ -73,7 +73,7 @@
               '("hello" 7))))
 
 (progn
-  (define-typed-function foo (a &optional b))
+(define-typed-function foo (a &optional b))
   (defun-typed foo ((str1 string) &optional ((str2 string) "str2")) t
     (declare (ignore str1 str2))
     'string)
@@ -136,8 +136,8 @@
   (is (eq 'number (foz "world")))
   (is (eq 'string (foz 7))))
 
+(define-typed-function my+ (arg &rest args))
 (progn
-  (define-typed-function my+ (arg &rest args))
   (defun-typed my+ ((num number) &rest numbers) number
     (if numbers
         (+ num (apply 'my+ numbers))
@@ -161,8 +161,8 @@
 
 (def-test fmakunbound-typed ()
   (with-output-to-string (*error-output*)
-    (eval '(progn
-            (define-typed-function fmakunbound-tester (a))
+    (eval '(define-typed-function fmakunbound-tester (a)))
+    (eval '(progn            
             (defun-typed fmakunbound-tester ((a list)) symbol
               (declare (ignore a))
               'list)

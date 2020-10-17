@@ -57,14 +57,20 @@
   (lambda-list-type (error "LAMBDA-LIST-TYPE must be supplied.") :type lambda-list-type)
   (hash-table (make-hash-table :test 'equalp) :type hash-table))
 
-(defun register-typed-function-wrapper (name lambda-list)
+(defun register-typed-function-wrapper (name lambda-list &key override)
   (declare (type function-name name)
            (type list   lambda-list))
-  (unless (gethash name *typed-function-table*)
-    (setf (gethash name *typed-function-table*)
-          (make-typed-function-wrapper :name name
-                                       :lambda-list lambda-list
-                                       :lambda-list-type (lambda-list-type lambda-list)))))
+  (unless override
+    (when-let (wrapper (gethash name *typed-function-table*))
+      (cerror "Yes, delete existing TYPED-FUNCTIONs and associate new ones"
+              "There already exists TYPED-FUNCTIONs associated with NAME ~S corresponding~%to the following TYPE-LISTS~%~{~^    ~S~%~}Do you want to delete these TYPED-FUNCTIONs and associate a new~%TYPED-FUNCTION-WRAPPER with NAME ~S?"            
+              name
+              (typed-function-wrapper-type-lists wrapper)
+              name)))
+  (setf (gethash name *typed-function-table*)
+        (make-typed-function-wrapper :name name
+                                     :lambda-list lambda-list
+                                     :lambda-list-type (lambda-list-type lambda-list))))
 
 (defun retrieve-typed-function-wrapper (name)
   (gethash name *typed-function-table*))

@@ -8,10 +8,12 @@ env:
 
 install:
   - bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
-  - git clone https://github.com/Bike/compiler-macro
   - git clone https://github.com/digikar99/trivial-types
 
 script:
+  - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
+                      (ql:quickload "typed-functions")
+                      (uiop:quit 0))'
   - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
                       (ql:quickload "typed-functions")
                       (asdf:test-system :typed-functions)
