@@ -1,4 +1,4 @@
-(in-package typed-functions)
+(in-package adhoc-polymorphic-functions)
 
 ;; In this file, our main functions/macros are
 ;; - DEFINE-LAMBDA-LIST-HELPER
@@ -23,7 +23,7 @@
 
 (deftype lambda-list-type () `(satisfies lambda-list-type-p))
 
-(5am:def-suite lambda-list :in :typed-functions)
+(5am:def-suite lambda-list :in :adhoc-polymorphic-functions)
 
 (defun valid-parameter-name-p (name)
   (and (symbolp name)
@@ -53,21 +53,21 @@
 (defvar *potential-type*)
 (setf (documentation '*potential-type* 'variable)
       "POTENTIAL-TYPE of the LAMBDA-LIST of the typed function being compiled.
-Bound inside the functions defined by TYPED-FUNCTIONS::DEFINE-LAMBDA-LIST-HELPER")
+Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST-HELPER")
 
 (defvar *lambda-list*)
 (setf (documentation '*lambda-list* 'variable)
       "LAMBDA-LIST of the typed function being compiled. Bound inside the functions
-defined by TYPED-FUNCTIONS::DEFINE-LAMBDA-LIST-HELPER")
+defined by POLYMORPHS::DEFINE-LAMBDA-LIST-HELPER")
 
 (defvar *name*)
 (setf (documentation '*name* 'variable)
-      "NAME of the typed function being compiled. Bound inside DEFINE-TYPED-FUNCTION")
+      "NAME of the typed function being compiled. Bound inside DEFINE-POLYMORPH")
 
 (defvar *lambda-list-typed-p*)
 (setf (documentation '*lambda-list-typed-p* 'variable)
       "Is T if the *LAMBDA-LIST* being processed is to be treated as if it had type
-specifiers. Bound inside the functions defined by TYPED-FUNCTIONS::DEFINE-LAMBDA-LIST-HELPER")
+specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST-HELPER")
 
 (defmacro define-lambda-list-helper ((outer-name outer-documentation)
                                      (inner-name inner-documentation)

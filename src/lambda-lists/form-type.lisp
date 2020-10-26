@@ -1,4 +1,4 @@
-(in-package :typed-functions)
+(in-package :adhoc-polymorphic-functions)
 
 (defun form-type (form &optional environment)
   "Returns two values: the first value is the TYPE of FORM if the second value is T"

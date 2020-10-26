@@ -1,4 +1,4 @@
-(in-package typed-functions)
+(in-package adhoc-polymorphic-functions)
 
 ;; As per the discussion at https://github.com/Bike/introspect-environment/issues/4
 ;; the FREE-VARIABLES-P cannot be substituted by a simple CLOSUREP (sb-kernel:closurep)
@@ -27,23 +27,23 @@
           (t nil))))
 
 ;;; - run-time correctness requires
-;;;   - DEFINE-TYPED-FUNCTION -> DEFUN
-;;;   - DEFUN-TYPED
+;;;   - DEFINE-POLYMORPH-FUNCTION -> DEFUN
+;;;   - DEFPOLYMORPH
 ;;; - compile-time correctness requires
-;;;   - DEFINE-TYPED-FUNCTION -> DEFINE-COMPILER-MACRO
+;;;   - DEFINE-POLYMORPH-FUNCTION -> DEFINE-COMPILER-MACRO
 ;;;   - GET-TYPE-LIST
-;;;   - DEFINE-COMPILER-MACRO-TYPED
+;;;   - DEFPOLYMORPH-COMPILER-MACRO
 
 (defvar *compiler-macro-expanding-p* nil
-  "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-TYPED-FUNCTION")
+  "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")
 (defvar *environment*)
 (setf (documentation '*environment* 'variable)
-      "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-TYPED-FUNCTION for
+      "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH for
 use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defmacro with-compiler-note (form &body body)
   `(handler-case (progn ,@body)
-     (no-applicable-typed-function (condition)
+     (no-applicable-polymorph (condition)
        (format *error-output*
                "~%; While compiling ~S: ~&; ~A"
                form
@@ -79,8 +79,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                          (str:split #\newline (format nil "~A" condition))))
        ,form)))
 
-(defmacro define-typed-function (name untyped-lambda-list &key override &environment env)
-  "Define a function named NAME that can then be used for DEFUN-TYPED for specializing on ORDINARY and OPTIONAL argument types."
+(defmacro define-polymorphic-function (name untyped-lambda-list &key override &environment env)
+  "Define a function named NAME that can then be used for DEFPOLYMORPH for specializing on ORDINARY and OPTIONAL argument types."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
@@ -90,11 +90,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       `(progn
          (eval-when (:compile-toplevel)
            ,(when override
-              `(undefine-typed-function ',name))
-           (register-typed-function-wrapper ',name ',untyped-lambda-list))
+              `(undefine-polymorphic-function ',name))
+           (register-polymorph-wrapper ',name ',untyped-lambda-list))
          (eval-when (:load-toplevel :execute)
-           (unless (gethash ',name *typed-function-table*)
-             (register-typed-function-wrapper ',name ',untyped-lambda-list :override ,override)))
+           (unless (gethash ',name *polymorphic-function-table*)
+             (register-polymorph-wrapper ',name ',untyped-lambda-list :override ,override)))
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
          (defun ,name ,lambda-list
            ,body-form)
@@ -110,7 +110,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                (if (eq ',name (car form))
                    (let ((arg-list (rest form)))
                      (multiple-value-bind (body function dispatch-type-list)
-                         (apply 'retrieve-typed-function ',name arg-list)
+                         (apply 'retrieve-polymorph ',name arg-list)
                        (declare (ignore function))
                        (if (< 1 (policy-quality 'speed env))
                            (progn
@@ -118,7 +118,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                ;; TODO: Here the reason concerning free-variables is hardcoded
                                (signal "~&~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
                              (if-let ((compiler-function (apply
-                                                          'retrieve-typed-function-compiler-macro
+                                                          'retrieve-polymorph-compiler-macro
                                                           ',name arg-list)))
                                (funcall compiler-function
                                         (cons body (rest form))
@@ -145,24 +145,24 @@ use by functions like TYPE-LIST-APPLICABLE-P")
         (t
          (values `(declare) body))))
 
-(defmacro defun-typed (name typed-lambda-list return-type &body body &environment env)
+(defmacro defpolymorph (name typed-lambda-list return-type &body body &environment env)
   "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
   (let* ((*name*               name)
-         (untyped-lambda-list (typed-function-wrapper-lambda-list
-                               (retrieve-typed-function-wrapper
+         (untyped-lambda-list (polymorph-wrapper-lambda-list
+                               (retrieve-polymorph-wrapper
                                 name))))
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
       (assert (type-list-compatible-p type-list untyped-lambda-list)
               nil
-              "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the TYPED-FUNCTIONs associated with ~S"
+              "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
               type-list untyped-lambda-list name)
       (multiple-value-bind (declarations body) (extract-declarations body)
         (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
               (free-variable-analysis-form `(lambda ,param-list (block ,name ,@body)))
-              (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
+              (form                        `(defpolymorph ,name ,typed-lambda-list ,@body)))
           (let* ((lambda-body `(lambda ,param-list
                                  ,(lambda-declarations typed-lambda-list :typed t)
                                  ,declarations
@@ -187,7 +187,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                 (handler-bind ((style-warning #'muffle-warning))
                                   ,sbcl-transform))))
                (eval-when (:compile-toplevel :load-toplevel :execute)
-                 (register-typed-function ',name ',type-list
+                 (register-polymorph ',name ',type-list
                                           ',(if free-variables
                                                 (progn
                                                   (terpri *error-output*)
@@ -206,33 +206,33 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                           ,lambda-body)
                  ',name))))))))
 
-(defmacro define-compiler-macro-typed (name type-list compiler-macro-lambda-list
+(defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list
                                        &body body)
   "An example of a type-list for a function with optional args would be (STRING &OPTIONAL INTEGER)"
   (declare (type function-name name)
            (type type-list type-list))
-  ;; TODO: Handle the case when NAME is not bound to a TYPED-FUNCTION
-  (let ((lambda-list (typed-function-wrapper-lambda-list
-                      (retrieve-typed-function-wrapper
+  ;; TODO: Handle the case when NAME is not bound to a POLYMORPH
+  (let ((lambda-list (polymorph-wrapper-lambda-list
+                      (retrieve-polymorph-wrapper
                        name))))
     (assert (type-list-compatible-p type-list lambda-list)
             nil
-            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the TYPED-FUNCTIONs associated with ~S"
+            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
             type-list lambda-list name)
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (register-typed-function-compiler-macro
+       (register-polymorph-compiler-macro
         ',name ',type-list
         (compile nil (parse-compiler-macro nil
                                            ',compiler-macro-lambda-list
                                            ',body)))
        ',name)))
 
-(defun fmakunbound-typed (name type-list)
-  "Remove the TYPED-FUNCTION associated with NAME with TYPE-LIST"
-  (remove-typed-function name type-list))
+(defun undefpolymorph (name type-list)
+  "Remove the POLYMORPH associated with NAME with TYPE-LIST"
+  (remove-polymorph name type-list))
 
-(defun undefine-typed-function (name)
-  "Remove the TYPED-FUNCTION(-WRAPPER) defined by DEFINE-TYPED-FUNCTION"
-  (remhash name *typed-function-table*)
+(defun undefine-polymorphic-function (name)
+  "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH"
+  (remhash name *polymorphic-function-table*)
   (fmakunbound name)
   (setf (compiler-macro-function name) nil))

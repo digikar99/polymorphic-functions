@@ -1,4 +1,4 @@
-(in-package :typed-functions)
+(in-package :adhoc-polymorphic-functions)
 
 (defmethod %lambda-list-type ((type (eql 'required-untyped-rest)) (lambda-list list))
   (let ((state :required))
@@ -60,7 +60,7 @@
 
 (defmethod %defun-body ((type (eql 'required-untyped-rest)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
-  `(apply (nth-value 1 (retrieve-typed-function ',*name*
+  `(apply (nth-value 1 (retrieve-polymorph ',*name*
                                                 ,@(subseq defun-lambda-list
                                                           0
                                                           (position '&rest defun-lambda-list))))

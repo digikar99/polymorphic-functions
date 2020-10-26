@@ -1,14 +1,14 @@
-(in-package :typed-functions)
+(in-package :adhoc-polymorphic-functions)
 
-(5am:in-suite :typed-functions)
+(5am:in-suite :adhoc-polymorphic-functions)
 
 (progn
-  (define-typed-function my= (a b) :override t)
-  (defun-typed my= ((a string) (b string)) boolean
+  (define-polymorphic-function my= (a b) :override t)
+  (defpolymorph my= ((a string) (b string)) boolean
     (return-from my= (string= a b)))
-  (defun-typed my= ((a number) (b number)) boolean
+  (defpolymorph my= ((a number) (b number)) boolean
     (= a b))
-  (define-compiler-macro-typed my= (number number) (&whole form a b)
+  (defpolymorph-compiler-macro my= (number number) (&whole form a b)
     (declare (ignore b))
     (if (= 0 a)
         ''zero
@@ -30,10 +30,10 @@
     (is (eq 'zero (my=-caller)))))
 
 (progn ; This requires SBCL version 2.0.9+
-  (define-typed-function bar (a &optional b c) :override t)
-  (defun-typed bar ((str string) &optional ((b integer) 5) ((c integer) 7)) t
+  (define-polymorphic-function bar (a &optional b c) :override t)
+  (defpolymorph bar ((str string) &optional ((b integer) 5) ((c integer) 7)) t
     (list str b c))
-  (define-compiler-macro-typed bar (string &optional integer integer) (&whole form &rest args)
+  (defpolymorph-compiler-macro bar (string &optional integer integer) (&whole form &rest args)
     (declare (ignore args))
     `(list ,form)) ; This usage of FORM also tests infinite recursion
   (defun bar-caller ()
@@ -50,10 +50,10 @@
   (is (equalp (bar-caller)
               '(("hello" 9 7)))))
 
-(define-typed-function baz (c &optional d) :override t)
+(define-polymorphic-function baz (c &optional d) :override t)
 (let ((a "hello")
       (b 5))
-  (defun-typed baz ((c string) &optional ((d integer) b)) t
+  (defpolymorph baz ((c string) &optional ((d integer) b)) t
     (declare (ignore c))
     (list a d)))
 
@@ -73,11 +73,11 @@
               '("hello" 7))))
 
 (progn
-  (define-typed-function foo (a &optional b) :override t)
-  (defun-typed foo ((str1 string) &optional ((str2 string) "str2")) t
+  (define-polymorphic-function foo (a &optional b) :override t)
+  (defpolymorph foo ((str1 string) &optional ((str2 string) "str2")) t
     (declare (ignore str1 str2))
     'string)
-  (defun-typed foo ((num1 number) &optional ((num2 number) pi)) t
+  (defpolymorph foo ((num1 number) &optional ((num2 number) pi)) t
     (declare (ignore num1 num2))
     'number))
 
@@ -88,14 +88,14 @@
   (is (eq 'number (foo 5.6 6))))
 
 (progn
-  (define-typed-function foobar (a &key key b) :override t)
-  (defun-typed foobar ((str string) &key ((key number) 5) ((b string) "world")) t
+  (define-polymorphic-function foobar (a &key key b) :override t)
+  (defpolymorph foobar ((str string) &key ((key number) 5) ((b string) "world")) t
     (declare (ignore str))
     (list 'string key b))
-  (define-compiler-macro-typed foobar (number &key (:key number) (:b string)) (&whole form &rest args)
+  (defpolymorph-compiler-macro foobar (number &key (:key number) (:b string)) (&whole form &rest args)
     (declare (ignore args))
     `(list ,form))
-  (defun-typed foobar ((num number) &key ((key number) 6) ((b string) "world")) t
+  (defpolymorph foobar ((num number) &key ((key number) 6) ((b string) "world")) t
     (declare (ignore num))
     (list 'number key b))
   (defun foobar-caller ()
@@ -112,19 +112,19 @@
   (is (equalp '(number 4.4 "bye")    (foobar 5.6 :b "bye" :key 4.4))))
 
 (progn
-  (define-typed-function foz (a) :override t)
-  (defun-typed foz ((a number)) t
+  (define-polymorphic-function foz (a) :override t)
+  (defpolymorph foz ((a number)) t
     (declare (optimize speed))
     (if (= a 5)
         'number
         (foz "hello")))
-  (defun-typed foz ((a string)) t
+  (defpolymorph foz ((a string)) t
     (declare (optimize speed))
     (if (string= a "hello")
         'string
         (foz 5)))
   ;; Will result in infinite expansion upon redefinition, if compilation is not done correctly
-  (defun-typed foz ((a number)) t
+  (defpolymorph foz ((a number)) t
     (declare (optimize speed))
     (if (= a 5)
         'number
@@ -136,21 +136,21 @@
   (is (eq 'number (foz "world")))
   (is (eq 'string (foz 7))))
 
-(define-typed-function my+ (arg &rest args) :override t)
+(define-polymorphic-function my+ (arg &rest args) :override t)
 (progn
-  (defun-typed my+ ((num number) &rest numbers) number
+  (defpolymorph my+ ((num number) &rest numbers) number
     (if numbers
         (+ num (apply 'my+ numbers))
         num))
-  (define-compiler-macro-typed my+ (number) (&whole form &rest args)
+  (defpolymorph-compiler-macro my+ (number) (&whole form &rest args)
     (declare (ignore args))
     `(list (+ ,@(cdr form))))
   (defun my+-number-caller ()
     (declare (optimize speed))
     (my+ 3 2 8))
-  (defun-typed my+ ((str string) &rest strings) string
+  (defpolymorph my+ ((str string) &rest strings) string
     (apply 'concatenate 'string str strings))
-  (defun-typed my+ ((l list) &rest lists) list
+  (defpolymorph my+ ((l list) &rest lists) list
     (apply 'append l lists)))
 
 (def-test untyped-rest-correctness ()
@@ -159,36 +159,36 @@
   (is (equalp '(1 2 3) (my+ '(1 2) '(3))))
   (is (equalp '(13) (my+-number-caller))))
 
-(def-test fmakunbound-typed ()
+(def-test undefpolymorph ()
   (with-output-to-string (*error-output*)
-    (eval '(define-typed-function fmakunbound-tester (a) :override t))
+    (eval '(define-polymorphic-function fmakunbound-tester (a) :override t))
     (eval '(progn            
-            (defun-typed fmakunbound-tester ((a list)) symbol
+            (defpolymorph fmakunbound-tester ((a list)) symbol
               (declare (ignore a))
               'list)
-            (defun-typed fmakunbound-tester ((a string)) symbol
+            (defpolymorph fmakunbound-tester ((a string)) symbol
               (declare (ignore a))
               'string)))
     (locally (declare (notinline fmakunbound-tester))
       (is (equalp 'list   (fmakunbound-tester '(a))))
       (is (equalp 'string (fmakunbound-tester "hello")))
-      (fmakunbound-typed 'fmakunbound-tester '(list))
+      (undefpolymorph 'fmakunbound-tester '(list))
       (is-error (fmakunbound-tester '(a)))
       (is (equalp 'string (fmakunbound-tester "hello"))))))
 
 (with-output-to-string (*error-output*)
-  (def-test undefine-typed-function ()
+  (def-test undefine-polymorphic-function ()
     (eval '(progn
-            (define-typed-function undefine-typed-function-tester (a) :override t)
-            (defun-typed undefine-typed-function-tester ((a list)) symbol
+            (define-polymorphic-function undefine-polymorphic-function-tester (a) :override t)
+            (defpolymorph undefine-polymorphic-function-tester ((a list)) symbol
               (declare (ignore a))
               'list)
-            (defun-typed undefine-typed-function-tester ((a string)) symbol
+            (defpolymorph undefine-polymorphic-function-tester ((a string)) symbol
               (declare (ignore a))
               'string)))
-    (locally (declare (notinline undefine-typed-function-tester))
-      (is (equalp 'list   (undefine-typed-function-tester '(a))))
-      (is (equalp 'string (undefine-typed-function-tester "hello")))
-      (undefine-typed-function 'undefine-typed-function-tester)
-      (is-error (undefine-typed-function-tester '(a)))
-      (is-error (undefine-typed-function-tester "hello")))))
+    (locally (declare (notinline undefine-polymorphic-function-tester))
+      (is (equalp 'list   (undefine-polymorphic-function-tester '(a))))
+      (is (equalp 'string (undefine-polymorphic-function-tester "hello")))
+      (undefine-polymorphic-function 'undefine-polymorphic-function-tester)
+      (is-error (undefine-polymorphic-function-tester '(a)))
+      (is-error (undefine-polymorphic-function-tester "hello")))))

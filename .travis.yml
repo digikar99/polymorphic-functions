@@ -12,11 +12,11 @@ install:
 
 script:
   - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
-                      (ql:quickload "typed-functions")
+                      (ql:quickload "adhoc-polymorphic-functions")
                       (uiop:quit 0))'
   - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
-                      (ql:quickload "typed-functions")
-                      (asdf:test-system :typed-functions)
+                      (ql:quickload "adhoc-polymorphic-functions")
+                      (asdf:test-system :adhoc-polymorphic-functions)
                       (uiop:quit 0))'
 
 notifications:

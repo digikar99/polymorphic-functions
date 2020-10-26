@@ -1,4 +1,4 @@
-(in-package typed-functions)
+(in-package adhoc-polymorphic-functions)
 
 (defun type-list-p (list)
   ;; TODO: what parameter-names are valid?
@@ -22,7 +22,7 @@
            (setq valid-p nil)))
     valid-p))
 
-(def-test type-list (:suite :typed-functions)
+(def-test type-list (:suite :adhoc-polymorphic-functions)
   (5am:is-true (type-list-p '()))
   (5am:is-true (type-list-p '(number string)))
   (5am:is-true (type-list-p '(&optional)))
@@ -33,23 +33,23 @@
 (deftype type-list () `(satisfies type-list-p))
 
 ;; equalp: need to allow for symbols and (setf symbol) "function-name" more strictly
-(defvar *typed-function-table* (make-hash-table :test 'equalp))
+(defvar *polymorphic-function-table* (make-hash-table :test 'equalp))
 
-(defstruct (typed-function)
+(defstruct (polymorph)
   (type-list nil :type (proper-list type-specifier))
   (body)
   ;; We need the FUNCTION-BODY due to compiler macros, and "objects of type FUNCTION can't be dumped into fasl files.
   (function)
   (compiler-macro))
 
-(defun typed-function (typed-function)
-  "Returns the NAMED-LAMBDA associated with TYPED-FUNCTION"
-  (declare (type typed-function typed-function)
+(defun polymorph (polymorph)
+  "Returns the LAMBDA associated with POLYMORPH"
+  (declare (type polymorph polymorph)
            (optimize speed))
-  (typed-function-function typed-function))
+  (polymorph-function polymorph))
 
-(defstruct typed-function-wrapper
-  "HASH-TABLE maps a TYPE-LIST to a TYPED-FUNCTION. A TYPE-LIST is simply a LIST of TYPEs."
+(defstruct polymorph-wrapper
+  "HASH-TABLE maps a TYPE-LIST to a POLYMORPH. A TYPE-LIST is simply a LIST of TYPEs."
   ;; TODO: Check if a symbol / list denotes a type
   (name (error "NAME must be supplied.") :type function-name)
   (lambda-list (error "LAMBDA-LIST must be supplied.") :type list)
@@ -57,53 +57,53 @@
   (lambda-list-type (error "LAMBDA-LIST-TYPE must be supplied.") :type lambda-list-type)
   (hash-table (make-hash-table :test 'equalp) :type hash-table))
 
-(defun register-typed-function-wrapper (name lambda-list &key override)
+(defun register-polymorph-wrapper (name lambda-list &key override)
   (declare (type function-name name)
            (type list   lambda-list))
   (unless override
-    (when-let (wrapper (gethash name *typed-function-table*))
-      (cerror "Yes, delete existing TYPED-FUNCTIONs and associate new ones"
-              "There already exists TYPED-FUNCTIONs associated with NAME ~S corresponding~%to the following TYPE-LISTS~%~{~^    ~S~%~}Do you want to delete these TYPED-FUNCTIONs and associate a new~%TYPED-FUNCTION-WRAPPER with NAME ~S?"            
+    (when-let (wrapper (gethash name *polymorphic-function-table*))
+      (cerror "Yes, delete existing POLYMORPHs and associate new ones"
+              "There already exists POLYMORPHs associated with NAME ~S corresponding~%to the following TYPE-LISTS~%~{~^    ~S~%~}Do you want to delete these POLYMORPHs and associate a new~%POLYMORPHIC-FUNCTION with NAME ~S?"
               name
-              (typed-function-wrapper-type-lists wrapper)
+              (polymorph-wrapper-type-lists wrapper)
               name)))
-  (setf (gethash name *typed-function-table*)
-        (make-typed-function-wrapper :name name
+  (setf (gethash name *polymorphic-function-table*)
+        (make-polymorph-wrapper :name name
                                      :lambda-list lambda-list
                                      :lambda-list-type (lambda-list-type lambda-list))))
 
-(defun retrieve-typed-function-wrapper (name)
-  (gethash name *typed-function-table*))
+(defun retrieve-polymorph-wrapper (name)
+  (gethash name *polymorphic-function-table*))
 
-(defun register-typed-function (name type-list function-body function)
+(defun register-polymorph (name type-list function-body function)
   (declare (type function-name name)
            (type function  function)
            (type type-list type-list))
-  (let* ((typed-function-wrapper (gethash name *typed-function-table*))
-         (table                  (typed-function-wrapper-hash-table typed-function-wrapper)))
-    (with-slots (type-lists) typed-function-wrapper
+  (let* ((polymorph-wrapper (gethash name *polymorphic-function-table*))
+         (table                  (polymorph-wrapper-hash-table polymorph-wrapper)))
+    (with-slots (type-lists) polymorph-wrapper
       (unless (member type-list type-lists :test 'equalp)
         (setf type-lists (cons type-list type-lists))))
-    (multiple-value-bind (typed-function exists)
+    (multiple-value-bind (polymorph exists)
         (gethash type-list table)
       (if exists
-          (setf (typed-function-function typed-function) function
-                (typed-function-body     typed-function) function-body)
+          (setf (polymorph-function polymorph) function
+                (polymorph-body     polymorph) function-body)
           (setf (gethash type-list table)
-                (make-typed-function :type-list type-list
+                (make-polymorph :type-list type-list
                                      :body function-body
                                      :function function))))))
 
-(defun retrieve-typed-function (name &rest arg-list)
+(defun retrieve-polymorph (name &rest arg-list)
   "If successful, returns 3 values:
   the first object is the function body,
   the second is the function itself,
-  the third is the type list corresponding to the typed function that will be used for dispatch"
+  the third is the type list corresponding to the polymorph that will be used for dispatch"
   (declare (type function-name name))
-  (let* ((function-wrapper       (gethash name *typed-function-table*))
-         (wrapper-hash-table     (typed-function-wrapper-hash-table       function-wrapper))
-         (type-lists             (typed-function-wrapper-type-lists       function-wrapper))
-         (lambda-list-type       (typed-function-wrapper-lambda-list-type function-wrapper)))
+  (let* ((function-wrapper       (gethash name *polymorphic-function-table*))
+         (wrapper-hash-table     (polymorph-wrapper-hash-table       function-wrapper))
+         (type-lists             (polymorph-wrapper-type-lists       function-wrapper))
+         (lambda-list-type       (polymorph-wrapper-lambda-list-type function-wrapper)))
     (flet ((%type-list-applicable-p (type-list)
              (type-list-applicable-p lambda-list-type arg-list type-list)))
       (let ((applicable-function-type-lists
@@ -112,19 +112,19 @@
           (1 (with-slots (body function)
                  (gethash (first applicable-function-type-lists) wrapper-hash-table)
                (values body function (first applicable-function-type-lists))))
-          (0 (error 'no-applicable-typed-function :arg-list arg-list :type-lists type-lists))
-          (t (error "Multiple applicable TYPED-FUNCTIONs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
+          (0 (error 'no-applicable-polymorph :arg-list arg-list :type-lists type-lists))
+          (t (error "Multiple applicable POLYMORPHs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
                     arg-list
                     applicable-function-type-lists)))))))
 
-(defun remove-typed-function (name type-list)
-  (let ((wrapper (retrieve-typed-function-wrapper name)))
+(defun remove-polymorph (name type-list)
+  (let ((wrapper (retrieve-polymorph-wrapper name)))
     (when wrapper
       (remhash type-list
-               (typed-function-wrapper-hash-table wrapper))
-      (removef (typed-function-wrapper-type-lists wrapper) type-list :test 'equalp))))
+               (polymorph-wrapper-hash-table wrapper))
+      (removef (polymorph-wrapper-type-lists wrapper) type-list :test 'equalp))))
 
-(define-compiler-macro retrieve-typed-function (&whole form name &rest arg-list
+(define-compiler-macro retrieve-polymorph (&whole form name &rest arg-list
                                                        &environment env)
   (cond ((= 3 (policy-quality 'debug env))
          form)
@@ -133,64 +133,64 @@
               (null (third name)))
          (when (eq 'funcall (first form))
            (setq form (rest form)))
-         (if (eq 'retrieve-typed-function (first form))
-             `(block retrieve-typed-function
+         (if (eq 'retrieve-polymorph (first form))
+             `(block retrieve-polymorph
                 ;; - TYPE_LISTS and WRAPPER-HASH-TABLE will change after the 
-                ;;   "call to RETRIEVE-TYPED-FUNCTION" is compiled
+                ;;   "call to RETRIEVE-POLYMORPH" is compiled
                 ;; - While FUNCTION-WRAPPER can be precompiled, completely dumping it requires
                 ;;   knowledge of WRAPPER-HASH-TABLE that would only be available after
-                ;;   the call to RETRIEVE-TYPED-FUNCTION is compiled. (Am I missing something?)
+                ;;   the call to RETRIEVE-POLYMORPH is compiled. (Am I missing something?)
                 ;;   An interested person may look up this link for MAKE-LOAD-FORM
                 ;;   https://blog.cneufeld.ca/2014/03/the-less-familiar-parts-of-lisp-for-beginners-make-load-form/
                 (let*
-                    ((function-wrapper   (gethash ,name *typed-function-table*))
-                     (lambda-list-type   (typed-function-wrapper-lambda-list-type function-wrapper))
+                    ((function-wrapper   (gethash ,name *polymorphic-function-table*))
+                     (lambda-list-type   (polymorph-wrapper-lambda-list-type function-wrapper))
                      (arg-list           (list ,@arg-list))
-                     (wrapper-hash-table (typed-function-wrapper-hash-table function-wrapper))
-                     (type-lists         (typed-function-wrapper-type-lists function-wrapper)))
+                     (wrapper-hash-table (polymorph-wrapper-hash-table function-wrapper))
+                     (type-lists         (polymorph-wrapper-type-lists function-wrapper)))
                   (declare (dynamic-extent arg-list))
                   (flet ((%type-list-applicable-p (type-list)
                            (type-list-applicable-p lambda-list-type arg-list type-list)))
                     (loop :for type-list :in type-lists
                           :do (when (%type-list-applicable-p type-list)
-                                (return-from retrieve-typed-function
-                                  (let ((typed-function (gethash type-list wrapper-hash-table)))
-                                    (values (typed-function-body     typed-function)
-                                            (typed-function-function typed-function))))))
-                    (error 'no-applicable-typed-function
+                                (return-from retrieve-polymorph
+                                  (let ((polymorph (gethash type-list wrapper-hash-table)))
+                                    (values (polymorph-body     polymorph)
+                                            (polymorph-function polymorph))))))
+                    (error 'no-applicable-polymorph
                            :arg-list arg-list :type-lists  type-lists))))
              form))
         (t form)))
 
-(defun register-typed-function-compiler-macro (name type-list function)
+(defun register-polymorph-compiler-macro (name type-list function)
   (declare (type function-name name)
            (type type-list type-list)
            (type function function))
-  (let ((table (typed-function-wrapper-hash-table (gethash name *typed-function-table*))))
-    (multiple-value-bind (typed-function exists)
+  (let ((table (polymorph-wrapper-hash-table (gethash name *polymorphic-function-table*))))
+    (multiple-value-bind (polymorph exists)
         (gethash type-list table)
       (if exists
-          (setf (typed-function-compiler-macro typed-function) function)
+          (setf (polymorph-compiler-macro polymorph) function)
           ;; Need below instead of error-ing to define the compiler macro simultaneously
           (setf (gethash type-list table)
-                (make-typed-function :type-list type-list
+                (make-polymorph :type-list type-list
                                      :compiler-macro function))))))
 
-(defun retrieve-typed-function-compiler-macro (name &rest arg-list)
+(defun retrieve-polymorph-compiler-macro (name &rest arg-list)
   ;; TODO: Update this function
   (declare (type function-name name))
-  (let* ((function-wrapper       (gethash name *typed-function-table*))
-         (wrapper-hash-table     (typed-function-wrapper-hash-table       function-wrapper))
-         (type-lists             (typed-function-wrapper-type-lists       function-wrapper))
-         (lambda-list-type       (typed-function-wrapper-lambda-list-type function-wrapper))
+  (let* ((function-wrapper       (gethash name *polymorphic-function-table*))
+         (wrapper-hash-table     (polymorph-wrapper-hash-table       function-wrapper))
+         (type-lists             (polymorph-wrapper-type-lists       function-wrapper))
+         (lambda-list-type       (polymorph-wrapper-lambda-list-type function-wrapper))
          (applicable-function-type-lists
            (remove-if-not (curry 'type-list-applicable-p lambda-list-type arg-list)
                           type-lists)))
     (case (length applicable-function-type-lists)
-      (1 (typed-function-compiler-macro
+      (1 (polymorph-compiler-macro
           (gethash (first applicable-function-type-lists) wrapper-hash-table)))
-      (0 (error 'no-applicable-typed-function
+      (0 (error 'no-applicable-polymorph
                 :arg-list arg-list :type-lists type-lists))
-      (t (error "Multiple applicable TYPED-FUNCTIONs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
+      (t (error "Multiple applicable POLYMORPHs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
                 arg-list
                 applicable-function-type-lists)))))

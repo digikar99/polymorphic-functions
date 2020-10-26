@@ -1,4 +1,4 @@
-(in-package :typed-functions)
+(in-package :adhoc-polymorphic-functions)
 
 (defmethod %lambda-list-type ((type (eql 'required-optional)) (lambda-list list))
   (let ((state :required))
@@ -139,7 +139,7 @@
                             ())))))
         (let ((optional-p-tree (optional-p-tree defun-lambda-list)))
           (values `(let ((apply-list ,optional-p-tree))
-                     (apply (nth-value 1 (apply 'retrieve-typed-function
+                     (apply (nth-value 1 (apply 'retrieve-polymorph
                                                 ',*name*
                                                 ,@(reverse return-list)
                                                 apply-list))

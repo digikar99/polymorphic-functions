@@ -1,19 +1,22 @@
-# typed-functions
+# adhoc-polymorphic-functions
 
 Provides {macro, structures and hash-table}-based wrappers around normal functions to allow for dispatching on types instead of classes. See [examples](#examples).
 
->This library is still experimental. The interface itself hasn't changed much since the start.
->
->I might rename the library later. `overloaded-functions` is one possible name. Please suggest a better name! It is recommended that users either `:use` it, or alias it with package-local-nicknames to avoid renaming troubles later.
+>This library is still experimental. There have been two renamings so far. Please use package-local-nicknames, and be okay to use global search replace.
+> However, I have no intention of renaming it further.
+
+The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism). This is not [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) since individual implementations do differ. I also do not see how the latter is implementable without the former.
 
 ## Why?
 
-- ANSI standard provided generic functions work do not work on parametric types `(array double-float)`.
+- ANSI standard provided generic functions work do not work on anything more than classes and structure classes, for example, say `(array double-float)`. However, Common Lisp does provide a rich type system.
 - As of 2020, there exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast.
-- With MOP, it might be possible to enable `cl:defmethod` on parametric types. No one I know of has tried this yet. I'm unfamiliar with MOP, and felt it might just be quicker to put this together. There also exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for parametric-types (or just the more-than-class types).
-- `specialization-store` has its own MOP and runs into about 3.5k LOC without tests. Besides the seeming code complexity, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
+- [static-dispatch](https://github.com/alex-gutev/static-dispatch) for allowing static-functions to be generic functions to be dispatched at compile-time; this, in turn, is used by [generic-cl](https://github.com/alex-gutev/generic-cl).
+- With MOP, it might be possible to enable `cl:defmethod` on parametric types. No one I know of has tried this yet. I'm unfamiliar with MOP, and felt it might just be quicker to put this together. 
+- There also exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for types. `specialization-store` has its own MOP and runs into about 3.5k LOC without tests. Besides the seeming code complexity, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
 - `fast-generic-functions` runs into about 900 LOC without tests.
-- `typed-functions` takes about 1.6k LOC with tests and, to me, it seems that is also fulfils the goal of `fast-generic-functions`.
+- `adhoc-polymorphic-functions` takes about 1.6k LOC with tests and, to me, it seems that is also fulfils the goal of `fast-generic-functions`.
+- No complaints about `static-dispatch` other than it not being suitable for types
 
 ## Comparison with specialization-store
 
@@ -27,27 +30,27 @@ This [manifests itself](https://github.com/markcox80/specialization-store/issues
   'hello)
 ```
 
-This does not allow for a default-value for `b` in the specialization, without redefining the `(defstore foo ...)` form to include a newer `init-form` for `b`.
+This does not allow for a default-value for `b` in the specialization, without redefining the `(defstore foo ...)` form to include a newer `init-form` for `b`. (Though, one could very well, write a wrapper macro for this. Of the 1.6k LoC in `adhoc-polymorphic-functions`, 950 LoC are for processing lambda lists(!))
 
 ```lisp
-(define-typed-function foo (a &key b))
-(defun-typed foo ((a string) &key ((b string) "hello")) t
+(define-polymorphic-function foo (a &key b))
+(defpolymorph foo ((a string) &key ((b string) "hello")) t
   'hello)
 ```
 
 If you do not require extensibility on anything other than `required` arguments, you should be happy with `specialization-store`. It also provides great-enough run-time performance comparable to the standard `cl:generic-function`s. (See the next section.)
 
-Further, at the moment, `typed-functions` provides no support for dispatching on `&rest` arguments. Raise an issue if this support is needed!
+Further, at the moment, `adhoc-polymorphic-functions` provides no support for dispatching on `&rest` arguments. Raise an issue (and discuss the semantics!) if this support is needed!
 
-`typed-functions` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
+`adhoc-polymorphic-functions` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
 
-## Comparison of generics, specializations and typed-functions
+## Comparison of generics, specializations and adhoc-polymorphic-functions
 
 For the run-time performance, consider the below definitions
 
 ```lisp
 (defpackage :perf-test
-  (:use :cl :specialization-store :typed-functions))
+  (:use :cl :specialization-store :adhoc-polymorphic-functions))
 (in-package :perf-test)
 
 (defmethod generic-= ((a string) (b string))
@@ -61,12 +64,12 @@ For the run-time performance, consider the below definitions
 (defspecialization (specialized-=-key :inline t) (&key (a string) (b string)) t
 (string= a b))
 
-(define-typed-function typed-= (a b))
-(defun-typed typed-= ((a string) (b string)) t
+(define-polymorphic-function polymorphic-= (a b))
+(defpolymorph polymorphic-= ((a string) (b string)) t
   (string= a b))
 
-(define-typed-function typed-=-key (&key a b))
-(defun-typed typed-=-key (&key ((a string) "") ((b string) "")) t
+(define-polymorphic-function polymorphic-=-key (&key a b))
+(defpolymorph polymorphic-=-key (&key ((a string) "") ((b string) "")) t
   (string= a b))
 ```
 
@@ -85,13 +88,13 @@ the performance results come out as:
 0.110 sec   | generic-=
 0.120 sec   | specialized-=
 0.323 sec   | specialized-=-key
-0.748 sec   | typed-=
-1.170 sec   | typed-=-key
+0.748 sec   | polymorphic-=
+1.170 sec   | polymorphic-=-key
 ```
 
-However, both `specialization-store` and `typed-functions` (as well as `fast-generic-functions`) provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
+However, both `specialization-store` and `adhoc-polymorphic-functions` (as well as `fast-generic-functions`) provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
 
-| Feature                         | cl:generic-function | specialization-store | typed-functions |
+| Feature                         | cl:generic-function | specialization-store | adhoc-polymorphic-functions |
 |:--------------------------------|:--------------------|:---------------------|:---------------|
 | Method combination              | Yes                 | No                   | No             |
 | Precedence                      | Yes                 | Partial*             | No             |
@@ -99,7 +102,7 @@ However, both `specialization-store` and `typed-functions` (as well as `fast-gen
 | Run-time Speed                  | Fast                | Fast                 | Slow           |
 | Compile-time support            | Partial**           | Yes                  | Yes            |
 
-\*`specialization-store` allows dispatching on the most specialized specialization; `typed-functions` provides no such support.
+\*`specialization-store` allows dispatching on the most specialized specialization; `adhoc-polymorphic-functions` provides no such support.
 
 ^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
@@ -113,17 +116,17 @@ Well...
 - Should provide compile-time optimizations, as well as compiler-notes to help user optimize / debug their code
 
 ## Examples
--
+
 See [src/misc-tests.lisp](src/misc-tests.lisp) for some more examples.
 
 ```lisp
-(use-package :typed-functions)
-(define-typed-function my= (a b))
-(defun-typed my= ((a string) (b string)) boolean
+(use-package :adhoc-polymorphic-functions)
+(define-polymorphic-function my= (a b))
+(defpolymorph my= ((a string) (b string)) boolean
   (string= a b))
-(defun-typed my= ((a character) (b character)) boolean
+(defpolymorph my= ((a character) (b character)) boolean
   (char= a b))
-(defun-typed my= ((a (simple-array single-float))
+(defpolymorph my= ((a (simple-array single-float))
                   (b (simple-array single-float))) symbol
   ;; possible here; not possible with cl:defmethod without some MOP-fu
   ;; do something
@@ -176,14 +179,15 @@ CL-USER> (defun baz (a b)
                     (type integer b))
            (my= a b))
 ; While compiling (MY= A B):
-;   No applicable TYPED-FUNCTION discovered for TYPE-LIST (STRING INTEGER).
+;
+;   No applicable POLYMORPH discovered for TYPE-LIST (STRING INTEGER).
 ;   Available TYPE-LISTs include:
 ;      ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
 ;      (CHARACTER CHARACTER)
 ;      (STRING STRING)
 BAZ
 CL-USER> (my= 5 "hello")
-; Evaluation aborted on #<TYPED-FUNCTIONS::NO-APPLICABLE-TYPED-FUNCTION {103A713D13}>.
+; Evaluation aborted on #<ADHOC-POLYMORPHIC-FUNCTIONS::NO-APPLICABLE-POLYMORPH {103A713D13}>.
 ```
 
 ## Dependencies outside quicklisp
@@ -194,8 +198,7 @@ CL-USER> (my= 5 "hello")
 
 ## Other Usage Notes
 
-- `define-typed-function` (should) have no effect if the name is already registered as a `typed-function(-wrapper)`. Use `undefine-typed-function` to deregister the name.
-- At `(debug 3)`, typed-functions (should) checks for the existence of multiple applicable `typed-function`s; otherwise, the first applicable `typed-function` is chosen.
+- At `(debug 3)`, adhoc-polymorphic-functions (should) checks for the existence of multiple applicable `polymorph`s; otherwise, the first applicable `polymorph` is chosen.
 
 ### Limitations
 
@@ -214,9 +217,9 @@ CL-USER> (defun bar ()
 ;    (MACROLET ((A NIL "hello")) (A))
 ;  could not be determined
 BAR
-CL-USER> (defun bar ()
+CL-USER> (defun bar () 
            (declare (optimize speed))
-           (my= "hello" (the string
+           (my= "hello" (the string                           ; this declaration
                              (macrolet ((a () "hello"))
                                (a)))))
 BAR

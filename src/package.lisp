@@ -1,16 +1,16 @@
 
-(uiop:define-package :typed-functions
+(uiop:define-package :adhoc-polymorphic-functions
   (:mix :trivial-types :cl :alexandria :introspect-environment)
   (:import-from :5am :is :def-test)
-  (:export :define-typed-function           
-           :undefine-typed-function
-           :defun-typed
-           :define-compiler-macro-typed
-           :fmakunbound-typed))
+  (:export :define-polymorphic-function           
+           :undefine-polymorphic-function
+           :defpolymorph
+           :defpolymorph-compiler-macro
+           :undefpolymorph))
 
-(in-package :typed-functions)
+(in-package :adhoc-polymorphic-functions)
 
-(5am:def-suite :typed-functions)
+(5am:def-suite :adhoc-polymorphic-functions)
 
 (defmacro catch-condition (form)
   `(handler-case ,form

@@ -1,4 +1,4 @@
-(in-package :typed-functions)
+(in-package :adhoc-polymorphic-functions)
 
 (defmethod %lambda-list-type ((type (eql 'required)) (lambda-list list))
   (if *lambda-list-typed-p*
@@ -21,7 +21,7 @@
 
 (defmethod %defun-body ((type (eql 'required)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
-  `(funcall (nth-value 1 (retrieve-typed-function ',*name* ,@defun-lambda-list))
+  `(funcall (nth-value 1 (retrieve-polymorph ',*name* ,@defun-lambda-list))
             ,@defun-lambda-list))
 
 (defmethod %sbcl-transform-body-args ((type (eql 'required)) (typed-lambda-list list))
