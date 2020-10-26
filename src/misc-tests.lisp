@@ -3,7 +3,7 @@
 (5am:in-suite :typed-functions)
 
 (progn
-  (define-typed-function my= (a b))
+  (define-typed-function my= (a b) :override t)
   (defun-typed my= ((a string) (b string)) boolean
     (return-from my= (string= a b)))
   (defun-typed my= ((a number) (b number)) boolean
@@ -30,7 +30,7 @@
     (is (eq 'zero (my=-caller)))))
 
 (progn ; This requires SBCL version 2.0.9+
-  (define-typed-function bar (a &optional b c))
+  (define-typed-function bar (a &optional b c) :override t)
   (defun-typed bar ((str string) &optional ((b integer) 5) ((c integer) 7)) t
     (list str b c))
   (define-compiler-macro-typed bar (string &optional integer integer) (&whole form &rest args)
@@ -50,7 +50,7 @@
   (is (equalp (bar-caller)
               '(("hello" 9 7)))))
 
-(define-typed-function baz (c &optional d))
+(define-typed-function baz (c &optional d) :override t)
 (let ((a "hello")
       (b 5))
   (defun-typed baz ((c string) &optional ((d integer) b)) t
@@ -73,7 +73,7 @@
               '("hello" 7))))
 
 (progn
-(define-typed-function foo (a &optional b))
+  (define-typed-function foo (a &optional b) :override t)
   (defun-typed foo ((str1 string) &optional ((str2 string) "str2")) t
     (declare (ignore str1 str2))
     'string)
@@ -88,7 +88,7 @@
   (is (eq 'number (foo 5.6 6))))
 
 (progn
-  (define-typed-function foobar (a &key key b))
+  (define-typed-function foobar (a &key key b) :override t)
   (defun-typed foobar ((str string) &key ((key number) 5) ((b string) "world")) t
     (declare (ignore str))
     (list 'string key b))
@@ -112,7 +112,7 @@
   (is (equalp '(number 4.4 "bye")    (foobar 5.6 :b "bye" :key 4.4))))
 
 (progn
-  (define-typed-function foz (a))
+  (define-typed-function foz (a) :override t)
   (defun-typed foz ((a number)) t
     (declare (optimize speed))
     (if (= a 5)
@@ -136,7 +136,7 @@
   (is (eq 'number (foz "world")))
   (is (eq 'string (foz 7))))
 
-(define-typed-function my+ (arg &rest args))
+(define-typed-function my+ (arg &rest args) :override t)
 (progn
   (defun-typed my+ ((num number) &rest numbers) number
     (if numbers
@@ -161,7 +161,7 @@
 
 (def-test fmakunbound-typed ()
   (with-output-to-string (*error-output*)
-    (eval '(define-typed-function fmakunbound-tester (a)))
+    (eval '(define-typed-function fmakunbound-tester (a) :override t))
     (eval '(progn            
             (defun-typed fmakunbound-tester ((a list)) symbol
               (declare (ignore a))
@@ -179,7 +179,7 @@
 (with-output-to-string (*error-output*)
   (def-test undefine-typed-function ()
     (eval '(progn
-            (define-typed-function undefine-typed-function-tester (a))
+            (define-typed-function undefine-typed-function-tester (a) :override t)
             (defun-typed undefine-typed-function-tester ((a list)) symbol
               (declare (ignore a))
               'list)
