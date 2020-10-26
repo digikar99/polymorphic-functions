@@ -132,6 +132,18 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                            original-form)))
                    (signal "COMPILER-MACRO of ~S can only optimize raw function calls." ',name)))))))))
 
+(defun extract-declarations (body)
+  "Returns two values: DECLARATIONS and remaining BODY"
+  (cond ((null body)
+         (values `(declare) nil))
+        ((and (listp (car body))
+              (eq 'declare (caar body)))
+         (multiple-value-bind (declarations rest-body) (extract-declarations (rest body))
+           (values (nconc (cons 'declare (cdar body))
+                          (rest declarations))
+                   rest-body)))
+        (t
+         (values `(declare) body))))
 
 (defmacro defun-typed (name typed-lambda-list return-type &body body &environment env)
   "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
@@ -139,57 +151,60 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (type typed-lambda-list typed-lambda-list))
   (let* ((*name*               name)
          (untyped-lambda-list (typed-function-wrapper-lambda-list
-                                (retrieve-typed-function-wrapper
-                                 name))))
+                               (retrieve-typed-function-wrapper
+                                name))))
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
       (assert (type-list-compatible-p type-list untyped-lambda-list)
               nil
               "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the TYPED-FUNCTIONs associated with ~S"
               type-list untyped-lambda-list name)
-      (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
-            (free-variable-analysis-form `(lambda ,param-list ,@body))
-            (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
-        (let* ((lambda-body `(lambda ,param-list
-                               ,(lambda-declarations typed-lambda-list :typed t)
-                               ,@(butlast body)
-                               (the ,return-type ,@(last body))))
-               ;; TODO: should not contain declarations
-               (free-variables (free-variables-p free-variable-analysis-form))
-               #+sbcl
-               (sbcl-transform `(sb-c:deftransform ,name (,param-list ,type-list *
-                                                          :policy (> speed 1))
-                                  `(apply ,',lambda-body ,@',(sbcl-transform-body-args typed-lambda-list
-                                                                                       :typed t)))))
-          ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
-          ;; and "objects of type FUNCTION can't be dumped into fasl files
-          `(progn
-             #+sbcl ,(unless (or free-variables
-                                 (recursive-function-p name lambda-body))
-                       (if (= 3 (policy-quality 'debug env))
-                           sbcl-transform
-                           `(locally (declare (sb-ext:muffle-conditions style-warning))
-                              (handler-bind ((style-warning #'muffle-warning))
-                                ,sbcl-transform))))
-             (eval-when (:compile-toplevel :load-toplevel :execute)
-               (register-typed-function ',name ',type-list
-                                        ',(if free-variables
-                                              (progn
-                                                (terpri *error-output*)
-                                                (format *error-output* "; Will not inline ~%;   ")
-                                                (write-string
-                                                 (str:replace-all
-                                                  (string #\newline)
-                                                  (uiop:strcat #\newline #\; "  ")
-                                                  (format nil "~S~&" form))
-                                                 *error-output*)
-                                                (format *error-output*
-                                                        "because free variables ~S were found"
-                                                        free-variables)
-                                                nil)
-                                              lambda-body)
-                                        ,lambda-body)
-               ',name)))))))
+      (multiple-value-bind (declarations body) (extract-declarations body)
+        (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
+              (free-variable-analysis-form `(lambda ,param-list (block ,name ,@body)))
+              (form                        `(defun-typed ,name ,typed-lambda-list ,@body)))
+          (let* ((lambda-body `(lambda ,param-list
+                                 ,(lambda-declarations typed-lambda-list :typed t)
+                                 ,declarations
+                                 (block ,name
+                                   ,@(butlast body)
+                                   (the ,return-type ,@(last body)))))
+                 ;; TODO: should not contain declarations
+                 (free-variables (free-variables-p free-variable-analysis-form))
+                 #+sbcl
+                 (sbcl-transform `(sb-c:deftransform ,name (,param-list ,type-list *
+                                                            :policy (> speed 1))
+                                    `(apply ,',lambda-body ,@',(sbcl-transform-body-args typed-lambda-list
+                                                                                         :typed t)))))
+            ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
+            ;; and "objects of type FUNCTION can't be dumped into fasl files
+            `(progn
+               #+sbcl ,(unless (or free-variables
+                                   (recursive-function-p name lambda-body))
+                         (if (= 3 (policy-quality 'debug env))
+                             sbcl-transform
+                             `(locally (declare (sb-ext:muffle-conditions style-warning))
+                                (handler-bind ((style-warning #'muffle-warning))
+                                  ,sbcl-transform))))
+               (eval-when (:compile-toplevel :load-toplevel :execute)
+                 (register-typed-function ',name ',type-list
+                                          ',(if free-variables
+                                                (progn
+                                                  (terpri *error-output*)
+                                                  (format *error-output* "; Will not inline ~%;   ")
+                                                  (write-string
+                                                   (str:replace-all
+                                                    (string #\newline)
+                                                    (uiop:strcat #\newline #\; "  ")
+                                                    (format nil "~S~&" form))
+                                                   *error-output*)
+                                                  (format *error-output*
+                                                          "because free variables ~S were found"
+                                                          free-variables)
+                                                  nil)
+                                                lambda-body)
+                                          ,lambda-body)
+                 ',name))))))))
 
 (defmacro define-compiler-macro-typed (name type-list compiler-macro-lambda-list
                                        &body body)

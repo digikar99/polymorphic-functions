@@ -5,7 +5,7 @@
 (progn
   (define-typed-function my= (a b))
   (defun-typed my= ((a string) (b string)) boolean
-    (string= a b))
+    (return-from my= (string= a b)))
   (defun-typed my= ((a number) (b number)) boolean
     (= a b))
   (define-compiler-macro-typed my= (number number) (&whole form a b)
