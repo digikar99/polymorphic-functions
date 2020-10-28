@@ -102,7 +102,7 @@ However, both `specialization-store` and `adhoc-polymorphic-functions` (as well 
 | Run-time Speed                  | Fast                | Fast                 | Slow           |
 | Compile-time support            | Partial**           | Yes                  | Yes            |
 
-\*`specialization-store` allows dispatching on the most specialized specialization; `adhoc-polymorphic-functions` provides no such support.
+\*`specialization-store` allows dispatching on the most specialized specialization; `adhoc-polymorphic-functions` provides no such support. While this could be provided, `adhoc-polymorphic-functions` relies on SBCL deftransforms on SBCL for better compile-time support, and this does not (seem to) provide such specialization support. (See [Limitations](#limitations).)
 
 ^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
