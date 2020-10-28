@@ -195,12 +195,11 @@
 
 #+sbcl
 (def-test polymorph-sbcl-transforms ()
-  (eval `(progn
-           (undefine-polymorphic-function 'sbcl-transform)
-           (define-polymorphic-function sbcl-transform (a) :override t)
-           (defpolymorph sbcl-transform ((a string)) t
-             (declare (ignore a))
-             nil)))
+  (with-output-to-string (*error-output*)
+    (eval `(progn
+             (undefine-polymorphic-function 'sbcl-transform)
+             (define-polymorphic-function sbcl-transform (a) :override t)
+             (defpolymorph sbcl-transform ((a string)) t))))
   (is (= 1 (length
             (sb-c::fun-info-transforms
              (sb-c::fun-info-or-lose 'sbcl-transform)))))

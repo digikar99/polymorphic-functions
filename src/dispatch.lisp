@@ -168,7 +168,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                  ,declarations
                                  (block ,name
                                    ,@(butlast body)
-                                   (the ,return-type ,@(last body)))))
+                                   (the ,return-type ,@(or (last body) '(nil))))))
                  ;; TODO: should not contain declarations
                  (free-variables (free-variables-p free-variable-analysis-form))
                  #+sbcl
