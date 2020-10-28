@@ -229,6 +229,15 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defun undefpolymorph (name type-list)
   "Remove the POLYMORPH associated with NAME with TYPE-LIST"
+  #+sbcl
+  (let ((info  (sb-c::fun-info-or-lose name))
+        (ctype (sb-c::specifier-type (list 'function
+                                           type-list
+                                           '*))))
+    (setf (sb-c::fun-info-transforms info)
+          (remove-if (curry #'sb-c::type= ctype)
+                     (sb-c::fun-info-transforms info)
+                     :key #'sb-c::transform-type)))
   (remove-polymorph name type-list))
 
 (defun undefine-polymorphic-function (name)

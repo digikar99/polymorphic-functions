@@ -192,3 +192,20 @@
       (undefine-polymorphic-function 'undefine-polymorphic-function-tester)
       (is-error (undefine-polymorphic-function-tester '(a)))
       (is-error (undefine-polymorphic-function-tester "hello")))))
+
+#+sbcl
+(def-test polymorph-sbcl-transforms ()
+  (eval `(progn
+           (undefine-polymorphic-function 'sbcl-transform)
+           (define-polymorphic-function sbcl-transform (a) :override t)
+           (defpolymorph sbcl-transform ((a string)) t
+             (declare (ignore a))
+             nil)))
+  (is (= 1 (length
+            (sb-c::fun-info-transforms
+             (sb-c::fun-info-or-lose 'sbcl-transform)))))
+  (eval `(undefpolymorph 'sbcl-transform '(string)))
+  (is (= 0 (length
+            (sb-c::fun-info-transforms
+             (sb-c::fun-info-or-lose 'sbcl-transform)))))
+  (eval `(undefine-polymorphic-function 'sbcl-transform)))
