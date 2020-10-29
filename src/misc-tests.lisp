@@ -134,7 +134,7 @@
   (is (eq 'string (foz "hello")))
   (is (eq 'number (foz "world")))
   (is (eq 'string (foz 7)))
-  (fmakunbound 'foz))
+  (undefine-polymorphic-function 'foz))
 
 (def-test untyped-rest-correctness ()
   (ignoring-error-output
@@ -212,3 +212,20 @@
             (sb-c::fun-info-transforms
              (sb-c::fun-info-or-lose 'sbcl-transform)))))
   (eval `(undefine-polymorphic-function 'sbcl-transform)))
+
+(def-test intersecting-type-lists ()
+  (ignoring-error-output
+    (eval `(progn
+             (undefine-polymorphic-function 'intersecting-type-lists-tester)
+             (define-polymorphic-function intersecting-type-lists-tester (a))
+             (defpolymorph intersecting-type-lists-tester ((a string)) t)))
+    (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t)))
+    (5am:is-true  (eval `(defpolymorph intersecting-type-lists-tester
+                             ((a (and array (not string)))) t)))
+    (eval `(undefpolymorph 'intersecting-type-lists-tester
+                           '((and array (not string)))))
+    (eval `(undefpolymorph 'intersecting-type-lists-tester
+                           '(string)))
+    (5am:is-true  (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t)))
+    (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a string)) t)))
+    (eval `(undefine-polymorphic-function 'intersecting-type-lists-tester))))

@@ -103,4 +103,9 @@
                                         '("hello" 5)
                                         '(number))))
 
-
+(defmethod %type-list-intersect-p ((type (eql 'required-untyped-rest)) list-1 list-2)
+  (let ((rest-position (position '&rest  list-1)))
+    (and (eq rest-position (position '&rest list-2))
+         (some #'type-intersect-p
+               (subseq list-1 rest-position)
+               (subseq list-2 rest-position)))))

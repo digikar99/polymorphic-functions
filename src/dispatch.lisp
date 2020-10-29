@@ -159,6 +159,15 @@ use by functions like TYPE-LIST-APPLICABLE-P")
               nil
               "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
               type-list untyped-lambda-list name)
+      (loop :for list :in (polymorph-wrapper-type-lists
+                           (retrieve-polymorph-wrapper
+                            name))
+            :do (when (and (type-list-intersect-p type-list list)
+                           (not (equalp type-list list)))
+                  (error "The given TYPE-LIST ~%  ~S~%intersects with the type list ~%  ~S~% of an existing polymorph"
+                         type-list
+                         list)
+                  (return)))
       (multiple-value-bind (declarations body) (extract-declarations body)
         (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
               (free-variable-analysis-form `(lambda ,param-list (block ,name ,@body)))
@@ -188,22 +197,22 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                   ,sbcl-transform))))
                (eval-when (:compile-toplevel :load-toplevel :execute)
                  (register-polymorph ',name ',type-list
-                                          ',(if free-variables
-                                                (progn
-                                                  (terpri *error-output*)
-                                                  (format *error-output* "; Will not inline ~%;   ")
-                                                  (write-string
-                                                   (str:replace-all
-                                                    (string #\newline)
-                                                    (uiop:strcat #\newline #\; "  ")
-                                                    (format nil "~S~&" form))
-                                                   *error-output*)
-                                                  (format *error-output*
-                                                          "because free variables ~S were found"
-                                                          free-variables)
-                                                  nil)
-                                                lambda-body)
-                                          ,lambda-body)
+                                     ',(if free-variables
+                                           (progn
+                                             (terpri *error-output*)
+                                             (format *error-output* "; Will not inline ~%;   ")
+                                             (write-string
+                                              (str:replace-all
+                                               (string #\newline)
+                                               (uiop:strcat #\newline #\; "  ")
+                                               (format nil "~S~&" form))
+                                              *error-output*)
+                                             (format *error-output*
+                                                     "because free variables ~S were found"
+                                                     free-variables)
+                                             nil)
+                                           lambda-body)
+                                     ,lambda-body)
                  ',name))))))))
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list
@@ -214,7 +223,14 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   ;; TODO: Handle the case when NAME is not bound to a POLYMORPH
   (let ((lambda-list (polymorph-wrapper-lambda-list
                       (retrieve-polymorph-wrapper
-                       name))))
+                       name)))
+        (type-list   (let ((key-position (position '&key type-list)))
+                       (if key-position
+                           (append (subseq type-list 0 key-position)
+                                   '(&key)
+                                   (sort (subseq type-list (1+ key-position))
+                                         #'string< :key #'first))
+                           type-list))))
     (assert (type-list-compatible-p type-list lambda-list)
             nil
             "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"

@@ -97,7 +97,11 @@
                     (t
                      (return-from %defun-lambda-list nil))))))
     (values (nreverse param-list)
-            (nreverse  type-list))))
+            (let* ((type-list    (nreverse type-list))
+                   (key-position (position '&key type-list)))
+              (append (subseq type-list 0 key-position)
+                      '(&key)
+                      (sort (subseq type-list (1+ key-position)) #'string< :key #'first))))))
 
 (def-test defun-lambda-list-key (:suite defun-lambda-list)
   (is (equalp '(a b &key)
@@ -117,7 +121,7 @@
     (is (eq second 'b))
     (is (eq third '&key))
     (is (equalp '(c 5) fourth))
-    (is (equalp type-list '(string number &key (:c number))))))
+    (is (equalp '(string number &key (:c number)) type-list))))
 
 (defmethod %defun-body ((type (eql 'required-key)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
@@ -240,3 +244,15 @@
   (5am:is-true  (type-list-applicable-p 'required-key
                                         '("hello" :c "world" :b 7)
                                         '(string &key (:b number) (:c string)))))
+
+(defmethod %type-list-intersect-p ((type (eql 'required-key)) list-1 list-2)
+  (let ((key-position (position '&key list-1)))
+    (and (eq key-position (position '&key list-2))
+         (some #'type-intersect-p
+               (subseq list-1 0 key-position)
+               (subseq list-2 0 key-position))
+         (let ((list-1      (subseq list-1 (1+ key-position)))
+               (list-2      (subseq list-2 (1+ key-position))))
+           (loop :for (param type) :in list-1
+                 :do (when (type-intersect-p type (second (assoc param list-2)))
+                       (return t)))))))

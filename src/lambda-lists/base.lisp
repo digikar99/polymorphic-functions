@@ -223,10 +223,30 @@ Non-examples:
 
 (5am:def-suite type-list-applicable-p :in lambda-list)
 
+;; TYPE-LIST-INTERSECT-P =======================================================
+
+(defun type-list-intersect-p (type-list-1 type-list-2)
+  #.+type-list-intersect-p+
+  (declare (type type-list type-list-1 type-list-2))
+  (let ((*lambda-list-typed-p* nil)
+        (*potential-type* (potential-type-of-lambda-list type-list-1)))
+    (and (length= type-list-1 type-list-2)
+         (%type-list-intersect-p *potential-type* type-list-1 type-list-2))))
+
+(defgeneric %type-list-intersect-p (type type-list-1 type-list-2)
+  (:documentation #.+type-list-intersect-p+))
+
+;; MISCELLANEOUS ===============================================================
+
+(defun type-intersect-p (type-1 type-2)
+  ;; TODO: DOes not actually handle intersection
+  (or (subtypep type-1 type-2)
+      (subtypep type-2 type-1)))
+
 (defun our-typep (arg type)
   (if *compiler-macro-expanding-p*
       (progn
-        (when (and (symbolp arg) ; type-declared-p
+        (when (and (symbolp arg)        ; type-declared-p
                    (not (cdr (assoc 'type
                                     (nth-value 2
                                                (variable-information arg *environment*))))))

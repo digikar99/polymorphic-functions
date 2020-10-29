@@ -42,3 +42,6 @@
 
 (defmethod type-list-applicable-p ((type (eql 'required)) (arg-list list) (type-list list))
   (every 'our-typep arg-list type-list))
+
+(defmethod %type-list-intersect-p ((type (eql 'required)) list-1 list-2)
+  (some #'type-intersect-p list-1 list-2))

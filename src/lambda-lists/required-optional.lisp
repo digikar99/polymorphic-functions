@@ -227,3 +227,12 @@
                                         '()
                                         '(string &optional number))))
 
+(defmethod %type-list-intersect-p ((type (eql 'required-optional)) list-1 list-2)
+  (let ((optional-position (position '&optional list-1)))
+    (and (eq optional-position (position '&optional list-2))
+         (some #'type-intersect-p
+               (subseq list-1 0 optional-position)
+               (subseq list-2 0 optional-position))
+         (some #'type-intersect-p
+               (subseq list-1 (1+ optional-position))
+               (subseq list-2 (1+ optional-position))))))
