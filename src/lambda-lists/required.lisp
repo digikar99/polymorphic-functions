@@ -22,7 +22,8 @@
 (defmethod %defun-body ((type (eql 'required)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
   `(funcall (nth-value 1 (retrieve-polymorph ',*name* ,@defun-lambda-list))
-            ,@defun-lambda-list))
+          ,@defun-lambda-list))
+
 
 (defmethod %sbcl-transform-body-args ((type (eql 'required)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
@@ -40,8 +41,17 @@
                                     (untyped-lambda-list list))
   (length= type-list untyped-lambda-list))
 
-(defmethod type-list-applicable-p ((type (eql 'required)) (arg-list list) (type-list list))
-  (every 'our-typep arg-list type-list))
+(defmethod applicable-p-function ((type (eql 'required)) (type-list list))
+  (let ((param-list (mapcar #'type->param type-list)))
+    `(lambda ,param-list
+       (declare (optimize speed))
+       (if *compiler-macro-expanding-p*
+           (and ,@(loop :for param :in param-list
+                        :for type  :in type-list
+                        :collect `(our-typep ,param ',type)))
+           (and ,@(loop :for param :in param-list
+                        :for type  :in type-list
+                        :collect `(typep ,param ',type)))))))
 
 (defmethod %type-list-intersect-p ((type (eql 'required)) list-1 list-2)
   (some #'type-intersect-p list-1 list-2))

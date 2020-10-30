@@ -180,52 +180,32 @@
        (= (position '&optional type-list)
           (position '&optional untyped-lambda-list))))
 
-(defmethod type-list-applicable-p ((type (eql 'required-optional))
-                                   (arg-list list)
-                                   (type-list list))
-  (let ((applicable-p t))
-    (loop :for type := (first type-list)
-          :for arg  := (first arg-list)
-          :while applicable-p
-          :until (eq type '&optional)
-          :do (unless (our-typep arg type)
-                (setf applicable-p nil))
-              ;; TYPE-LIST must contain at least one additional element
-              ;; &optional than ARG-LIST
-              (setf applicable-p (and applicable-p
-                                      (rest type-list)
-                                      arg-list)
-                    type-list    (rest type-list)
-                    arg-list     (rest arg-list)))
-    (when (and applicable-p
-               (eq '&optional (first type-list)))
-      (setf type-list (rest type-list))
-      (loop :for arg := (first arg-list)
-            :for type :in type-list
-            :while (and applicable-p
-                        arg
-                        type)           ; (typep nil nil) returns NIL
-            :do (unless (our-typep arg type)
-                  (setf applicable-p nil))
-                (setf arg-list (rest arg-list))))
-    (and (not arg-list) applicable-p)))
-
-(def-test type-list-optional (:suite type-list-applicable-p)
-  (5am:is-false (type-list-applicable-p 'required-optional
-                                        '("hello" 5 6)
-                                        '(string &optional number)))
-  (5am:is-true  (type-list-applicable-p 'required-optional
-                                        '("hello" 5)
-                                        '(string &optional number)))
-  (5am:is-false (type-list-applicable-p 'required-optional
-                                        '("hello" 5)
-                                        '(number &optional number)))
-  (5am:is-true  (type-list-applicable-p 'required-optional
-                                        '("hello")
-                                        '(string &optional number)))
-  (5am:is-false (type-list-applicable-p 'required-optional
-                                        '()
-                                        '(string &optional number))))
+(defmethod applicable-p-function ((type (eql 'required-optional)) (type-list list))
+  (let* ((optional-position (position '&optional type-list))
+         (param-list (loop :for i :from 0
+                           :for type :in type-list
+                           :collect (if (> i optional-position)
+                                        (type->param type '&optional)
+                                        (type->param type)))))
+    `(lambda ,param-list
+       (declare (optimize speed))
+       (if *compiler-macro-expanding-p*
+           (and ,@(loop :for param :in (subseq param-list 0 optional-position)
+                        :for type  :in (subseq type-list  0 optional-position)
+                        :collect `(our-typep ,param ',type))
+                ,@(loop :for (param default supplied-p)
+                          :in (subseq param-list (1+ optional-position))
+                        :for type  :in (subseq type-list (1+ optional-position))
+                        :collect `(or (not ,supplied-p)
+                                      (our-typep ,param ',type))))
+           (and ,@(loop :for param :in (subseq param-list 0 optional-position)
+                        :for type  :in (subseq type-list  0 optional-position)
+                        :collect `(typep ,param ',type))
+                ,@(loop :for (param default supplied-p)
+                          :in (subseq param-list (1+ optional-position))
+                        :for type  :in (subseq type-list (1+ optional-position))
+                        :collect `(or (not ,supplied-p)
+                                      (typep ,param ',type))))))))
 
 (defmethod %type-list-intersect-p ((type (eql 'required-optional)) list-1 list-2)
   (let ((optional-position (position '&optional list-1)))

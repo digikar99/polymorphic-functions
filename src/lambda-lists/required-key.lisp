@@ -197,53 +197,32 @@
                   (return-from %type-list-compatible-p nil))))
     t))
 
-(defmethod type-list-applicable-p ((type (eql 'required-key))
-                                   (arg-list list)
-                                   (type-list list))
-  (let ((applicable-p t))
-    (loop :for type := (first type-list)
-          :for arg  := (first arg-list)
-          :while applicable-p
-          :until (eq type '&key)
-          :do (unless (our-typep arg type)
-                (setf applicable-p nil))
-              ;; TYPE-LIST must contain at least one additional element
-              ;; &key than ARG-LIST
-              (setf applicable-p (and applicable-p
-                                      (rest type-list)
-                                      arg-list)
-                    type-list    (rest type-list)
-                    arg-list     (rest arg-list)))
-    (when (and applicable-p
-               (eq '&key (first type-list)))
-      (setf type-list (rest type-list))
-      (loop :for key  := (first arg-list)
-            :for value := (second arg-list)
-            :for type := (second (assoc key type-list))
-            :while (and applicable-p
-                        value
-                        type)           ; (typep nil nil) returns NIL
-            :do (unless (our-typep value type)
-                  (setf applicable-p nil))
-                (setf arg-list (cddr arg-list))))
-    (and (not arg-list) applicable-p)))
-
-(def-test type-list-key (:suite type-list-applicable-p)
-  (5am:is-true  (type-list-applicable-p 'required-key
-                                        '("hello")
-                                        '(string &key (:b number))))
-  (5am:is-true  (type-list-applicable-p 'required-key
-                                        '("hello" :b 5)
-                                        '(string &key (:b number))))
-  (5am:is-false (type-list-applicable-p 'required-key
-                                        '("hello" :b 5)
-                                        '(number &key (:b number))))
-  (5am:is-false (type-list-applicable-p 'required-key
-                                        '("hello" :c 4 :b 5)
-                                        '(string &key (:b number))))
-  (5am:is-true  (type-list-applicable-p 'required-key
-                                        '("hello" :c "world" :b 7)
-                                        '(string &key (:b number) (:c string)))))
+(defmethod applicable-p-function ((type (eql 'required-key)) (type-list list))
+  (let* ((key-position (position '&key type-list))
+         (param-list (loop :for i :from 0
+                           :for type :in type-list
+                           :collect (if (> i key-position)
+                                        (type->param type '&key)
+                                        (type->param type)))))
+    `(lambda ,param-list
+       (declare (optimize speed))
+       (if *compiler-macro-expanding-p*
+           (and ,@(loop :for param :in (subseq param-list 0 key-position)
+                        :for type  :in (subseq type-list  0 key-position)
+                        :collect `(our-typep ,param ',type))
+                ,@(loop :for (param default supplied-p)
+                          :in (subseq param-list (1+ key-position))
+                        :for type  :in (subseq type-list (1+ key-position))
+                        :collect `(or (not ,supplied-p)
+                                      (our-typep ,param ',(second type)))))
+           (and ,@(loop :for param :in (subseq param-list 0 key-position)
+                        :for type  :in (subseq type-list  0 key-position)
+                        :collect `(typep ,param ',type))
+                ,@(loop :for (param default supplied-p)
+                          :in (subseq param-list (1+ key-position))
+                        :for type  :in (subseq type-list (1+ key-position))
+                        :collect `(or (not ,supplied-p)
+                                      (typep ,param ',(second type)))))))))
 
 (defmethod %type-list-intersect-p ((type (eql 'required-key)) list-1 list-2)
   (let ((key-position (position '&key list-1)))

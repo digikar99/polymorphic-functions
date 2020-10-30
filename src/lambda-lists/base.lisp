@@ -205,23 +205,17 @@ Non-examples:
   (5am:is-true  (type-list-compatible-p '(string) '(c &rest e)))
   (5am:is-false (type-list-compatible-p '(number string) '(c &rest e))))
 
-;; TYPE-LIST-APPLICABLE-P ======================================================
+;; APPLICABLE-P-FUNCTION =======================================================
 
-(defgeneric type-list-applicable-p (lambda-list-type arg-list type-list))
+(defgeneric applicable-p-function (lambda-list-type type-list))
 
-(defmethod type-list-applicable-p ((type t)
-                                   (arg-list t)
-                                   (typed-lambda-list t))
+(defmethod applicable-p-function ((type t) (type-list t))
   (assert (typep type 'lambda-list-type) nil
           "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
           +lambda-list-types+ type)
   (assert (typep type-list 'type-list) nil
           "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
-  (assert (typep arg-list 'list) nil
-          "Expected ARG-LIST to be a LIST but is ~a" arg-list)
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
-
-(5am:def-suite type-list-applicable-p :in lambda-list)
 
 ;; TYPE-LIST-INTERSECT-P =======================================================
 
@@ -244,13 +238,27 @@ Non-examples:
       (subtypep type-2 type-1)))
 
 (defun our-typep (arg type)
-  (if *compiler-macro-expanding-p*
-      (progn
-        (when (and (symbolp arg)        ; type-declared-p
-                   (not (cdr (assoc 'type
-                                    (nth-value 2
-                                               (variable-information arg *environment*))))))
-          (signal 'form-type-failure :form arg))
-        (subtypep (form-type arg *environment*) type))
-      (typep arg type)))
+  (assert *compiler-macro-expanding-p*)
+  (when (and (symbolp arg)    ; type-declared-p
+             (not (cdr (assoc 'type
+                              (nth-value 2
+                                         (variable-information arg *environment*))))))
+    (signal 'form-type-failure :form arg))
+  (subtypep (form-type arg *environment*) type))
 
+(defun type->param (type-specifier &optional type)
+  (if (member type-specifier lambda-list-keywords)
+      type-specifier
+      (case type
+        (&key (list (intern (symbol-name (first type-specifier))
+                            :adhoc-polymorphic-functions)
+                    nil
+                    (gensym (concatenate 'string
+                                         (write-to-string (first type-specifier))
+                                         "-SUPPLIED-P"))))
+        (&optional (list (gensym (write-to-string type-specifier))
+                         nil
+                         (gensym (concatenate 'string
+                                              (write-to-string type-specifier)
+                                              "-SUPPLIED-P"))))
+        (t (gensym (write-to-string type-specifier))))))

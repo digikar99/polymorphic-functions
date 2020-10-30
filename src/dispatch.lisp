@@ -41,7 +41,7 @@
       "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH for
 use by functions like TYPE-LIST-APPLICABLE-P")
 
-(defmacro with-compiler-note (form &body body)
+(defmacro with-compiler-note (&body body)
   `(handler-case (progn ,@body)
      (no-applicable-polymorph (condition)
        (format *error-output*
@@ -49,7 +49,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                form
                (str:join (uiop:strcat #\newline ";  ")
                          (str:split #\newline (format nil "~A" condition))))
-       ,form)
+       original-form)
      (form-type-failure (condition)
        (declare (ignorable condition))
        #-sbcl
@@ -57,16 +57,16 @@ use by functions like TYPE-LIST-APPLICABLE-P")
          (format *error-output*
                  (uiop:strcat "~%; Unable to optimize~%; "
                               (str:join (uiop:strcat #\newline ";  ")
-                                        (str:split #\newline (format nil " ~S" ,form)))
+                                        (str:split #\newline (format nil " ~S" original-form)))
                               "~%; because ~&; ~A")
                  (str:join (uiop:strcat #\newline ";  ")
                            (str:split #\newline (format nil "~A" condition)))))
-       ,form)
+       block-form)
      (condition (condition)
        (format *error-output*
                (cond ((< 1 (policy-quality 'speed env))
                       (uiop:strcat "~&; "
-                                   (format nil "Unable to optimize ~S because:" ,form)
+                                   (format nil "Unable to optimize ~S because:" original-form)
                                    "~&;  ~A"))
                      ((eq 'apply (car form))
                       "~&; ~A")
@@ -77,7 +77,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                      (t ""))
                (str:join (uiop:strcat #\newline ";  ")
                          (str:split #\newline (format nil "~A" condition))))
-       ,form)))
+       original-form
+       block-form)))
 
 (defmacro define-polymorphic-function (name untyped-lambda-list &key override &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH for specializing on ORDINARY and OPTIONAL argument types."
@@ -102,11 +103,19 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (declare (ignore args))
            (let ((*environment*                 env)
                  (*compiler-macro-expanding-p*    t)
-                 (original-form                form))
-             (with-compiler-note original-form
+                 (original-form                form)
+                 (block-form                    nil))
+             (with-compiler-note
                (when (eq 'funcall (car form))
                  (setf form (cons (second (cadr form))
                                   (cddr form))))
+               (setq block-form 
+                     (let ((name (first form)))
+                       `(block ,name
+                          (funcall (nth-value 1 (retrieve-polymorph
+                                                 ',name
+                                                 ,@(rest form)))
+                                   ,@(rest form)))))
                (if (eq ',name (car form))
                    (let ((arg-list (rest form)))
                      (multiple-value-bind (body function dispatch-type-list)

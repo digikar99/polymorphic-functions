@@ -85,23 +85,20 @@
                                     (untyped-lambda-list list))
   (= (length type-list) (position '&rest untyped-lambda-list)))
 
-(defmethod type-list-applicable-p ((type (eql 'required-untyped-rest))
-                                   (arg-list list)
-                                   (type-list list))
-  (every 'our-typep
-         (subseq arg-list 0 (length type-list))
-         type-list))
-
-(def-test type-list-untyped-rest (:suite type-list-applicable-p)
-  (5am:is-true (type-list-applicable-p 'required-untyped-rest
-                                        '("hello" 5 6)
-                                        '(string)))
-  (5am:is-true  (type-list-applicable-p 'required-untyped-rest
-                                        '("hello" 5)
-                                        '(string)))
-  (5am:is-false (type-list-applicable-p 'required-untyped-rest
-                                        '("hello" 5)
-                                        '(number))))
+(defmethod applicable-p-function ((type (eql 'required-untyped-rest)) (type-list list))
+  (let* ((rest-position (position '&rest type-list))
+         (param-list (append (mapcar #'type->param (subseq type-list 0 rest-position))
+                             `(&rest ,(gensym)))))
+    `(lambda ,param-list
+       (declare (optimize speed)
+                (ignore ,@(last param-list)))
+       (if *compiler-macro-expanding-p*
+           (and ,@(loop :for param :in (subseq param-list 0 rest-position)
+                        :for type  :in (subseq type-list  0 rest-position)
+                        :collect `(our-typep ,param ',type)))
+           (and ,@(loop :for param :in (subseq param-list 0 rest-position)
+                        :for type  :in (subseq type-list  0 rest-position)
+                        :collect `(typep ,param ',type)))))))
 
 (defmethod %type-list-intersect-p ((type (eql 'required-untyped-rest)) list-1 list-2)
   (let ((rest-position (position '&rest  list-1)))
