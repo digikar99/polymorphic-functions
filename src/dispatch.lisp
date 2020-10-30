@@ -145,6 +145,17 @@ use by functions like TYPE-LIST-APPLICABLE-P")
         (t
          (values `(declare) body))))
 
+(defun ensure-non-intersecting-type-lists (name type-list)
+  (loop :for list :in (polymorph-wrapper-type-lists
+                       (retrieve-polymorph-wrapper
+                        name))
+        :do (when (and (type-list-intersect-p type-list list)
+                       (not (equalp type-list list)))
+              (error "The given TYPE-LIST ~%  ~S~%intersects with the type list ~%  ~S~% of an existing polymorph"
+                     type-list
+                     list)
+              (return))))
+
 (defmacro defpolymorph (name typed-lambda-list return-type &body body &environment env)
   "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type function-name name)
@@ -159,15 +170,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
               nil
               "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
               type-list untyped-lambda-list name)
-      (loop :for list :in (polymorph-wrapper-type-lists
-                           (retrieve-polymorph-wrapper
-                            name))
-            :do (when (and (type-list-intersect-p type-list list)
-                           (not (equalp type-list list)))
-                  (error "The given TYPE-LIST ~%  ~S~%intersects with the type list ~%  ~S~% of an existing polymorph"
-                         type-list
-                         list)
-                  (return)))
+      (ensure-non-intersecting-type-lists name type-list)
       (multiple-value-bind (declarations body) (extract-declarations body)
         (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
               (free-variable-analysis-form `(lambda ,param-list (block ,name ,@body)))
@@ -235,6 +238,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
             nil
             "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
             type-list lambda-list name)
+    (ensure-non-intersecting-type-lists name type-list)
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (register-polymorph-compiler-macro
         ',name ',type-list
