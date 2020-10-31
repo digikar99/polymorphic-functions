@@ -115,20 +115,17 @@
   the third is the type list corresponding to the polymorph that will be used for dispatch"
   (declare (type function-name name))
   (let* ((function-wrapper       (gethash name *polymorphic-function-table*))
-         (wrapper-hash-table     (polymorph-wrapper-hash-table function-wrapper))
-         (type-lists             (polymorph-wrapper-type-lists function-wrapper)))
-    (let ((applicable-function-type-lists
-            (loop :for polymorph :being the hash-values :of wrapper-hash-table
-                  :if (polymorph-applicable-p polymorph arg-list)
-                    :collect (polymorph-type-list polymorph))))
-      (case (length applicable-function-type-lists)
-        (1 (with-slots (body function)
-               (gethash (first applicable-function-type-lists) wrapper-hash-table)
-             (values body function (first applicable-function-type-lists))))
-        (0 (error 'no-applicable-polymorph :arg-list arg-list :type-lists type-lists))
-        (t (error "Multiple applicable POLYMORPHs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
-                  arg-list
-                  applicable-function-type-lists))))))
+         (wrapper-hash-table     (polymorph-wrapper-hash-table function-wrapper)))
+    (loop :for polymorph :being the hash-values :of wrapper-hash-table
+          :do (when (apply (polymorph-applicable-p-function polymorph)
+                           arg-list)
+                (return-from retrieve-polymorph
+                  (values (polymorph-body      polymorph)
+                          (polymorph-function  polymorph)
+                          (polymorph-type-list polymorph)))))
+    (error 'no-applicable-polymorph
+           :arg-list arg-list
+           :type-lists (polymorph-wrapper-type-lists function-wrapper))))
 
 (defun remove-polymorph (name type-list)
   (let ((wrapper (retrieve-polymorph-wrapper name)))

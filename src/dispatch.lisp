@@ -61,7 +61,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               "~%; because ~&; ~A")
                  (str:join (uiop:strcat #\newline ";  ")
                            (str:split #\newline (format nil "~A" condition)))))
-       block-form)
+       (if (= 3 (policy-quality 'debug env))
+           original-form
+           block-form))
      (condition (condition)
        (format *error-output*
                (cond ((< 1 (policy-quality 'speed env))
@@ -77,8 +79,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                      (t ""))
                (str:join (uiop:strcat #\newline ";  ")
                          (str:split #\newline (format nil "~A" condition))))
-       original-form
-       block-form)))
+       (if (= 3 (policy-quality 'debug env))
+           original-form
+           block-form))))
 
 (defmacro define-polymorphic-function (name untyped-lambda-list &key override &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH

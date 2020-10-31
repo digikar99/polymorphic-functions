@@ -73,7 +73,7 @@ For the run-time performance, consider the below definitions
   (string= a b))
 ```
 
-For a 1,000,000 calls to each in the format
+For a 5,000,000 calls to each in the format
 
 ```lisp
 (let ((a "hello")
@@ -84,15 +84,15 @@ For a 1,000,000 calls to each in the format
 the performance results come out as:
 
 ```
-0.001 sec   | naive string=
-0.110 sec   | generic-=
-0.120 sec   | specialized-=
-0.323 sec   | specialized-=-key
-0.748 sec   | polymorphic-=
-1.170 sec   | polymorphic-=-key
+0.016 sec   | naive string=
+0.577 sec   | generic-=
+0.616 sec   | specialized-=
+1.620 sec   | specialized-=-key
+0.761 sec   | polymorphic-=
+0.918 sec   | polymorphic-=-key
 ```
 
-However, both `specialization-store` and `adhoc-polymorphic-functions` (as well as `fast-generic-functions`) provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
+All of `specialization-store` and `adhoc-polymorphic-functions` as well as `fast-generic-functions` or `static-dispatch` provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
 
 | Feature                         | cl:generic-function | specialization-store | adhoc-polymorphic-functions |
 |:--------------------------------|:--------------------|:---------------------|:---------------|
@@ -102,7 +102,7 @@ However, both `specialization-store` and `adhoc-polymorphic-functions` (as well 
 | Run-time Speed                  | Fast                | Fast                 | Slow           |
 | Compile-time support            | Partial**           | Yes                  | Yes            |
 
-\*`specialization-store` allows dispatching on the most specialized specialization; `adhoc-polymorphic-functions` provides no such support. While this could be provided, `adhoc-polymorphic-functions` relies on SBCL deftransforms on SBCL for better compile-time support, and this does not (seem to) provide such specialization support. (See [Limitations](#limitations).)
+\*`specialization-store` allows dispatching on the most specialized specialization; `adhoc-polymorphic-functions` provides no such support. In fact, as of this commit, this library wouldn't allow you to define polymorphs whose type lists are a subtype of each other. While specialization could have been provided, `adhoc-polymorphic-functions` relies on SBCL deftransforms on SBCL for better compile-time support, and this does not (seem to) provide such specialization support. (See [Limitations](#limitations).)
 
 ^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
@@ -198,7 +198,8 @@ CL-USER> (my= 5 "hello")
 
 ## Other Usage Notes
 
-- At `(debug 3)`, adhoc-polymorphic-functions (should) checks for the existence of multiple applicable `polymorph`s; otherwise, the first applicable `polymorph` is chosen.
+- For the sake of runtime performance, `adhoc-polymorphic-function`'s compiler macros do some things that may make debugging harder. To avoid such ugly things, use `(debug 3)`.
+- `adhoc-polymorphic-functions` intends to check for intersecting type-lists to keep the type-lists of the polymorphs disjoint. However, this support is currently limited to the case wherein one is a proper subtype or supertype of the other.
 
 ### Limitations
 
