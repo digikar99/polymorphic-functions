@@ -228,11 +228,12 @@
 (defmethod %type-list-intersect-p ((type (eql 'required-key)) list-1 list-2)
   (let ((key-position (position '&key list-1)))
     (and (eq key-position (position '&key list-2))
-         (some #'type-intersect-p
-               (subseq list-1 0 key-position)
-               (subseq list-2 0 key-position))
-         (let ((list-1      (subseq list-1 (1+ key-position)))
-               (list-2      (subseq list-2 (1+ key-position))))
-           (loop :for (param type) :in list-1
-                 :do (when (type-intersect-p type (second (assoc param list-2)))
-                       (return t)))))))
+         (every #'type-intersect-p
+                (subseq list-1 0 key-position)
+                (subseq list-2 0 key-position)))))
+
+(def-test type-list-intersect-key (:suite type-list-intersect-p)
+  (5am:is-true  (type-list-intersect-p '(string &key (:a string)) '(string &key (:a array))))
+  (5am:is-true  (type-list-intersect-p '(string &key (:a string)) '(string &key (:a number))))
+  (5am:is-false (type-list-intersect-p '(string &key (:a string)) '(number)))
+  (5am:is-false (type-list-intersect-p '(string &key (:a string)) '(number &key (:a string)))))

@@ -230,6 +230,8 @@ Non-examples:
 (defgeneric %type-list-intersect-p (type type-list-1 type-list-2)
   (:documentation #.+type-list-intersect-p+))
 
+(5am:def-suite type-list-intersect-p :in lambda-list)
+
 ;; MISCELLANEOUS ===============================================================
 
 (defun type-intersect-p (type-1 type-2)

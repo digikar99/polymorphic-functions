@@ -103,6 +103,11 @@
 (defmethod %type-list-intersect-p ((type (eql 'required-untyped-rest)) list-1 list-2)
   (let ((rest-position (position '&rest  list-1)))
     (and (eq rest-position (position '&rest list-2))
-         (some #'type-intersect-p
-               (subseq list-1 rest-position)
-               (subseq list-2 rest-position)))))
+         (every #'type-intersect-p
+                (subseq list-1 rest-position)
+                (subseq list-2 rest-position)))))
+
+(def-test type-list-intersect-untyped-rest (:suite type-list-intersect-p)
+  (5am:is-true  (type-list-intersect-p '(string string) '(string array)))
+  (5am:is-false (type-list-intersect-p '(string string) '(string number)))
+  (5am:is-false (type-list-intersect-p '(string string) '(string))))

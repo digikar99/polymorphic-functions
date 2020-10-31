@@ -211,9 +211,12 @@
 (defmethod %type-list-intersect-p ((type (eql 'required-optional)) list-1 list-2)
   (let ((optional-position (position '&optional list-1)))
     (and (eq optional-position (position '&optional list-2))
-         (some #'type-intersect-p
-               (subseq list-1 0 optional-position)
-               (subseq list-2 0 optional-position))
-         (some #'type-intersect-p
-               (subseq list-1 (1+ optional-position))
-               (subseq list-2 (1+ optional-position))))))
+         (every #'type-intersect-p
+                (subseq list-1 0 optional-position)
+                (subseq list-2 0 optional-position)))))
+
+(def-test type-list-intersect-optional (:suite type-list-intersect-p)
+  (5am:is-true  (type-list-intersect-p '(string &optional string) '(string &optional array)))
+  (5am:is-true  (type-list-intersect-p '(string &optional string) '(string &optional number)))
+  (5am:is-false (type-list-intersect-p '(string &optional string) '(number)))
+  (5am:is-false (type-list-intersect-p '(string &optional string) '(number &optional string))))
