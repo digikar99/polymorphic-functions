@@ -53,6 +53,9 @@ For the run-time performance, consider the below definitions
   (:use :cl :specialization-store :adhoc-polymorphic-functions))
 (in-package :perf-test)
 
+(defun function-= (a b)
+  (string= a b))
+
 (defmethod generic-= ((a string) (b string))
   (string= a b))
 
@@ -62,7 +65,7 @@ For the run-time performance, consider the below definitions
 
 (defstore specialized-=-key (&key a b))
 (defspecialization (specialized-=-key :inline t) (&key (a string) (b string)) t
-(string= a b))
+  (string= a b))
 
 (define-polymorphic-function polymorphic-= (a b))
 (defpolymorph polymorphic-= ((a string) (b string)) t
@@ -84,7 +87,7 @@ For a 5,000,000 calls to each in the format
 the performance results come out as:
 
 ```
-0.016 sec   | naive string=
+0.494 sec   | function-=
 0.577 sec   | generic-=
 0.616 sec   | specialized-=
 1.620 sec   | specialized-=-key
