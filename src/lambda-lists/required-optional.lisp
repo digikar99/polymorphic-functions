@@ -138,13 +138,14 @@
                             (cons ,sym ,(optional-p-tree (rest optional-lambda-list)))
                             ())))))
         (let ((optional-p-tree (optional-p-tree defun-lambda-list)))
-          (values `(let ((apply-list ,optional-p-tree))
-                     (apply (nth-value 1 (apply 'retrieve-polymorph
-                                                ',*name*
-                                                ,@(reverse return-list)
-                                                apply-list))
-                            ,@(reverse return-list)
-                            apply-list))
+          (values (with-gensyms (apply-list)
+                    `(let ((,apply-list ,optional-p-tree))
+                       (apply (nth-value 1 (apply 'retrieve-polymorph
+                                                  ',*name*
+                                                  ,@(reverse return-list)
+                                                  ,apply-list))
+                              ,@(reverse return-list)
+                              ,apply-list)))
                   defun-lambda-list))))))
 
 (defmethod %sbcl-transform-body-args ((type (eql 'required-optional)) (typed-lambda-list list))

@@ -229,3 +229,14 @@
     (5am:is-true  (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t)))
     (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a string)) t)))
     (eval `(undefine-polymorphic-function 'intersecting-type-lists-tester))))
+
+(def-test once-only ()
+  (ignoring-error-output
+    (eval `(progn
+             (define-polymorphic-function my= (&key a b) :override t)
+             (defpolymorph my= (&key ((a number) 0) ((b number) 0)) boolean
+               (= a b)))))
+  (is (= 3 (eval `(let ((a 1))
+                    (my= :a (incf a) :b (incf a))
+                    a))))
+  (undefine-polymorphic-function 'my=))

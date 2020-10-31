@@ -148,13 +148,14 @@
                                     (cons ,sym ,recurse-result))
                               ,recurse-result))))))
         (let ((key-p-tree (key-p-tree defun-lambda-list)))
-          (values `(let ((apply-list ,key-p-tree))
-                     (apply (nth-value 1 (apply 'retrieve-polymorph
-                                                ',*name*
-                                                ,@(reverse return-list)
-                                                apply-list))
-                            ,@(reverse return-list)
-                            apply-list))
+          (values (with-gensyms (apply-list)
+                    `(let ((,apply-list ,key-p-tree))
+                       (apply (nth-value 1 (apply 'retrieve-polymorph
+                                                  ',*name*
+                                                  ,@(reverse return-list)
+                                                  ,apply-list))
+                              ,@(reverse return-list)
+                              ,apply-list)))
                   defun-lambda-list))))))
 
 (defmethod %sbcl-transform-body-args ((type (eql 'required-key)) (typed-lambda-list list))

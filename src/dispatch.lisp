@@ -81,7 +81,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
        block-form)))
 
 (defmacro define-polymorphic-function (name untyped-lambda-list &key override &environment env)
-  "Define a function named NAME that can then be used for DEFPOLYMORPH for specializing on ORDINARY and OPTIONAL argument types."
+  "Define a function named NAME that can then be used for DEFPOLYMORPH
+for specializing on ORDINARY and OPTIONAL argument types."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
@@ -110,12 +111,16 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                  (setf form (cons (second (cadr form))
                                   (cddr form))))
                (setq block-form 
-                     (let ((name (first form)))
-                       `(block ,name
-                          (funcall (nth-value 1 (retrieve-polymorph
-                                                 ',name
-                                                 ,@(rest form)))
-                                   ,@(rest form)))))
+                     (let ((name (first form))
+                           (gensyms (make-gensym-list (length (rest form)))))
+                       `(let (,@(loop :for sym :in gensyms
+                                      :for form :in (rest form)
+                                      :collect `(,sym ,form)))
+                          (block ,name
+                            (funcall (nth-value 1 (retrieve-polymorph
+                                                   ',name
+                                                   ,@gensyms))
+                                     ,@gensyms)))))
                (if (eq ',name (car form))
                    (let ((arg-list (rest form)))
                      (multiple-value-bind (body function dispatch-type-list)
