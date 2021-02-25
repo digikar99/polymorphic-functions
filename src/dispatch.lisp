@@ -52,18 +52,21 @@ use by functions like TYPE-LIST-APPLICABLE-P")
        original-form)
      (form-type-failure (condition)
        (declare (ignorable condition))
-       #-sbcl
-       (when (< 1 (policy-quality 'speed env))
-         (format *error-output*
-                 (uiop:strcat "~%; Unable to optimize~%; "
-                              (str:join (uiop:strcat #\newline ";  ")
-                                        (str:split #\newline (format nil " ~S" original-form)))
-                              "~%; because ~&; ~A")
-                 (str:join (uiop:strcat #\newline ";  ")
-                           (str:split #\newline (format nil "~A" condition)))))
-       (if (= 3 (policy-quality 'debug env))
+       (if (member :sbcl *features*)
            original-form
-           block-form))
+           (progn
+             (when (< 1 (policy-quality 'speed env))
+               (format *error-output*
+                       (uiop:strcat "~%; Unable to optimize~%; "
+                                    (str:join (uiop:strcat #\newline ";  ")
+                                              (str:split #\newline (format nil " ~S"
+                                                                           original-form)))
+                                    "~%; because ~&; ~A")
+                       (str:join (uiop:strcat #\newline ";  ")
+                                 (str:split #\newline (format nil "~A" condition)))))
+             (if (= 3 (policy-quality 'debug env))
+                 original-form
+                 block-form))))
      (condition (condition)
        (format *error-output*
                (cond ((< 1 (policy-quality 'speed env))
@@ -113,7 +116,7 @@ for specializing on ORDINARY and OPTIONAL argument types."
                (when (eq 'funcall (car form))
                  (setf form (cons (second (cadr form))
                                   (cddr form))))
-               (setq block-form 
+               (setq block-form
                      (let ((name (first form))
                            (gensyms (make-gensym-list (length (rest form)))))
                        `(let (,@(loop :for sym :in gensyms
