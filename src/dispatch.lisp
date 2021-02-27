@@ -127,31 +127,30 @@ for specializing on ORDINARY and OPTIONAL argument types."
                                                    ',name
                                                    ,@gensyms))
                                      ,@gensyms)))))
-               (cond ((< (policy-quality 'speed env) 2)
-                      (return-from ,name original-form))
-                     ((not (eq ',name (car form)))
-                      (signal "COMPILER-MACRO of ~S can only optimize raw function calls."
-                              ',name))
-                     (t
-                      (let ((arg-list (rest form)))
-                        (multiple-value-bind (body function dispatch-type-list)
-                            (apply 'retrieve-polymorph ',name arg-list)
-                          (declare (ignore function))
-                          (unless body
-                            ;; TODO: Here the reason concerning free-variables is hardcoded
-                            (signal "~&~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
-                          (if-let ((compiler-function (apply
-                                                       'retrieve-polymorph-compiler-macro
-                                                       ',name arg-list)))
-                            (funcall compiler-function
-                                     (cons body (rest form))
-                                     env)
-                            ;; TODO: Use some other declaration for inlining as well
-                            ;; Optimized for speed and type information available
-                            (if (recursive-function-p ',name body)
-                                (signal "~&Inlining ~S results in (potentially infinite) recursive expansion"
-                                        form)
-                                `(,body ,@(cdr form)))))))))))))))
+               (if (eq ',name (car form))
+                   (let ((arg-list (rest form)))
+                     (multiple-value-bind (body function dispatch-type-list)
+                         (apply 'retrieve-polymorph ',name arg-list)
+                       (declare (ignore function))
+                       (if (< 1 (policy-quality 'speed env))
+                           (progn
+                             (unless body
+                               ;; TODO: Here the reason concerning free-variables is hardcoded
+                               (signal "~&~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
+                             (if-let ((compiler-function (apply
+                                                          'retrieve-polymorph-compiler-macro
+                                                          ',name arg-list)))
+                               (funcall compiler-function
+                                        (cons body (rest form))
+                                        env)
+                               ;; TODO: Use some other declaration for inlining as well
+                               ;; Optimized for speed and type information available
+                               (if (recursive-function-p ',name body)
+                                   (signal "~&Inlining ~S results in (potentially infinite) recursive expansion"
+                                           form)
+                                   `(,body ,@(cdr form)))))
+                           original-form)))
+                   (signal "COMPILER-MACRO of ~S can only optimize raw function calls." ',name)))))))))
 
 (defun extract-declarations (body)
   "Returns two values: DECLARATIONS and remaining BODY"
