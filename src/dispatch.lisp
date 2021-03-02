@@ -86,7 +86,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            original-form
            block-form))))
 
-(defmacro define-polymorphic-function (name untyped-lambda-list &key override &environment env)
+(defmacro define-polymorphic-function (name untyped-lambda-list &key overwrite &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH
 for specializing on ORDINARY and OPTIONAL argument types."
   (declare (type function-name       name)
@@ -97,12 +97,12 @@ for specializing on ORDINARY and OPTIONAL argument types."
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
       `(progn
          (eval-when (:compile-toplevel)
-           ,(when override
+           ,(when overwrite
               `(undefine-polymorphic-function ',name))
            (register-polymorph-wrapper ',name ',untyped-lambda-list))
          (eval-when (:load-toplevel :execute)
            (unless (gethash ',name *polymorphic-function-table*)
-             (register-polymorph-wrapper ',name ',untyped-lambda-list :override ,override)))
+             (register-polymorph-wrapper ',name ',untyped-lambda-list :overwrite ,overwrite)))
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
          (defun ,name ,lambda-list
            ,body-form)

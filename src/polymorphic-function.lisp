@@ -65,10 +65,10 @@
   (lambda-list-type (error "LAMBDA-LIST-TYPE must be supplied.") :type lambda-list-type)
   (hash-table (make-hash-table :test 'equalp) :type hash-table))
 
-(defun register-polymorph-wrapper (name lambda-list &key override)
+(defun register-polymorph-wrapper (name lambda-list &key overwrite)
   (declare (type function-name name)
            (type list   lambda-list))
-  (unless override
+  (unless overwrite
     (when-let (wrapper (gethash name *polymorphic-function-table*))
       (cerror "Yes, delete existing POLYMORPHs and associate new ones"
               "There already exists POLYMORPHs associated with NAME ~S corresponding~%to the following TYPE-LISTS~%~{~^    ~S~%~}Do you want to delete these POLYMORPHs and associate a new~%POLYMORPHIC-FUNCTION with NAME ~S?"

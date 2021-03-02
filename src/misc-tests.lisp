@@ -8,7 +8,7 @@
 (def-test required-args-correctness ()
   (ignoring-error-output
     (eval `(progn
-             (define-polymorphic-function my= (a b) :override t)
+             (define-polymorphic-function my= (a b) :overwrite t)
              (defpolymorph my= ((a string) (b string)) boolean
                (return-from my= (string= a b)))
              (defpolymorph my= ((a number) (b number)) boolean
@@ -37,7 +37,7 @@
 (def-test optional-args-correctness ()
   (ignoring-error-output
     (eval `(progn ; This requires SBCL version 2.0.9+
-             (define-polymorphic-function bar (a &optional b c) :override t)
+             (define-polymorphic-function bar (a &optional b c) :overwrite t)
              (defpolymorph bar ((str string) &optional ((b integer) 5) ((c integer) 7)) t
                (list str b c))
              (defpolymorph-compiler-macro bar (string &optional integer integer)
@@ -60,7 +60,7 @@
 
 (def-test non-null-environment-correctness ()
   (ignoring-error-output
-    (eval `(define-polymorphic-function baz (c &optional d) :override t))
+    (eval `(define-polymorphic-function baz (c &optional d) :overwrite t))
     (eval `(let ((a "hello")
                  (b 5))
              (defpolymorph baz ((c string) &optional ((d integer) b)) t
@@ -85,7 +85,7 @@
 (def-test typed-key-correctness ()
   (ignoring-error-output
     (eval `(progn
-             (define-polymorphic-function foobar (a &key key b) :override t)
+             (define-polymorphic-function foobar (a &key key b) :overwrite t)
              (defpolymorph foobar ((str string) &key ((key number) 5) ((b string) "world")) t
                (declare (ignore str))
                (list 'string key b))
@@ -112,7 +112,7 @@
 (def-test recursive-correctness ()
   (ignoring-error-output
     (eval `(progn
-             (define-polymorphic-function foz (a) :override t)
+             (define-polymorphic-function foz (a) :overwrite t)
              (defpolymorph foz ((a number)) t
                (declare (optimize speed))
                (if (= a 5)
@@ -138,7 +138,7 @@
 
 (def-test untyped-rest-correctness ()
   (ignoring-error-output
-    (eval `(define-polymorphic-function my+ (arg &rest args) :override t))
+    (eval `(define-polymorphic-function my+ (arg &rest args) :overwrite t))
     (eval `(progn
              (defpolymorph my+ ((num number) &rest numbers) number
                (if numbers
@@ -163,7 +163,7 @@
 
 (def-test undefpolymorph ()
   (with-output-to-string (*error-output*)
-    (eval '(define-polymorphic-function undefpolymorph-tester (a) :override t))
+    (eval '(define-polymorphic-function undefpolymorph-tester (a) :overwrite t))
     (eval '(progn
             (defpolymorph undefpolymorph-tester ((a list)) symbol
               (declare (ignore a))
@@ -182,7 +182,7 @@
 (def-test undefine-polymorphic-function ()
   (ignoring-error-output
     (eval '(progn
-            (define-polymorphic-function undefine-polymorphic-function-tester (a) :override t)
+            (define-polymorphic-function undefine-polymorphic-function-tester (a) :overwrite t)
             (defpolymorph undefine-polymorphic-function-tester ((a list)) symbol
               (declare (ignore a))
               'list)
@@ -202,7 +202,7 @@
   (with-output-to-string (*error-output*)
     (eval `(progn
              (undefine-polymorphic-function 'sbcl-transform)
-             (define-polymorphic-function sbcl-transform (a) :override t)
+             (define-polymorphic-function sbcl-transform (a) :overwrite t)
              (defpolymorph sbcl-transform ((a string)) t))))
   (is (= 1 (length
             (sb-c::fun-info-transforms
@@ -233,7 +233,7 @@
 (def-test once-only ()
   (ignoring-error-output
     (eval `(progn
-             (define-polymorphic-function my= (&key a b) :override t)
+             (define-polymorphic-function my= (&key a b) :overwrite t)
              (defpolymorph my= (&key ((a number) 0) ((b number) 0)) boolean
                (= a b)))))
   (is (= 3 (eval `(let ((a 1))
