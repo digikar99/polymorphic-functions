@@ -129,26 +129,27 @@ for specializing on ORDINARY and OPTIONAL argument types."
                                      ,@gensyms)))))
                (if (eq ',name (car form))
                    (let ((arg-list (rest form)))
-                     (multiple-value-bind (body function dispatch-type-list)
+                     (multiple-value-bind (fbody function dispatch-type-list)
                          (apply 'retrieve-polymorph ',name arg-list)
                        (declare (ignore function))
                        (if (< 1 (policy-quality 'speed env))
-                           (progn
-                             (unless body
+                           (let ((fbody-return-type (when fbody
+                                                      (nth 1 (nth 2 (nth 4 fbody))))))
+                             (unless fbody
                                ;; TODO: Here the reason concerning free-variables is hardcoded
                                (signal "~&~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
                              (if-let ((compiler-function (apply
                                                           'retrieve-polymorph-compiler-macro
                                                           ',name arg-list)))
                                (funcall compiler-function
-                                        (cons body (rest form))
+                                        (cons fbody (rest form))
                                         env)
                                ;; TODO: Use some other declaration for inlining as well
                                ;; Optimized for speed and type information available
-                               (if (recursive-function-p ',name body)
+                               (if (recursive-function-p ',name fbody)
                                    (signal "~&Inlining ~S results in (potentially infinite) recursive expansion"
                                            form)
-                                   `(,body ,@(cdr form)))))
+                                   `(the ,fbody-return-type (,fbody ,@(cdr form))))))
                            original-form)))
                    (signal "COMPILER-MACRO of ~S can only optimize raw function calls." ',name)))))))))
 
