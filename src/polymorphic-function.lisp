@@ -121,7 +121,7 @@
                            arg-list)
                 (return-from retrieve-polymorph
                   (values (polymorph-body      polymorph)
-                          (polymorph-function  polymorph)
+                          (the function (polymorph-function  polymorph))
                           (polymorph-type-list polymorph)))))
     (error 'no-applicable-polymorph
            :arg-list arg-list

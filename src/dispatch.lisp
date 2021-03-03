@@ -123,9 +123,10 @@ for specializing on ORDINARY and OPTIONAL argument types."
                                       :for form :in (rest form)
                                       :collect `(,sym ,form)))
                           (block ,name
-                            (funcall (nth-value 1 (retrieve-polymorph
-                                                   ',name
-                                                   ,@gensyms))
+                            (funcall (the function
+                                          (nth-value 1 (retrieve-polymorph
+                                                        ',name
+                                                        ,@gensyms)))
                                      ,@gensyms)))))
                (if (eq ',name (car form))
                    (let ((arg-list (rest form)))
