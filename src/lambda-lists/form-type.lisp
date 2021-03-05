@@ -3,7 +3,7 @@
 (defun form-type (form &optional environment)
   "Returns two values: the first value is the TYPE of FORM if the second value is T"
   (cond ((constantp form environment)
-         (values (type-of (constant-form-value form environment))
+         (values `(eql ,(constant-form-value form environment))
                  t))
         ((symbolp form)
          (values (introspect-environment:variable-type form environment)

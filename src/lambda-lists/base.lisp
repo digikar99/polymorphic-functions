@@ -253,23 +253,13 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               (nth-value 2
                                          (variable-information arg *environment*))))))
     (signal 'form-type-failure :form arg))
-  (or (subtypep (form-type arg *environment*) type *environment*)
-      ;; This case arises because
-      ;;   (typep 5 '(member 5)) ;=> T
-      ;; but
-      ;;   (subtypep (type-of 5) '(member 5)) ;=> NIL
-      ;; :(
-      (if (constantp arg *environment*) ; this is compile-time!
-          (typep (constant-form-value arg *environment*)
-                 type *environment*)
-          nil)))
+  (subtypep (form-type arg *environment*) type *environment*))
 
 (def-test our-typep (:suite :adhoc-polymorphic-functions)
   (macrolet ((with-compile-time (&rest body)
                `(let ((*compiler-macro-expanding-p* t)
                       (*environment* nil))
                   ,@body)))
-    ;; TODO: Add negative tests especially for member and eql
     (5am:is-true (with-compile-time (our-typep 5 '(member 5))))
     (5am:is-true (with-compile-time (our-typep 5 '(eql 5))))
     (5am:is-true (with-compile-time (our-typep ''symbol '(eql symbol))))
