@@ -239,14 +239,42 @@ Non-examples:
   (or (subtypep type-1 type-2)
       (subtypep type-2 type-1)))
 
+(defvar *compiler-macro-expanding-p* nil
+  "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")
+(defvar *environment*)
+(setf (documentation '*environment* 'variable)
+      "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH for
+use by functions like TYPE-LIST-APPLICABLE-P")
+
 (defun our-typep (arg type)
   (assert *compiler-macro-expanding-p*)
-  (when (and (symbolp arg)    ; type-declared-p
+  (when (and (symbolp arg)              ; type-declared-p
              (not (cdr (assoc 'type
                               (nth-value 2
                                          (variable-information arg *environment*))))))
     (signal 'form-type-failure :form arg))
-  (subtypep (form-type arg *environment*) type))
+  (or (subtypep (form-type arg *environment*) type *environment*)
+      ;; This case arises because
+      ;;   (typep 5 '(member 5)) ;=> T
+      ;; but
+      ;;   (subtypep (type-of 5) '(member 5)) ;=> NIL
+      ;; :(
+      (if (constantp arg *environment*) ; this is compile-time!
+          (typep (constant-form-value arg *environment*)
+                 type *environment*)
+          nil)))
+
+(def-test our-typep (:suite :adhoc-polymorphic-functions)
+  (macrolet ((with-compile-time (&rest body)
+               `(let ((*compiler-macro-expanding-p* t)
+                      (*environment* nil))
+                  ,@body)))
+    ;; TODO: Add negative tests especially for member and eql
+    (5am:is-true (with-compile-time (our-typep 5 '(member 5))))
+    (5am:is-true (with-compile-time (our-typep 5 '(eql 5))))
+    (5am:is-true (with-compile-time (our-typep ''symbol '(eql symbol))))
+    (5am:is-true (with-compile-time (our-typep ''symbol '(member symbol))))
+    (5am:is-true (with-compile-time (our-typep ''symbol '(or fixnum (member symbol)))))))
 
 (defun type->param (type-specifier &optional type)
   (if (member type-specifier lambda-list-keywords)

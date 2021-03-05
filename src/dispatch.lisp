@@ -34,13 +34,6 @@
 ;;;   - GET-TYPE-LIST
 ;;;   - DEFPOLYMORPH-COMPILER-MACRO
 
-(defvar *compiler-macro-expanding-p* nil
-  "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")
-(defvar *environment*)
-(setf (documentation '*environment* 'variable)
-      "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH for
-use by functions like TYPE-LIST-APPLICABLE-P")
-
 (defmacro with-compiler-note (&body body)
   `(handler-case (progn ,@body)
      (no-applicable-polymorph (condition)
