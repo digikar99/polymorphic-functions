@@ -209,3 +209,9 @@
       (t (error "Multiple applicable POLYMORPHs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
                 arg-list
                 applicable-function-type-lists)))))
+
+(defun find-polymorphs (name)
+  (declare (type function-name name))
+  (let* ((function-wrapper       (gethash name *polymorphic-function-table*))
+         (wrapper-hash-table     (polymorph-wrapper-hash-table function-wrapper)))
+    (hash-table-values wrapper-hash-table)))
