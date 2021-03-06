@@ -249,6 +249,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 (defun our-typep (arg type)
   (assert *compiler-macro-expanding-p*)
   (when (and (symbolp arg)              ; type-declared-p
+             (not (member arg '(nil t)))
              (not (cdr (assoc 'type
                               (nth-value 2
                                          (variable-information arg *environment*))))))

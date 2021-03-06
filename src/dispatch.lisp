@@ -45,21 +45,20 @@
        original-form)
      (form-type-failure (condition)
        (declare (ignorable condition))
-       (if (member :sbcl *features*)
+       (when (< 1 (policy-quality 'speed env))
+         (format *error-output*
+                 (uiop:strcat "~%; Optimization of ~&;  "
+                              (str:join (uiop:strcat #\newline ";  ")
+                                        (str:split #\newline (format nil " ~S"
+                                                                     original-form)))
+                              "~%; is left to ~A because ADHOC-POLYMORPHIC-FUNCTIONS "
+                              "is unable to optimize it ~%; because~&; ~A~&; ~&")
+                 (lisp-implementation-type)
+                 (str:join (uiop:strcat #\newline ";  ")
+                           (str:split #\newline (format nil "~A" condition)))))
+       (if (= 3 (policy-quality 'debug env))
            original-form
-           (progn
-             (when (< 1 (policy-quality 'speed env))
-               (format *error-output*
-                       (uiop:strcat "~%; Unable to optimize~%; "
-                                    (str:join (uiop:strcat #\newline ";  ")
-                                              (str:split #\newline (format nil " ~S"
-                                                                           original-form)))
-                                    "~%; because ~&; ~A")
-                       (str:join (uiop:strcat #\newline ";  ")
-                                 (str:split #\newline (format nil "~A" condition)))))
-             (if (= 3 (policy-quality 'debug env))
-                 original-form
-                 block-form))))
+           block-form))
      (condition (condition)
        (format *error-output*
                (cond ((< 1 (policy-quality 'speed env))
