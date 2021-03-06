@@ -81,7 +81,11 @@
 
 (defmacro define-polymorphic-function (name untyped-lambda-list &key overwrite &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH
-for specializing on ORDINARY and OPTIONAL argument types."
+for specializing on various argument types.
+
+If OVERWRITE is T, all the existing polymorphs associated with NAME are deleted,
+and new polymorphs will be ready to be installed.
+If OVERWRITE is NIL, a continuable error is raised."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
