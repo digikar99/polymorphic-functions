@@ -44,7 +44,6 @@
                          (str:split #\newline (format nil "~A" condition))))
        original-form)
      (form-type-failure (condition)
-       (declare (ignorable condition))
        (when (< 1 (policy-quality 'speed env))
          (format *error-output*
                  (uiop:strcat "~%; Optimization of ~&;  "
@@ -59,21 +58,17 @@
        (if (= 3 (policy-quality 'debug env))
            original-form
            block-form))
-     (condition (condition)
-       (format *error-output*
-               (cond ((< 1 (policy-quality 'speed env))
-                      (uiop:strcat "~&; "
-                                   (format nil "Unable to optimize ~S because:" original-form)
-                                   "~&;  ~A"))
-                     ((eq 'apply (car form))
-                      "~&; ~A")
-                     ((= 3 (policy-quality 'debug env))
-                      (uiop:strcat "~%; "
-                                   (format nil "While compiling ~S:" form)
-                                   "~&;  ~A"))
-                     (t ""))
-               (str:join (uiop:strcat #\newline ";  ")
-                         (str:split #\newline (format nil "~A" condition))))
+     ((or polymorph-body-has-free-variables
+       recursive-expansion-is-possibly-infinite) (condition)
+       (when (< 1 (policy-quality 'speed env))
+         (format *error-output*
+                 (uiop:strcat "~&; "
+                              (format nil "Unable to optimize ~S because:" original-form)
+                              "~&;  ~A")
+                 (str:join (uiop:strcat #\newline ";  ")
+                           (str:split #\newline (format nil "~A" condition)))))
+       ;; FIXME: Will SBCL optimize these cases - should these conditions be merged
+       ;; into the previous FORM-TYPE-FAILURE case?
        (if (= 3 (policy-quality 'debug env))
            original-form
            block-form))))
@@ -134,7 +129,8 @@ If OVERWRITE is NIL, a continuable error is raised."
                                                       (nth 1 (nth 2 (nth 4 fbody))))))
                              (unless fbody
                                ;; TODO: Here the reason concerning free-variables is hardcoded
-                               (signal "~&~S with TYPE-LIST ~S cannot be inlined due to free-variables" ',name dispatch-type-list))
+                               (signal 'polymorph-body-has-free-variables :name ',name
+                                       :type-list dispatch-type-list))
                              (if-let ((compiler-function (apply
                                                           'retrieve-polymorph-compiler-macro
                                                           ',name arg-list)))
@@ -144,8 +140,8 @@ If OVERWRITE is NIL, a continuable error is raised."
                                ;; TODO: Use some other declaration for inlining as well
                                ;; Optimized for speed and type information available
                                (if (recursive-function-p ',name fbody)
-                                   (signal "~&Inlining ~S results in (potentially infinite) recursive expansion"
-                                           form)
+                                   (signal 'recursive-expansion-is-possibly-infinite
+                                           :form form)
                                    `(the ,fbody-return-type (,fbody ,@(cdr form))))))
                            original-form)))
                    (signal "COMPILER-MACRO of ~S can only optimize raw function calls." ',name)))))))))
