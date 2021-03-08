@@ -99,13 +99,14 @@ If OVERWRITE is NIL, a continuable error is raised."
            ,body-form)
          (define-compiler-macro ,name (&whole form &rest args &environment env)
            (declare (ignore args))
+           ;; FIXME: Is the assumption that FORM either starts with ',NAME or FUNCALL correct?
            (let ((*environment*                 env)
                  (*compiler-macro-expanding-p*    t)
                  (original-form                form)
                  (block-form                    nil))
              (with-compiler-note
                (when (eq 'funcall (car form))
-                 (setf form (cons (second (cadr form))
+                 (setf form (cons (second (second form))
                                   (cddr form))))
                (setq block-form
                      (let ((name (first form))
@@ -119,32 +120,30 @@ If OVERWRITE is NIL, a continuable error is raised."
                                                         ',name
                                                         ,@gensyms)))
                                      ,@gensyms)))))
-               (if (eq ',name (car form))
-                   (let ((arg-list (rest form)))
-                     (multiple-value-bind (fbody function dispatch-type-list)
-                         (apply 'retrieve-polymorph ',name arg-list)
-                       (declare (ignore function))
-                       (if (< 1 (policy-quality 'speed env))
-                           (let ((fbody-return-type (when fbody
-                                                      (nth 1 (nth 2 (nth 4 fbody))))))
-                             (unless fbody
-                               ;; TODO: Here the reason concerning free-variables is hardcoded
-                               (signal 'polymorph-body-has-free-variables :name ',name
-                                       :type-list dispatch-type-list))
-                             (if-let ((compiler-function (apply
-                                                          'retrieve-polymorph-compiler-macro
-                                                          ',name arg-list)))
-                               (funcall compiler-function
-                                        (cons fbody (rest form))
-                                        env)
-                               ;; TODO: Use some other declaration for inlining as well
-                               ;; Optimized for speed and type information available
-                               (if (recursive-function-p ',name fbody)
-                                   (signal 'recursive-expansion-is-possibly-infinite
-                                           :form form)
-                                   `(the ,fbody-return-type (,fbody ,@(cdr form))))))
-                           original-form)))
-                   (signal "COMPILER-MACRO of ~S can only optimize raw function calls." ',name)))))))))
+               (let ((arg-list (rest form)))
+                 (multiple-value-bind (fbody function dispatch-type-list)
+                     (apply 'retrieve-polymorph ',name arg-list)
+                   (declare (ignore function))
+                   (if (< 1 (policy-quality 'speed env))
+                       (let ((fbody-return-type (when fbody
+                                                  (nth 1 (nth 2 (nth 4 fbody))))))
+                         (unless fbody
+                           ;; TODO: Here the reason concerning free-variables is hardcoded
+                           (signal 'polymorph-body-has-free-variables :name ',name
+                                                                      :type-list dispatch-type-list))
+                         (if-let ((compiler-function (apply
+                                                      'retrieve-polymorph-compiler-macro
+                                                      ',name arg-list)))
+                           (funcall compiler-function
+                                    (cons fbody (rest form))
+                                    env)
+                           ;; TODO: Use some other declaration for inlining as well
+                           ;; Optimized for speed and type information available
+                           (if (recursive-function-p ',name fbody)
+                               (signal 'recursive-expansion-is-possibly-infinite
+                                       :form form)
+                               `(the ,fbody-return-type (,fbody ,@(cdr form))))))
+                       original-form))))))))))
 
 (defun extract-declarations (body)
   "Returns two values: DECLARATIONS and remaining BODY"
