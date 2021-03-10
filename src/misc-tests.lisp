@@ -240,3 +240,25 @@
                     (my= :a (incf a) :b (incf a))
                     a))))
   (undefine-polymorphic-function 'my=))
+
+
+;;; FIXME: This does not work on CCL; even on SBCL, at least a few improvements
+;;; are necessary to be table to handle compiler-macros for setf forms
+;;; effectively.
+#-ccl
+(def-test setf-polymorphs ()
+  (ignoring-error-output
+    (eval `(progn
+             (define-polymorphic-function (setf foo) (a b) :overwrite t)
+             (defpolymorph (setf foo) ((a t) (b t)) t
+               (list a b))
+             (defpolymorph-compiler-macro (setf foo) (t t) (a b)
+               (print (list a b))
+               `(list ,a ,b))
+             (defun setf-foo-caller (a b)
+               (declare (optimize speed))
+               (setf (foo b) a)))))
+  (is (equalp '(2 3) (setf (foo 3) 2)))
+  (is (equalp '(2 3) (setf-foo-caller 2 3)))
+  (fmakunbound 'setf-foo-caller)
+  (undefine-polymorphic-function '(setf foo)))

@@ -109,12 +109,16 @@ If OVERWRITE is NIL, a continuable error is raised."
                  (setf form (cons (second (second form))
                                   (cddr form))))
                (setq block-form
-                     (let ((name (first form))
-                           (gensyms (make-gensym-list (length (rest form)))))
+                     (let* ((name       (first form))
+                            (gensyms    (make-gensym-list (length (rest form))))
+                            (block-name (if (and (listp name)
+                                                 (eq 'setf (first name)))
+                                            (second name)
+                                            name)))
                        `(let (,@(loop :for sym :in gensyms
                                       :for form :in (rest form)
                                       :collect `(,sym ,form)))
-                          (block ,name
+                          (block ,block-name
                             (funcall (the function
                                           (nth-value 1 (retrieve-polymorph
                                                         ',name
@@ -174,6 +178,10 @@ If OVERWRITE is NIL, a continuable error is raised."
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
   (let* ((*name*               name)
+         (block-name           (if (and (listp name)
+                                        (eq 'setf (first name)))
+                                   (second name)
+                                   name))
          (untyped-lambda-list (polymorph-wrapper-lambda-list
                                (retrieve-polymorph-wrapper
                                 name))))
@@ -186,12 +194,12 @@ If OVERWRITE is NIL, a continuable error is raised."
       (ensure-non-intersecting-type-lists name type-list)
       (multiple-value-bind (declarations body) (extract-declarations body)
         (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
-              (free-variable-analysis-form `(lambda ,param-list (block ,name ,@body)))
+              (free-variable-analysis-form `(lambda ,param-list (block ,block-name ,@body)))
               (form                        `(defpolymorph ,name ,typed-lambda-list ,@body)))
           (let* ((lambda-body `(lambda ,param-list
                                  ,(lambda-declarations typed-lambda-list :typed t)
                                  ,declarations
-                                 (block ,name
+                                 (block ,block-name
                                    ,@(butlast body)
                                    (the ,return-type ,@(or (last body) '(nil))))))
                  ;; TODO: should not contain declarations
