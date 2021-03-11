@@ -93,6 +93,7 @@
          (table             (polymorph-wrapper-hash-table polymorph-wrapper))
          (lambda-list-type  (polymorph-wrapper-lambda-list-type polymorph-wrapper)))
     (with-slots (type-lists) polymorph-wrapper
+      ;; FIXME: Use a type-list equality check, not EQUALP
       (unless (member type-list type-lists :test 'equalp)
         (setf type-lists (cons type-list type-lists))))
     (multiple-value-bind (polymorph exists)
@@ -210,8 +211,24 @@
                 arg-list
                 applicable-function-type-lists)))))
 
-(defun find-polymorphs (name)
+(defun find-polymorphs (name &optional (type-list nil type-list-p))
+  "Returns two values:
+If a POLYMORPHIC-FUNCTION by NAME does not exist, returns NIL NIL.
+If it exists, the second value is T and the first value is a possibly empty
+  list of POLYMORPHs associated with NAME."
   (declare (type function-name name))
   (let* ((function-wrapper       (gethash name *polymorphic-function-table*))
-         (wrapper-hash-table     (polymorph-wrapper-hash-table function-wrapper)))
-    (hash-table-values wrapper-hash-table)))
+         (wrapper-hash-table     (when function-wrapper
+                                   (polymorph-wrapper-hash-table function-wrapper))))
+    (cond ((null function-wrapper)
+           (values nil nil))
+          ((null type-list-p)
+           (values (hash-table-values wrapper-hash-table) t))
+          (t
+           ;; FIXME: Use a type-list equality check, not EQUALP
+           (loop :for polymorph :being the hash-values :of wrapper-hash-table
+                 :do (when (equalp type-list
+                                   (polymorph-type-list polymorph))
+                       (return-from find-polymorphs
+                         (values (list polymorph) t))))
+           (values nil t)))))
