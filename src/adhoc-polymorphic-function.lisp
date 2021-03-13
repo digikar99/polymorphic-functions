@@ -111,16 +111,19 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 (defun register-polymorphic-function (name untyped-lambda-list &key overwrite)
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
-  (unless overwrite
+  (unless overwrite ; so, OVERWRITE is NIL
     (when-let (apf (and (fboundp name) (fdefinition name)))
       (if (typep apf 'adhoc-polymorphic-function)
-          (cerror "Yes, delete existing POLYMORPHs and associate new ones"
-                  "There already exists a ADHOC-POLYMORPHIC-FUNCTION associated with NAME ~S corresponding~%to the following TYPE-LISTS~%~{~^    ~S~%~}Do you want to delete these POLYMORPHs and associate a new~%POLYMORPHIC-FUNCTION with NAME ~S?"
-                  name (polymorphic-function-type-lists apf) name)
+          (if (equalp untyped-lambda-list
+                      (polymorphic-function-lambda-list apf))
+              (return-from register-polymorphic-function name)
+              (cerror "Yes, delete existing POLYMORPHs to associate new ones"
+                      'lambda-list-has-changed
+                      :name name
+                      :new-lambda-list untyped-lambda-list))
           (cerror (format nil
-                          "Yes, delete existing FUNCTION associated with ~S and associate a new ADHOC-POLYMORPHIC-FUNCTION" name)
-                  "There already exists a FUNCTION associated with NAME ~S.~%Do you want to delete the existing FUNCTION and associate a new~%POLYMORPHIC-FUNCTION with NAME ~S?"
-                  name name))))
+                          "Yes, delete existing FUNCTION associated with ~S and associate an ADHOC-POLYMORPHIC-FUNCTION" name)
+                  'not-a-ahp :name name))))
   (let ((*name* name))
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
       (let ((apf (make-instance 'adhoc-polymorphic-function
@@ -139,8 +142,14 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (type function      lambda)
            (type type-list     type-list)
            (type list          lambda-body))
-  (let* ((apf               (fdefinition name))
-         (lambda-list-type  (polymorphic-function-lambda-list-type apf)))
+  (let* ((apf                 (fdefinition name))
+         (lambda-list-type    (polymorphic-function-lambda-list-type apf))
+         (untyped-lambda-list (polymorphic-function-lambda-list apf)))
+    (assert (type-list-compatible-p type-list untyped-lambda-list)
+            nil
+            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
+            type-list untyped-lambda-list name)
+    (ensure-non-intersecting-type-lists name type-list)
     (with-slots (type-lists polymorphs) apf
       ;; FIXME: Use a type-list equality check, not EQUALP
       (unless (member type-list type-lists :test 'equalp)
@@ -227,8 +236,25 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (declare (type function-name name)
            (type type-list type-list)
            (type function lambda))
-  (let* ((apf              (fdefinition name))
-         (lambda-list-type (polymorphic-function-lambda-list-type apf)))
+
+  (let* ((apf         (fdefinition name))
+         (lambda-list (polymorphic-function-lambda-list apf))
+         (lambda-list-type (polymorphic-function-lambda-list-type apf))
+         (type-list   (let ((key-position (position '&key type-list)))
+                        (if key-position
+                            (append (subseq type-list 0 key-position)
+                                    '(&key)
+                                    (sort (subseq type-list (1+ key-position))
+                                          #'string< :key #'first))
+                            ;; This sorting allows things to work even though
+                            ;; we use EQUALP instead of TYPE-LIST-=
+                            type-list))))
+    (assert (type-list-compatible-p type-list lambda-list)
+            nil
+            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
+            type-list lambda-list name)
+    (ensure-non-intersecting-type-lists name type-list)
+
     (with-slots (polymorphs) apf
       (if-let (polymorph (find type-list polymorphs :test #'equalp
                                                     :key #'polymorph-type-list))
@@ -268,7 +294,7 @@ If it exists, the second value is T and the first value is a possibly empty
   (let* ((apf        (and (fboundp name) (fdefinition name)))
          (polymorphs (when (typep apf 'adhoc-polymorphic-function)
                        (polymorphic-function-polymorphs apf))))
-    (cond ((null apf)
+    (cond ((null (typep apf 'adhoc-polymorphic-function))
            (values nil nil))
           ((null type-list-p)
            (values (copy-list polymorphs) t))
