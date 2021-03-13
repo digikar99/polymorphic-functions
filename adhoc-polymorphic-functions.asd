@@ -12,20 +12,20 @@
                "str")
   :pathname #P"src/"
   :components ((:file "package")
-               (:file "polymorphic-function"      :depends-on ("package"))
-               (:module "lambda-lists"      :depends-on ("package")
+               (:file "adhoc-polymorphic-function" :depends-on ("package"))
+               (:module "lambda-lists"             :depends-on ("package")
                 :components ((:file "doc")
                              (:file "form-type")
-                             (:file "base"  :depends-on ("doc" "form-type"))
+                             (:file "base"         :depends-on ("doc" "form-type"))
                              (:file "required")
                              (:file "required-optional")
                              (:file "required-key")
                              (:file "required-untyped-rest")))
-               (:file "conditions"          :depends-on ("package"))
-               (:file "dispatch"            :depends-on ("polymorphic-function"
-                                                         "lambda-lists"
-                                                         "conditions"))
-               (:file "misc-tests"          :depends-on ("dispatch")))
+               (:file "conditions"                 :depends-on ("package"))
+               (:file "dispatch"                   :depends-on ("adhoc-polymorphic-function"
+                                                                "lambda-lists"
+                                                                "conditions"))
+               (:file "misc-tests"                 :depends-on ("dispatch")))
   :perform (test-op (o c)
                     (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
                                                    (5AM:*ON-ERROR* :DEBUG))

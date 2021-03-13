@@ -63,7 +63,7 @@
            (optimize speed))
   (apply (the function (polymorph-applicable-p-function polymorph)) args))
 
-(defclass polymorphic-function ()
+(defclass adhoc-polymorphic-function ()
   ((name        :initarg :name
                 :initform (error "NAME must be supplied.")
                 :reader polymorphic-function-name)
@@ -76,16 +76,14 @@
                      :initarg :lambda-list-type
                      :initform (error "LAMBDA-LIST-TYPE must be supplied.")
                      :reader polymorphic-function-lambda-list-type)
-   (hash-table  :initform (make-hash-table :test 'equalp) :type hash-table
-                :reader polymorphic-function-hash-table)
+   (polymorphs  :initform nil
+                :accessor polymorphic-function-polymorphs)
    (documentation :initarg :documentation
                   :type (or string null))
    #+sbcl (sb-pcl::source :initarg sb-pcl::source)
    #+sbcl (%lock
            :initform (sb-thread:make-mutex :name "GF lock")
            :reader sb-pcl::gf-lock))
-  (:documentation
-   "HASH-TABLE maps a TYPE-LIST to a POLYMORPH. A TYPE-LIST is simply a LIST of TYPEs.")
   ;; TODO: Check if a symbol / list denotes a type
   (:metaclass closer-mop:funcallable-standard-class))
 
@@ -102,26 +100,26 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   (unless overwrite
-    (when-let (pf (and (fboundp name) (fdefinition name)))
-      (if (typep pf 'polymorphic-function)
+    (when-let (apf (and (fboundp name) (fdefinition name)))
+      (if (typep apf 'adhoc-polymorphic-function)
           (cerror "Yes, delete existing POLYMORPHs and associate new ones"
-                  "There already exists a POLYMORPHIC-FUNCTION associated with NAME ~S corresponding~%to the following TYPE-LISTS~%~{~^    ~S~%~}Do you want to delete these POLYMORPHs and associate a new~%POLYMORPHIC-FUNCTION with NAME ~S?"
-                  name (polymorphic-function-type-lists pf) name)
+                  "There already exists a ADHOC-POLYMORPHIC-FUNCTION associated with NAME ~S corresponding~%to the following TYPE-LISTS~%~{~^    ~S~%~}Do you want to delete these POLYMORPHs and associate a new~%POLYMORPHIC-FUNCTION with NAME ~S?"
+                  name (polymorphic-function-type-lists apf) name)
           (cerror (format nil
-                          "Yes, delete existing FUNCTION associated with ~S and associate a new POLYMORPHIC-FUNCTION" name)
+                          "Yes, delete existing FUNCTION associated with ~S and associate a new ADHOC-POLYMORPHIC-FUNCTION" name)
                   "There already exists a FUNCTION associated with NAME ~S.~%Do you want to delete the existing FUNCTION and associate a new~%POLYMORPHIC-FUNCTION with NAME ~S?"
                   name name))))
   (let ((*name* name))
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
-      (let ((pf (make-instance 'polymorphic-function
+      (let ((apf (make-instance 'adhoc-polymorphic-function
                                :name name
                                :lambda-list untyped-lambda-list
                                :lambda-list-type (lambda-list-type untyped-lambda-list))))
         (closer-mop:set-funcallable-instance-function
-         pf
+         apf
          (compile nil
                   `(lambda ,lambda-list ,body-form)))
-        (setf (fdefinition name) pf)))))
+        (setf (fdefinition name) apf)))))
 
 (defun register-polymorph (name type-list lambda-body lambda)
   ;; TODO: Get rid of APPLICABLE-P-FUNCTION: construct it from type-list
@@ -129,26 +127,23 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (type function      lambda)
            (type type-list     type-list)
            (type list          lambda-body))
-  (let* ((pf                (fdefinition name))
-         (table             (polymorphic-function-hash-table pf))
-         (lambda-list-type  (polymorphic-function-lambda-list-type pf)))
-    (with-slots (type-lists) pf
+  (let* ((apf               (fdefinition name))
+         (lambda-list-type  (polymorphic-function-lambda-list-type apf)))
+    (with-slots (type-lists polymorphs) apf
       ;; FIXME: Use a type-list equality check, not EQUALP
       (unless (member type-list type-lists :test 'equalp)
-        (setf type-lists (cons type-list type-lists))))
-    (multiple-value-bind (polymorph exists)
-        (gethash type-list table)
-      (if exists
-          (setf (polymorph-lambda      polymorph) lambda
-                (polymorph-lambda-body polymorph) lambda-body)
-          (setf (gethash type-list table)
-                (make-instance 'polymorph
-                               :type-list type-list
-                               :applicable-p-function
-                               (compile nil (applicable-p-function lambda-list-type
-                                                                   type-list))
-                               :lambda-body lambda-body
-                               :lambda      lambda))))))
+        (setf type-lists (cons type-list type-lists)))
+      (if-let (polymorph (find type-list polymorphs :test #'equalp :key #'polymorph-type-list))
+        (setf (polymorph-lambda      polymorph) lambda
+              (polymorph-lambda-body polymorph) lambda-body)
+        (push (make-instance 'polymorph
+                             :type-list type-list
+                             :applicable-p-function
+                             (compile nil (applicable-p-function lambda-list-type
+                                                                 type-list))
+                             :lambda-body lambda-body
+                             :lambda      lambda)
+              polymorphs)))))
 
 (defun retrieve-polymorph (name &rest arg-list)
   "If successful, returns 3 values:
@@ -156,9 +151,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   the second is the function itself,
   the third is the type list corresponding to the polymorph that will be used for dispatch"
   (declare (type function-name name))
-  (let* ((polymorphic-function (fdefinition name))
-         (pf-hash-table   (polymorphic-function-hash-table polymorphic-function)))
-    (loop :for polymorph :being the hash-values :of pf-hash-table
+  (let* ((ahp        (fdefinition name))
+         (polymorphs (polymorphic-function-polymorphs ahp)))
+    (loop :for polymorph :in polymorphs
           :do (when (apply (polymorph-applicable-p-function polymorph)
                            arg-list)
                 (return-from retrieve-polymorph
@@ -167,14 +162,14 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                           (polymorph-type-list polymorph)))))
     (error 'no-applicable-polymorph
            :arg-list arg-list
-           :type-lists (polymorphic-function-type-lists polymorphic-function))))
+           :type-lists (polymorphic-function-type-lists ahp))))
 
 (defun remove-polymorph (name type-list)
-  (let ((pf (fdefinition name)))
-    (when pf
-      (remhash type-list
-               (polymorphic-function-hash-table pf))
-      (removef (polymorphic-function-type-lists pf) type-list :test 'equalp))))
+  (let ((apf (fdefinition name)))
+    (when apf
+      (removef (polymorphic-function-polymorphs apf) type-list 
+               :test #'equalp :key #'polymorph-type-list)
+      (removef (polymorphic-function-type-lists apf) type-list :test 'equalp))))
 
 (define-compiler-macro retrieve-polymorph (&whole form name &rest arg-list
                                                   &environment env)
@@ -196,14 +191,13 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                   ;;   An interested person may look up this link for MAKE-LOAD-FORM
                   ;;   https://blog.cneufeld.ca/2014/03/the-less-familiar-parts-of-lisp-for-beginners-make-load-form/
                   (let*
-                      ((polymorphic-function (fdefinition ,name))
-                       (pf-hash-table        (polymorphic-function-hash-table
-                                              polymorphic-function))
+                      ((apf        (fdefinition ,name))
+                       (polymorphs (polymorphic-function-polymorphs apf))
                        ,@(mapcar #'list gensyms arg-list))
                     (declare (optimize speed)
-                             (type hash-table           pf-hash-table)
-                             (type polymorphic-function polymorphic-function))
-                    (loop :for polymorph :being the hash-values :of pf-hash-table
+                             (type list                       polymorphs)
+                             (type adhoc-polymorphic-function apf))
+                    (loop :for polymorph :in polymorphs
                           :do (when (funcall (the function
                                                   (polymorph-applicable-p-function polymorph))
                                              ,@gensyms)
@@ -212,7 +206,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                           (polymorph-lambda      polymorph)))))
                     (error 'no-applicable-polymorph
                            :arg-list (list ,@gensyms)
-                           :type-lists (polymorphic-function-type-lists polymorphic-function)))))
+                           :type-lists (polymorphic-function-type-lists apf)))))
              form))
         (t form)))
 
@@ -220,56 +214,53 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (declare (type function-name name)
            (type type-list type-list)
            (type function lambda))
-  (let* ((pf               (fdefinition name))
-         (table            (polymorphic-function-hash-table pf))
-         (lambda-list-type (polymorphic-function-lambda-list-type pf)))
-    (multiple-value-bind (polymorph exists)
-        (gethash type-list table)
-      (if exists
-          (setf (polymorph-compiler-macro-lambda polymorph) lambda)
-          ;; Need below instead of error-ing to define the compiler macro simultaneously
-          (setf (gethash type-list table)
-                (make-instance 'polymorph
-                               :type-list type-list
-                               :applicable-p-function
-                               (compile nil (applicable-p-function lambda-list-type
-                                                                   type-list))
-                               :compiler-macro-lambda lambda))))))
+  (let* ((apf              (fdefinition name))
+         (lambda-list-type (polymorphic-function-lambda-list-type apf)))
+    (with-slots (polymorphs) apf
+      (if-let (polymorph (find type-list polymorphs :test #'equalp
+                                                    :key #'polymorph-type-list))
+        (setf (polymorph-compiler-macro-lambda polymorph) lambda)
+        ;; Need below instead of error-ing to define the compiler macro simultaneously
+        (push (make-instance 'polymorph
+                             :type-list type-list
+                             :applicable-p-function
+                             (compile nil (applicable-p-function lambda-list-type
+                                                                 type-list))
+                             :compiler-macro-lambda lambda)
+              polymorphs)))))
 
 (defun retrieve-polymorph-compiler-macro (name &rest arg-list)
-  ;; TODO: Update this function
   (declare (type function-name name))
-  (let* ((polymorphic-function (fdefinition name))
-         (pf-hash-table        (polymorphic-function-hash-table polymorphic-function))
-         (type-lists           (polymorphic-function-type-lists polymorphic-function))
-         (applicable-function-type-lists
-           (loop :for polymorph :being the hash-values :of pf-hash-table
+  (let* ((apf        (fdefinition name))
+         (polymorphs (polymorphic-function-polymorphs apf))
+         (type-lists (polymorphic-function-type-lists apf))
+         (applicable-polymorphs
+           (loop :for polymorph :in polymorphs
                  :if (polymorph-applicable-p polymorph arg-list)
-                   :collect (polymorph-type-list polymorph))))
-    (case (length applicable-function-type-lists)
-      (1 (polymorph-compiler-macro-lambda
-          (gethash (first applicable-function-type-lists) pf-hash-table)))
+                   :collect polymorph)))
+    (case (length applicable-polymorphs)
+      (1 (polymorph-compiler-macro-lambda (first applicable-polymorphs)))
       (0 (error 'no-applicable-polymorph :arg-list arg-list :type-lists type-lists))
       (t (error "Multiple applicable POLYMORPHs discovered for ARG-LIST ~S:~%~{~S~^    ~%~}"
                 arg-list
-                applicable-function-type-lists)))))
+                (mapcar #'polymorph-type-list applicable-polymorphs))))))
 
 (defun find-polymorphs (name &optional (type-list nil type-list-p))
   "Returns two values:
-If a POLYMORPHIC-FUNCTION by NAME does not exist, returns NIL NIL.
+If a ADHOC-POLYMORPHIC-FUNCTION by NAME does not exist, returns NIL NIL.
 If it exists, the second value is T and the first value is a possibly empty
   list of POLYMORPHs associated with NAME."
   (declare (type function-name name))
-  (let* ((polymorphic-function   (and (fboundp name) (fdefinition name)))
-         (pf-hash-table     (when polymorphic-function
-                                   (polymorphic-function-hash-table polymorphic-function))))
-    (cond ((null polymorphic-function)
+  (let* ((apf        (and (fboundp name) (fdefinition name)))
+         (polymorphs (when (typep apf 'adhoc-polymorphic-function)
+                       (polymorphic-function-polymorphs apf))))
+    (cond ((null apf)
            (values nil nil))
           ((null type-list-p)
-           (values (hash-table-values pf-hash-table) t))
+           (values (copy-list polymorphs) t))
           (t
            ;; FIXME: Use a type-list equality check, not EQUALP
-           (loop :for polymorph :being the hash-values :of pf-hash-table
+           (loop :for polymorph :in polymorphs
                  :do (when (equalp type-list
                                    (polymorph-type-list polymorph))
                        (return-from find-polymorphs
