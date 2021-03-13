@@ -1,6 +1,6 @@
 # adhoc-polymorphic-functions
 
-Provides {macro, structures and hash-table}-based wrappers around normal functions to allow for dispatching on types instead of classes. See [examples](#examples).
+Provides `polymorphic-functions` to allow for dispatching on types instead of classes. See [examples](#examples).
 
 >This library is still experimental. There have been two renamings so far. Please use package-local-nicknames, and be okay to use global search replace.
 > However, I have no intention of renaming it further.
@@ -9,14 +9,18 @@ The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org
 
 ## Why?
 
-- ANSI standard provided generic functions work do not work on anything more than classes and structure classes, for example, say `(array double-float)`. However, Common Lisp does provide a rich type system.
-- As of 2020, there exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast.
+- ANSI standard provided generic functions work do not work on anything more than classes, structure classes and eql-types; for example, say `(array double-float)`. However, Common Lisp does provide a rich type system.
+- The ANSI standard generic functions are also restricted to specializing on only `required` arguments. Currently, `polymorphic-functions` do have certain restrictions for combinations of optional-keyword and rest arguments; but these are primarily due to my own time-constraints than any limitation within the system.
+- `polymorphic-functions` are implemented using the metaclass `closer-mop:funcallable-standard-class` and `closer-mop:set-funcallable-instance-function`. As such, these are not generic functions, in the sense that at least on SBCL, making `polymorphic-function` a subclass of `generic-function` renders one unable to parse the type-lists aka specializer-lists in the required custom manner. This basically renders one unable to do anything with a form like `(defmethod foo ((a t) &optional ((b number) 4)) (list a b))`.
+- In addition, a compiler-note-providing compiler-macro has also been provided for compile-time optimization facilities.
+
+## Related Projects
+
 - [static-dispatch](https://github.com/alex-gutev/static-dispatch) for allowing static-functions to be generic functions to be dispatched at compile-time; this, in turn, is used by [generic-cl](https://github.com/alex-gutev/generic-cl).
-- With MOP, it might be possible to enable `cl:defmethod` on parametric types. No one I know of has tried this yet. I'm unfamiliar with MOP, and felt it might just be quicker to put this together. 
-- There also exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for types. `specialization-store` has its own MOP and runs into about 3.5k LOC without tests. Besides the seeming code complexity, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
-- `fast-generic-functions` runs into about 900 LOC without tests.
-- `adhoc-polymorphic-functions` takes about 1.6k LOC with tests and, to me, it seems that is also fulfils the goal of `fast-generic-functions`.
-- No complaints about `static-dispatch` other than it not being suitable for types
+- There exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for types. `specialization-store` has its own MOP and runs into about 3.5k LOC without tests (1.6K for us; but no MOP). Besides the seeming code complexity, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
+- No complaints about `static-dispatch` other than it not being suitable for types.
+- As of 2020, there also exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast.
+
 
 ## Comparison with specialization-store
 
@@ -81,29 +85,29 @@ For a 5,000,000 calls to each in the format
 ```lisp
 (let ((a "hello")
       (b "world"))
-  (time (loop repeat 1000000 do (string= a b))))
+  (time (loop repeat 5000000 do (string= a b))))
 ```
 
 the performance results come out as:
 
 ```
-0.494 sec   | function-=
-0.577 sec   | generic-=
-0.616 sec   | specialized-=
-1.620 sec   | specialized-=-key
-0.761 sec   | polymorphic-=
-0.918 sec   | polymorphic-=-key
+0.471 sec   | function-=
+0.531 sec   | generic-=
+0.615 sec   | specialized-=
+1.647 sec   | specialized-=-key
+1.151 sec   | polymorphic-=
+1.339 sec   | polymorphic-=-key
 ```
 
 All of `specialization-store` and `adhoc-polymorphic-functions` as well as `fast-generic-functions` or `static-dispatch` provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
 
 | Feature                         | cl:generic-function | specialization-store | adhoc-polymorphic-functions |
-|:--------------------------------|:--------------------|:---------------------|:---------------|
-| Method combination              | Yes                 | No                   | No             |
-| Precedence                      | Yes                 | Partial*             | No             |
-| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^           |
-| Run-time Speed                  | Fast                | Fast                 | Slow           |
-| Compile-time support            | Partial**           | Yes                  | Yes            |
+|:--------------------------------|:--------------------|:---------------------|:----------------------------|
+| Method combination              | Yes                 | No                   | No                          |
+| Precedence                      | Yes                 | Partial*             | No                          |
+| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                        |
+| Run-time Speed                  | Fast                | Fast                 | Slow                        |
+| Compile-time support            | Partial**           | Yes                  | Yes                         |
 
 \*`specialization-store` allows dispatching on the most specialized specialization; `adhoc-polymorphic-functions` provides no such support. In fact, as of this commit, this library wouldn't allow you to define polymorphs whose type lists are a subtype of each other. While specialization could have been provided, `adhoc-polymorphic-functions` relies on SBCL deftransforms on SBCL for better compile-time support, and this does not (seem to) provide such specialization support. (See [Limitations](#limitations).)
 
@@ -111,12 +115,6 @@ All of `specialization-store` and `adhoc-polymorphic-functions` as well as `fast
 Well...
 
 \*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries.
-
-## An Ideal Way Forward
-
-- The designer should know MOP to extend `cl:generic-function` to provide dispatching based on typed
-- The resulting work should not have the above limitation of `fast-generic-functions`
-- Should provide compile-time optimizations, as well as compiler-notes to help user optimize / debug their code
 
 ## Examples
 
@@ -212,22 +210,23 @@ At least one limitation stems from the limitations of the implementations (and C
 CL-USER> (defun bar ()
            (declare (optimize speed))
            (my= "hello" (macrolet ((a () "hello"))
-                          (a)))) ; on non-SBCL systems
-; Unable to optimize
-;  (MY= "hello" (MACROLET ((A NIL "hello")) (A)))
+                          (a))))
+; Optimization of
+;   (MY= "hello"
+;        (MACROLET ((A ()
+;                     "hello"))
+;          (A)))
+; is left to SBCL because ADHOC-POLYMORPHIC-FUNCTIONS is unable to optimize it
 ; because
 ;
 ;  Type of
-;    (MACROLET ((A NIL "hello")) (A))
+;    (MACROLET ((A ()
+;                 "hello"))
+;      (A))
 ;  could not be determined
+;
 BAR
-CL-USER> (defun bar () 
-           (declare (optimize speed))
-           (my= "hello" (the string                           ; this declaration
-                             (macrolet ((a () "hello"))
-                               (a)))))
-BAR
-CL-USER> (disassemble 'bar)
+CL-USER> (disassemble 'bar)               ; on SBCL
 ; disassembly for BAR
 ; Size: 13 bytes. Origin: #x5300799B                          ; BAR
 ; 9B:       BA4F011050       MOV EDX, #x5010014F              ; T

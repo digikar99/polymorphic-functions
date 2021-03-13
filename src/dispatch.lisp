@@ -55,7 +55,8 @@
                  (lisp-implementation-type)
                  (str:join (uiop:strcat #\newline ";  ")
                            (str:split #\newline (format nil "~A" condition)))))
-       (if (= 3 (policy-quality 'debug env))
+       (if (or (= 3 (policy-quality 'debug env))
+               (member :sbcl *features*))
            original-form
            block-form))
      ((or polymorph-body-has-free-variables
@@ -85,69 +86,66 @@ If OVERWRITE is NIL, a continuable error is raised."
   ;; TODO: Handle the case of redefinition
   (let ((*name*        name)
         (*environment*  env))
-    (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
-      `(progn
-         (eval-when (:compile-toplevel)
-           ,(when overwrite
-              `(undefine-polymorphic-function ',name))
-           (register-polymorph-wrapper ',name ',untyped-lambda-list))
-         (eval-when (:load-toplevel :execute)
-           (unless (gethash ',name *polymorphic-function-table*)
-             (register-polymorph-wrapper ',name ',untyped-lambda-list :overwrite ,overwrite)))
-         #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-         (defun ,name ,lambda-list
-           ,body-form)
-         (define-compiler-macro ,name (&whole form &rest args &environment env)
-           (declare (ignore args))
-           ;; FIXME: Is the assumption that FORM either starts with ',NAME or FUNCALL correct?
-           (let ((*environment*                 env)
-                 (*compiler-macro-expanding-p*    t)
-                 (original-form                form)
-                 (block-form                    nil))
-             (with-compiler-note
-               (when (eq 'funcall (car form))
-                 (setf form (cons (second (second form))
-                                  (cddr form))))
-               (setq block-form
-                     (let* ((name       (first form))
-                            (gensyms    (make-gensym-list (length (rest form))))
-                            (block-name (if (and (listp name)
-                                                 (eq 'setf (first name)))
-                                            (second name)
-                                            name)))
-                       `(let (,@(loop :for sym :in gensyms
-                                      :for form :in (rest form)
-                                      :collect `(,sym ,form)))
-                          (block ,block-name
-                            (funcall (the function
-                                          (nth-value 1 (retrieve-polymorph
-                                                        ',name
-                                                        ,@gensyms)))
-                                     ,@gensyms)))))
-               (let ((arg-list (rest form)))
-                 (multiple-value-bind (fbody function dispatch-type-list)
-                     (apply 'retrieve-polymorph ',name arg-list)
-                   (declare (ignore function))
-                   (if (< 1 (policy-quality 'speed env))
-                       (let ((fbody-return-type (when fbody
-                                                  (nth 1 (nth 2 (nth 4 fbody))))))
-                         (unless fbody
-                           ;; TODO: Here the reason concerning free-variables is hardcoded
-                           (signal 'polymorph-body-has-free-variables :name ',name
-                                                                      :type-list dispatch-type-list))
-                         (if-let ((compiler-function (apply
-                                                      'retrieve-polymorph-compiler-macro
-                                                      ',name arg-list)))
-                           (funcall compiler-function
-                                    (cons fbody (rest form))
-                                    env)
-                           ;; TODO: Use some other declaration for inlining as well
-                           ;; Optimized for speed and type information available
-                           (if (recursive-function-p ',name fbody)
-                               (signal 'recursive-expansion-is-possibly-infinite
-                                       :form form)
-                               `(the ,fbody-return-type (,fbody ,@(cdr form))))))
-                       original-form))))))))))
+    `(progn
+       (eval-when (:compile-toplevel)
+         ,(when overwrite
+            `(undefine-polymorphic-function ',name))
+         (register-polymorphic-function ',name ',untyped-lambda-list))
+       (eval-when (:load-toplevel :execute)
+         (unless (fboundp ',name)
+           (register-polymorphic-function ',name ',untyped-lambda-list :overwrite ,overwrite)))
+       #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
+       (define-compiler-macro ,name (&whole form &rest args &environment env)
+         (declare (ignore args))
+         ;; FIXME: Is the assumption that FORM either starts with ',NAME or FUNCALL correct?
+         (let ((*environment*                 env)
+               (*compiler-macro-expanding-p*    t)
+               (original-form                form)
+               (block-form                    nil))
+           (with-compiler-note
+             (when (eq 'funcall (car form))
+               (setf form (cons (second (second form))
+                                (cddr form))))
+             (setq block-form
+                   (let* ((name       (first form))
+                          (gensyms    (make-gensym-list (length (rest form))))
+                          (block-name (if (and (listp name)
+                                               (eq 'setf (first name)))
+                                          (second name)
+                                          name)))
+                     `(let (,@(loop :for sym :in gensyms
+                                    :for form :in (rest form)
+                                    :collect `(,sym ,form)))
+                        (block ,block-name
+                          (funcall (the function
+                                        (nth-value 1 (retrieve-polymorph
+                                                      ',name
+                                                      ,@gensyms)))
+                                   ,@gensyms)))))
+             (let ((arg-list (rest form)))
+               (multiple-value-bind (fbody function dispatch-type-list)
+                   (apply 'retrieve-polymorph ',name arg-list)
+                 (declare (ignore function))
+                 (if (< 1 (policy-quality 'speed env))
+                     (let ((fbody-return-type (when fbody
+                                                (nth 1 (nth 2 (nth 4 fbody))))))
+                       (unless fbody
+                         ;; TODO: Here the reason concerning free-variables is hardcoded
+                         (signal 'polymorph-body-has-free-variables :name ',name
+                                                                    :type-list dispatch-type-list))
+                       (if-let ((compiler-function (apply
+                                                    'retrieve-polymorph-compiler-macro
+                                                    ',name arg-list)))
+                         (funcall compiler-function
+                                  (cons fbody (rest form))
+                                  env)
+                         ;; TODO: Use some other declaration for inlining as well
+                         ;; Optimized for speed and type information available
+                         (if (recursive-function-p ',name fbody)
+                             (signal 'recursive-expansion-is-possibly-infinite
+                                     :form form)
+                             `(the ,fbody-return-type (,fbody ,@(cdr form))))))
+                     original-form)))))))))
 
 (defun extract-declarations (body)
   "Returns two values: DECLARATIONS and remaining BODY"
@@ -163,8 +161,8 @@ If OVERWRITE is NIL, a continuable error is raised."
          (values `(declare) body))))
 
 (defun ensure-non-intersecting-type-lists (name type-list)
-  (loop :for list :in (polymorph-wrapper-type-lists
-                       (retrieve-polymorph-wrapper
+  (loop :for list :in (polymorphic-function-type-lists
+                       (fdefinition
                         name))
         :do (when (and (type-list-intersect-p type-list list)
                        (not (equalp type-list list)))
@@ -182,8 +180,8 @@ If OVERWRITE is NIL, a continuable error is raised."
                                         (eq 'setf (first name)))
                                    (second name)
                                    name))
-         (untyped-lambda-list (polymorph-wrapper-lambda-list
-                               (retrieve-polymorph-wrapper
+         (untyped-lambda-list (polymorphic-function-lambda-list
+                               (fdefinition
                                 name))))
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
@@ -217,8 +215,7 @@ If OVERWRITE is NIL, a continuable error is raised."
                          (if (= 3 (policy-quality 'debug env))
                              sbcl-transform
                              `(locally (declare (sb-ext:muffle-conditions style-warning))
-                                (handler-bind ((style-warning #'muffle-warning))
-                                  ,sbcl-transform))))
+                                ,sbcl-transform)))
                (eval-when (:compile-toplevel :load-toplevel :execute)
                  (register-polymorph ',name ',type-list
                                      ',(if free-variables
@@ -245,8 +242,8 @@ If OVERWRITE is NIL, a continuable error is raised."
   (declare (type function-name name)
            (type type-list type-list))
   ;; TODO: Handle the case when NAME is not bound to a POLYMORPH
-  (let ((lambda-list (polymorph-wrapper-lambda-list
-                      (retrieve-polymorph-wrapper
+  (let ((lambda-list (polymorphic-function-lambda-list
+                      (fdefinition
                        name)))
         (type-list   (let ((key-position (position '&key type-list)))
                        (if key-position
@@ -283,6 +280,5 @@ If OVERWRITE is NIL, a continuable error is raised."
 
 (defun undefine-polymorphic-function (name)
   "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH"
-  (remhash name *polymorphic-function-table*)
   (fmakunbound name)
   (setf (compiler-macro-function name) nil))

@@ -60,10 +60,6 @@ Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST-HELPER")
       "LAMBDA-LIST of the typed function being compiled. Bound inside the functions
 defined by POLYMORPHS::DEFINE-LAMBDA-LIST-HELPER")
 
-(defvar *name*)
-(setf (documentation '*name* 'variable)
-      "NAME of the typed function being compiled. Bound inside DEFINE-POLYMORPH")
-
 (defvar *lambda-list-typed-p*)
 (setf (documentation '*lambda-list-typed-p* 'variable)
       "Is T if the *LAMBDA-LIST* being processed is to be treated as if it had type
@@ -241,10 +237,6 @@ Non-examples:
 
 (defvar *compiler-macro-expanding-p* nil
   "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")
-(defvar *environment*)
-(setf (documentation '*environment* 'variable)
-      "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH for
-use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defun our-typep (arg type)
   (assert *compiler-macro-expanding-p*)

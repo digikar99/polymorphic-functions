@@ -4,6 +4,7 @@
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
+               "closer-mop"
                "introspect-environment"
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
                "hu.dwim.walker"
