@@ -7,7 +7,7 @@
            :defpolymorph
            :defpolymorph-compiler-macro
            :undefpolymorph
-           :find-polymorphs))
+           :find-polymorph))
 
 (in-package :adhoc-polymorphic-functions)
 

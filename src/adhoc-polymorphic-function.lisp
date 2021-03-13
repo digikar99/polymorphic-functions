@@ -50,7 +50,8 @@
                 :initform (error "NAME must be supplied!"))
    (compiler-macro-lambda :initarg :compiler-macro-lambda
                           :initform nil
-                          :accessor polymorph-compiler-macro-lambda)))
+                          :accessor polymorph-compiler-macro-lambda))
+  (:metaclass closer-mop:funcallable-standard-class))
 
 (defmethod print-object ((o polymorph) stream)
   (print-unreadable-object (o stream :type t)
@@ -165,7 +166,10 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                                                  type-list))
                              :lambda-body lambda-body
                              :lambda      lambda)
-              polymorphs)))))
+              polymorphs))
+      (let ((polymorph (find type-list polymorphs :test #'equalp :key #'polymorph-type-list)))
+        (closer-mop:set-funcallable-instance-function polymorph lambda))
+      name)))
 
 (defun retrieve-polymorph (name &rest arg-list)
   "If successful, returns 3 values:
@@ -285,7 +289,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                 arg-list
                 (mapcar #'polymorph-type-list applicable-polymorphs))))))
 
-(defun find-polymorphs (name &optional (type-list nil type-list-p))
+(defun find-polymorph (name type-list)
   "Returns two values:
 If a ADHOC-POLYMORPHIC-FUNCTION by NAME does not exist, returns NIL NIL.
 If it exists, the second value is T and the first value is a possibly empty
@@ -296,13 +300,11 @@ If it exists, the second value is T and the first value is a possibly empty
                        (polymorphic-function-polymorphs apf))))
     (cond ((null (typep apf 'adhoc-polymorphic-function))
            (values nil nil))
-          ((null type-list-p)
-           (values (copy-list polymorphs) t))
           (t
            ;; FIXME: Use a type-list equality check, not EQUALP
            (loop :for polymorph :in polymorphs
                  :do (when (equalp type-list
                                    (polymorph-type-list polymorph))
-                       (return-from find-polymorphs
-                         (values (list polymorph) t))))
+                       (return-from find-polymorph
+                         (values polymorph t))))
            (values nil t)))))
