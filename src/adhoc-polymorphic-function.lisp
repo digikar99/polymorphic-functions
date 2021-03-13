@@ -46,9 +46,16 @@
    ;; and "objects of type FUNCTION can't be dumped into fasl files."
    (lambda-body :initarg :lambda-body :accessor polymorph-lambda-body)
    (lambda      :initarg :lambda      :accessor polymorph-lambda)
+   (name        :initarg :name
+                :initform (error "NAME must be supplied!"))
    (compiler-macro-lambda :initarg :compiler-macro-lambda
                           :initform nil
                           :accessor polymorph-compiler-macro-lambda)))
+
+(defmethod print-object ((o polymorph) stream)
+  (print-unreadable-object (o stream :type t)
+    (with-slots (name type-list) o
+      (format stream "~S ~S" name type-list))))
 
 (defun polymorph (polymorph)
   "Returns the LAMBDA associated with POLYMORPH"
@@ -86,6 +93,11 @@
            :reader sb-pcl::gf-lock))
   ;; TODO: Check if a symbol / list denotes a type
   (:metaclass closer-mop:funcallable-standard-class))
+
+(defmethod print-object ((o adhoc-polymorphic-function) stream)
+  (print-unreadable-object (o stream :type t)
+    (with-slots (name type-lists) o
+      (format stream "~S (~S)" name (length type-lists)))))
 
 (defvar *name*)
 (setf (documentation '*name* 'variable)
@@ -137,6 +149,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
         (setf (polymorph-lambda      polymorph) lambda
               (polymorph-lambda-body polymorph) lambda-body)
         (push (make-instance 'polymorph
+                             :name name
                              :type-list type-list
                              :applicable-p-function
                              (compile nil (applicable-p-function lambda-list-type
@@ -167,7 +180,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 (defun remove-polymorph (name type-list)
   (let ((apf (fdefinition name)))
     (when apf
-      (removef (polymorphic-function-polymorphs apf) type-list 
+      (removef (polymorphic-function-polymorphs apf) type-list
                :test #'equalp :key #'polymorph-type-list)
       (removef (polymorphic-function-type-lists apf) type-list :test 'equalp))))
 
@@ -222,6 +235,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
         (setf (polymorph-compiler-macro-lambda polymorph) lambda)
         ;; Need below instead of error-ing to define the compiler macro simultaneously
         (push (make-instance 'polymorph
+                             :name name
                              :type-list type-list
                              :applicable-p-function
                              (compile nil (applicable-p-function lambda-list-type
