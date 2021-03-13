@@ -44,7 +44,7 @@
                          (str:split #\newline (format nil "~A" condition))))
        original-form)
      (form-type-failure (condition)
-       (when (< 1 (policy-quality 'speed env))
+       (when optim-speed
          (format *error-output*
                  (uiop:strcat "~%; Optimization of ~&;  "
                               (str:join (uiop:strcat #\newline ";  ")
@@ -55,13 +55,15 @@
                  (lisp-implementation-type)
                  (str:join (uiop:strcat #\newline ";  ")
                            (str:split #\newline (format nil "~A" condition)))))
-       (if (or (= 3 (policy-quality 'debug env))
-               (member :sbcl *features*))
-           original-form
-           block-form))
+       (cond (optim-debug original-form)
+             ((and optim-speed
+                   (member :sbcl *features*)
+                   original-form))
+             ((or optim-speed optim-slight-speed) block-form)
+             (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!"))))
      ((or polymorph-body-has-free-variables
        recursive-expansion-is-possibly-infinite) (condition)
-       (when (< 1 (policy-quality 'speed env))
+       (when optim-speed
          (format *error-output*
                  (uiop:strcat "~&; "
                               (format nil "Unable to optimize ~S because:" original-form)
@@ -70,9 +72,12 @@
                            (str:split #\newline (format nil "~A" condition)))))
        ;; FIXME: Will SBCL optimize these cases - should these conditions be merged
        ;; into the previous FORM-TYPE-FAILURE case?
-       (if (= 3 (policy-quality 'debug env))
-           original-form
-           block-form))))
+       (cond (optim-debug original-form)
+             ((and optim-speed
+                   (member :sbcl *features*)
+                   original-form))
+             ((or optim-speed optim-slight-speed) block-form)
+             (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!"))))))
 
 (defmacro define-polymorphic-function (name untyped-lambda-list &key overwrite &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH
@@ -86,7 +91,9 @@ If OVERWRITE is NIL, a continuable error is raised."
   ;; TODO: Handle the case of redefinition
   (let ((*name*        name)
         (*environment*  env))
-    `(progn
+    `(,@(if optim-debug
+            `(handler-bind ((style-warning #'muffle-warning)))
+            `(progn))
        (eval-when (:compile-toplevel)
          ,(when overwrite
             `(undefine-polymorphic-function ',name))
@@ -126,26 +133,28 @@ If OVERWRITE is NIL, a continuable error is raised."
                (multiple-value-bind (fbody function dispatch-type-list)
                    (apply 'retrieve-polymorph ',name arg-list)
                  (declare (ignore function))
-                 (if (< 1 (policy-quality 'speed env))
-                     (let ((fbody-return-type (when fbody
-                                                (nth 1 (nth 2 (nth 4 fbody))))))
-                       (unless fbody
-                         ;; TODO: Here the reason concerning free-variables is hardcoded
-                         (signal 'polymorph-body-has-free-variables :name ',name
-                                                                    :type-list dispatch-type-list))
-                       (if-let ((compiler-function (apply
-                                                    'retrieve-polymorph-compiler-macro
-                                                    ',name arg-list)))
-                         (funcall compiler-function
-                                  (cons fbody (rest form))
-                                  env)
-                         ;; TODO: Use some other declaration for inlining as well
-                         ;; Optimized for speed and type information available
-                         (if (recursive-function-p ',name fbody)
-                             (signal 'recursive-expansion-is-possibly-infinite
-                                     :form form)
-                             `(the ,fbody-return-type (,fbody ,@(cdr form))))))
-                     original-form)))))))))
+                 (cond (optim-speed
+                        (let ((fbody-return-type (when fbody
+                                                   (nth 1 (nth 2 (nth 4 fbody))))))
+                          (unless fbody
+                            ;; TODO: Here the reason concerning free-variables is hardcoded
+                            (signal 'polymorph-body-has-free-variables
+                                    :name ',name :type-list dispatch-type-list))
+                          (if-let ((compiler-function (apply
+                                                       'retrieve-polymorph-compiler-macro
+                                                       ',name arg-list)))
+                            (funcall compiler-function
+                                     (cons fbody (rest form))
+                                     env)
+                            ;; TODO: Use some other declaration for inlining as well
+                            ;; Optimized for speed and type information available
+                            (if (recursive-function-p ',name fbody)
+                                (signal 'recursive-expansion-is-possibly-infinite
+                                        :form form)
+                                `(the ,fbody-return-type (,fbody ,@(cdr form)))))))
+                       (optim-debug        original-form)
+                       (optim-slight-speed block-form)
+                       (t (error "Non-exhaustive cases!")))))))))))
 
 (defun extract-declarations (body)
   "Returns two values: DECLARATIONS and remaining BODY"
@@ -204,7 +213,7 @@ If OVERWRITE is NIL, a continuable error is raised."
                  (free-variables (free-variables-p free-variable-analysis-form))
                  #+sbcl
                  (sbcl-transform `(sb-c:deftransform ,name (,param-list ,type-list *
-                                                            :policy (> speed 1))
+                                                            :policy (< debug speed))
                                     `(apply ,',lambda-body ,@',(sbcl-transform-body-args typed-lambda-list
                                                                                          :typed t)))))
             ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
@@ -212,10 +221,11 @@ If OVERWRITE is NIL, a continuable error is raised."
             `(progn
                #+sbcl ,(unless (or free-variables
                                    (recursive-function-p name lambda-body))
-                         (if (= 3 (policy-quality 'debug env))
+                         (if optim-debug
                              sbcl-transform
                              `(locally (declare (sb-ext:muffle-conditions style-warning))
-                                ,sbcl-transform)))
+                                (handler-bind ((style-warning #'muffle-warning))
+                                  ,sbcl-transform))))
                (eval-when (:compile-toplevel :load-toplevel :execute)
                  (register-polymorph ',name ',type-list
                                      ',(if free-variables
