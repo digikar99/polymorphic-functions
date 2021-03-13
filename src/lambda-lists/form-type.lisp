@@ -9,10 +9,13 @@
          (values (introspect-environment:variable-type form environment)
                  (cdr (assoc 'type
                              (nth-value 2
-                                        (variable-information form *environment*))))))
+                                        (variable-information form environment))))))
         ((listp form)
          (values (let ((first (first form)))
-                   (cond ((typep first 'function-name)
+                   (cond ((and (eq 'function first)
+                               (null (cddr form)))
+                          (introspect-environment:function-type (second form) environment))
+                         ((typep first 'function-name)
                           (cond ((macro-function first environment)
                                  (form-type (macroexpand form environment)
                                             environment))
