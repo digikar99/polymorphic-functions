@@ -5,11 +5,12 @@
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
                "closer-mop"
+               "hu.dwim.walker" ; solely for determining free-variables!
                "introspect-environment"
-               "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
-               "hu.dwim.walker"
+               "iterate"
                "fiveam" ;; just keep things together!
-               "str")
+               "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
+               "split-sequence")
   :pathname #P"src/"
   :components ((:file "package")
                (:file "adhoc-polymorphic-function" :depends-on ("package"))

@@ -1,10 +1,11 @@
 (in-package adhoc-polymorphic-functions)
 
-;; As per the discussion at https://github.com/Bike/introspect-environment/issues/4
-;; the FREE-VARIABLES-P cannot be substituted by a simple CLOSUREP (sb-kernel:closurep)
-;; TODO: Find the limitations of HU.DWIM.WALKER (one known is MACROLET)
-;; See the discussion at
-;; https://www.reddit.com/r/lisp/comments/itf0gv/determining_freevariables_in_a_form/
+;;; As per the discussion at https://github.com/Bike/introspect-environment/issues/4
+;;; the FREE-VARIABLES-P cannot be substituted by a simple CLOSUREP (sb-kernel:closurep)
+;;; TODO: Find the limitations of HU.DWIM.WALKER (one known is MACROLET)
+;;; See the discussion at
+;;; https://www.reddit.com/r/lisp/comments/itf0gv/determining_freevariables_in_a_form/
+;;; (iterate::free-variables form) has been tried out proves out to be pretty restrictive
 (defun free-variables-p (form)
   (let (free-variables)
     (with-output-to-string (*error-output*)
@@ -40,21 +41,21 @@
        (format *error-output*
                "~%; While compiling ~S: ~&; ~A"
                form
-               (str:join (uiop:strcat #\newline ";  ")
-                         (str:split #\newline (format nil "~A" condition))))
+               (str-join (uiop:strcat #\newline ";  ")
+                         (str-split #\newline (format nil "~A" condition))))
        original-form)
      (form-type-failure (condition)
        (when optim-speed
          (format *error-output*
                  (uiop:strcat "~%; Optimization of ~&;  "
-                              (str:join (uiop:strcat #\newline ";  ")
-                                        (str:split #\newline (format nil " ~S"
+                              (str-join (uiop:strcat #\newline ";  ")
+                                        (str-split #\newline (format nil " ~S"
                                                                      original-form)))
                               "~%; is left to ~A because ADHOC-POLYMORPHIC-FUNCTIONS "
                               "is unable to optimize it ~%; because~&; ~A~&; ~&")
                  (lisp-implementation-type)
-                 (str:join (uiop:strcat #\newline ";  ")
-                           (str:split #\newline (format nil "~A" condition)))))
+                 (str-join (uiop:strcat #\newline ";  ")
+                           (str-split #\newline (format nil "~A" condition)))))
        (cond (optim-debug original-form)
              ((and optim-speed
                    (member :sbcl *features*)
@@ -68,8 +69,8 @@
                  (uiop:strcat "~&; "
                               (format nil "Unable to optimize ~S because:" original-form)
                               "~&;  ~A")
-                 (str:join (uiop:strcat #\newline ";  ")
-                           (str:split #\newline (format nil "~A" condition)))))
+                 (str-join (uiop:strcat #\newline ";  ")
+                           (str-split #\newline (format nil "~A" condition)))))
        ;; FIXME: Will SBCL optimize these cases - should these conditions be merged
        ;; into the previous FORM-TYPE-FAILURE case?
        (cond (optim-debug original-form)
@@ -85,7 +86,7 @@ for specializing on various argument types.
 
 If OVERWRITE is T, all the existing polymorphs associated with NAME are deleted,
 and new polymorphs will be ready to be installed.
-If OVERWRITE is NIL, a continuable error is raised."
+If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has changed."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   ;; TODO: Handle the case of redefinition
@@ -191,10 +192,11 @@ If OVERWRITE is NIL, a continuable error is raised."
   "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
-  (let* ((block-name           (if (and (listp name)
-                                        (eq 'setf (first name)))
-                                   (second name)
-                                   name)))
+  (let* ((block-name    (if (and (listp name)
+                                 (eq 'setf (first name)))
+                            (second name)
+                            name))
+         (*environment* env))
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
       (multiple-value-bind (declarations body) (extract-declarations body)
@@ -225,14 +227,14 @@ If OVERWRITE is NIL, a continuable error is raised."
                              `(locally (declare (sb-ext:muffle-conditions style-warning))
                                 (handler-bind ((style-warning #'muffle-warning))
                                   ,sbcl-transform))))
-               (eval-when (:load-toplevel :execute)
+               (eval-when (:compile-toplevel :load-toplevel :execute)
                  (register-polymorph ',name ',type-list
                                      ',(if free-variables
                                            (progn
                                              (terpri *error-output*)
                                              (format *error-output* "; Will not inline ~%;   ")
                                              (write-string
-                                              (str:replace-all
+                                              (str-replace-all
                                                (string #\newline)
                                                (uiop:strcat #\newline #\; "  ")
                                                (format nil "~S~&" form))
