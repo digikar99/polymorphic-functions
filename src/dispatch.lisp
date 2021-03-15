@@ -136,7 +136,7 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
                 (declare (ignore function))
                 (cond (optim-speed
                        (let ((fbody-return-type (when fbody
-                                                  (nth 1 (nth 2 (nth 4 fbody))))))
+                                                  (nth 1 (lastcar (nth 4 fbody))))))
                          (unless fbody
                            ;; TODO: Here the reason concerning free-variables is hardcoded
                            (signal 'polymorph-body-has-free-variables
