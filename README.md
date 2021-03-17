@@ -3,7 +3,9 @@
 Provides `polymorphic-functions` to allow for dispatching on types instead of classes. See [examples](#examples).
 
 >This library is still experimental. There have been two renamings so far. Please use package-local-nicknames, and be okay to use global search replace.
-> However, I have no intention of renaming it further.
+>However, I have no intention of renaming it further.
+>
+>The interface for &rest args is especially unstable being added very recently.
 
 The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism). This is not [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) since individual implementations do differ. I also do not see how the latter is implementable without the former.
 
@@ -17,7 +19,7 @@ The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org
 ## Related Projects
 
 - [static-dispatch](https://github.com/alex-gutev/static-dispatch) for allowing static-functions to be generic functions to be dispatched at compile-time; this, in turn, is used by [generic-cl](https://github.com/alex-gutev/generic-cl).
-- There exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for types. `specialization-store` has its own MOP and runs into about 3.5k LOC without tests (1.6K for us; but no MOP). Besides the seeming code complexity, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
+- There exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for types.  `specialization-store` implements a MOP, so can be extensible (at the cost of over-abstraction? I lack the experience and knowledge to comment.) But other than this, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
 - No complaints about `static-dispatch` other than it not being suitable for types.
 - As of 2020, there also exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast.
 

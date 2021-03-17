@@ -93,12 +93,13 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
   (let ((*name*        name)
         (*environment*  env))
     `(,@(if optim-debug
-            `(handler-bind ((style-warning #'muffle-warning)))
-            `(progn))
+            `(progn)
+            `(handler-bind ((style-warning #'muffle-warning))))
       (eval-when (:compile-toplevel)
         ,(when overwrite
            `(undefine-polymorphic-function ',name))
         (register-polymorphic-function ',name ',untyped-lambda-list))
+      ;; FIXME: What should the exact arrangement be here?
       (eval-when (:load-toplevel :execute)
         (unless (fboundp ',name)
           (register-polymorphic-function ',name ',untyped-lambda-list :overwrite ,overwrite)))
@@ -192,11 +193,12 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
   "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
   (declare (type function-name name)
            (type typed-lambda-list typed-lambda-list))
-  (let* ((block-name    (if (and (listp name)
-                                 (eq 'setf (first name)))
-                            (second name)
-                            name))
-         (*environment* env))
+  (let* ((block-name       (if (and (listp name)
+                                    (eq 'setf (first name)))
+                               (second name)
+                               name))
+         (*environment*    env)
+         (lambda-list-type (lambda-list-type typed-lambda-list :typed t)))
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
       (multiple-value-bind (declarations body) (extract-declarations body)
@@ -212,8 +214,11 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
                  ;; TODO: should not contain declarations
                  (free-variables (free-variables-p free-variable-analysis-form))
                  #+sbcl
-                 (sbcl-transform `(sb-c:deftransform ,name (,param-list ,type-list *
-                                                            :policy (< debug speed))
+                 (sbcl-transform `(sb-c:deftransform ,name
+                                      (,param-list ,(if (eq '&rest (lastcar type-list))
+                                                        (butlast type-list)
+                                                        type-list) *
+                                       :policy (< debug speed))
                                     `(apply ,',lambda-body
                                             ,@',(sbcl-transform-body-args typed-lambda-list
                                                                           :typed t)))))
@@ -244,7 +249,8 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
                                                      free-variables)
                                              nil)
                                            lambda-body)
-                                     ,lambda-body)
+                                     ,lambda-body
+                                     ',lambda-list-type)
                  ',name))))))))
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list

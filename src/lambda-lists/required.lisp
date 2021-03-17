@@ -53,8 +53,10 @@
                         :for type  :in type-list
                         :collect `(typep ,param ',type)))))))
 
-(defmethod %type-list-intersect-p ((type (eql 'required)) list-1 list-2)
-  (every #'type-intersect-p list-1 list-2))
+(defmethod %type-list-intersect-p ((type-1 (eql 'required)) (type-2 (eql 'required))
+                                   list-1 list-2)
+  (and (length= list-1 list-2)
+       (every #'type-intersect-p list-1 list-2)))
 
 (def-test type-list-intersect-required (:suite type-list-intersect-p)
   (5am:is-true  (type-list-intersect-p '(string string) '(string array)))

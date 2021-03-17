@@ -208,15 +208,21 @@
                         :collect `(or (not ,supplied-p)
                                       (typep ,param ',type))))))))
 
-(defmethod %type-list-intersect-p ((type (eql 'required-optional)) list-1 list-2)
-  (let ((optional-position (position '&optional list-1)))
-    (and (eq optional-position (position '&optional list-2))
+(defmethod %type-list-intersect-p ((type-1 (eql 'required-optional))
+                                   (type-2 (eql 'required-optional))
+                                   list-1 list-2)
+  (let ((optional-position-1 (position '&optional list-1))
+        (optional-position-2 (position '&optional list-2)))
+    ;; What if position of optional arguments is not same? Or if lengths are different?
+    ;; '(&optional string) and '(&optional string number) do intersect
+    ;; Well, yes, but then, any type-list with 0 required arguments intersects with them!
+    (and (= optional-position-1 optional-position-2)
          (every #'type-intersect-p
-                (subseq list-1 0 optional-position)
-                (subseq list-2 0 optional-position)))))
+                (subseq list-1 0 optional-position-1)
+                (subseq list-2 0 optional-position-2)))))
 
 (def-test type-list-intersect-optional (:suite type-list-intersect-p)
   (5am:is-true  (type-list-intersect-p '(string &optional string) '(string &optional array)))
   (5am:is-true  (type-list-intersect-p '(string &optional string) '(string &optional number)))
-  (5am:is-false (type-list-intersect-p '(string &optional string) '(number)))
+  (5am:is-true  (type-list-intersect-p '(&optional string) '(&optional string number)))
   (5am:is-false (type-list-intersect-p '(string &optional string) '(number &optional string))))

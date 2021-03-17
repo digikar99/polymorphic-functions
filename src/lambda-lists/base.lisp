@@ -14,7 +14,7 @@
     (list 'required
           'required-optional
           'required-key
-          'required-untyped-rest)
+          'rest)
   :test #'equalp)
 
 (defun lambda-list-type-p (object)
@@ -35,18 +35,16 @@
   (declare (type list lambda-list))
   (the lambda-list-type
        (let ((intersection (intersection lambda-list lambda-list-keywords)))
-         ;; premature optimization and over-abstraction:/
-         (cond ((null intersection)
-                'required)
+         ;; premature optimization and over-abstraction :/
+         (cond ((null intersection) 'required)
                ((and (car intersection) (null (cdr intersection)) ; length is 1
                      (member '&optional intersection))
                 'required-optional)
                ((and (car intersection) (null (cdr intersection)) ; length is 1
                      (member '&key intersection))
                 'required-key)
-               ((and (car intersection) (null (cdr intersection)) ; length is 1
-                     (member '&rest intersection))
-                'required-untyped-rest)
+               ((member '&rest intersection) ; don't check the lengths
+                'rest)
                (t
                 (error "Neither of ~A types" +lambda-list-types+))))))
 
@@ -218,12 +216,13 @@ Non-examples:
 (defun type-list-intersect-p (type-list-1 type-list-2)
   #.+type-list-intersect-p+
   (declare (type type-list type-list-1 type-list-2))
-  (let ((*lambda-list-typed-p* nil)
-        (*potential-type* (potential-type-of-lambda-list type-list-1)))
-    (and (length= type-list-1 type-list-2)
-         (%type-list-intersect-p *potential-type* type-list-1 type-list-2))))
+  (let ((*lambda-list-typed-p* nil))
+    (%type-list-intersect-p (potential-type-of-lambda-list type-list-1)
+                            (potential-type-of-lambda-list type-list-2)
+                            type-list-1
+                            type-list-2)))
 
-(defgeneric %type-list-intersect-p (type type-list-1 type-list-2)
+(defgeneric %type-list-intersect-p (type-1 type-2 type-list-1 type-list-2)
   (:documentation #.+type-list-intersect-p+))
 
 (5am:def-suite type-list-intersect-p :in lambda-list)

@@ -225,15 +225,23 @@
                         :collect `(or (not ,supplied-p)
                                       (typep ,param ',(second type)))))))))
 
-(defmethod %type-list-intersect-p ((type (eql 'required-key)) list-1 list-2)
-  (let ((key-position (position '&key list-1)))
-    (and (eq key-position (position '&key list-2))
+(defmethod %type-list-intersect-p ((type-1 (eql 'required-key))
+                                   (type-2 (eql 'required-key))
+                                   list-1 list-2)
+  (let ((key-position-1 (position '&key list-1))
+        (key-position-2 (position '&key list-2)))
+    ;; What about differing number of &key arguments?
+    ;; Well, that case only arises if required-arguments are already intersecting!
+    (and (= key-position-1 key-position-2)
          (every #'type-intersect-p
-                (subseq list-1 0 key-position)
-                (subseq list-2 0 key-position)))))
+                (subseq list-1 0 key-position-1)
+                (subseq list-2 0 key-position-2)))))
 
 (def-test type-list-intersect-key (:suite type-list-intersect-p)
   (5am:is-true  (type-list-intersect-p '(string &key (:a string)) '(string &key (:a array))))
   (5am:is-true  (type-list-intersect-p '(string &key (:a string)) '(string &key (:a number))))
-  (5am:is-false (type-list-intersect-p '(string &key (:a string)) '(number)))
-  (5am:is-false (type-list-intersect-p '(string &key (:a string)) '(number &key (:a string)))))
+  (5am:is-true  (type-list-intersect-p '(string &key (:a string))
+                                       '(string &key (:a string) (:b number))))
+  (5am:is-false (type-list-intersect-p '(string &key (:a string)) '(number &key (:a string))))
+  (5am:is-false (type-list-intersect-p '(&key (:a string) (:b number))
+                                       '(string &key (:a string) (:b number)))))

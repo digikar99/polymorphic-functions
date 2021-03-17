@@ -21,7 +21,7 @@
                              (:file "required")
                              (:file "required-optional")
                              (:file "required-key")
-                             (:file "required-untyped-rest")))
+                             (:file "rest")))
                (:file "conditions"                 :depends-on ("package"))
                (:file "dispatch"                   :depends-on ("adhoc-polymorphic-function"
                                                                 "lambda-lists"

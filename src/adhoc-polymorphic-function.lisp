@@ -5,7 +5,7 @@
   (let ((valid-p t))
     (loop :for elt := (first list)
           :while (and list valid-p) ; we don't want list to be empty
-          :until (eq '&key elt)
+          :until (member elt '(&key &rest))
           :do (setq valid-p
                     (and valid-p
                          (cond ((eq '&optional elt)
@@ -15,18 +15,25 @@
                                (t
                                 nil))))
               (setq list (rest list)))
-    (cond ((and valid-p list (eq '&key (first list)))
-           (loop :for (param type) :in (rest list)
-                 :do (setq valid-p (type-specifier-p type))))
-          ((and valid-p list)
-           (setq valid-p nil)))
+    (when valid-p
+      (cond ((eq '&key (first list))
+             (when list
+               (loop :for (param type) :in (rest list)
+                     :do (setq valid-p (type-specifier-p type)))))
+            ((eq '&rest (first list))
+             (unless (null (rest list))
+               (setq valid-p nil)))
+            (list
+             (setq valid-p nil))))
     valid-p))
 
 (def-test type-list (:suite :adhoc-polymorphic-functions)
   (5am:is-true (type-list-p '()))
   (5am:is-true (type-list-p '(number string)))
+  (5am:is-true (type-list-p '(number string &rest)))
   (5am:is-true (type-list-p '(&optional)))
   (5am:is-true (type-list-p '(&key)))
+  (5am:is-true (type-list-p '(&rest)))
   (5am:is-true (type-list-p '(number &optional string)))
   (5am:is-true (type-list-p '(number &key (:a string)))))
 
@@ -137,19 +144,25 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                   `(lambda ,lambda-list ,body-form)))
         (setf (fdefinition name) apf)))))
 
-(defun register-polymorph (name type-list lambda-body lambda)
+(defun register-polymorph (name type-list lambda-body lambda lambda-list-type)
   ;; TODO: Get rid of APPLICABLE-P-FUNCTION: construct it from type-list
   (declare (type function-name name)
            (type function      lambda)
            (type type-list     type-list)
            (type list          lambda-body))
-  (let* ((apf                 (fdefinition name))
-         (lambda-list-type    (polymorphic-function-lambda-list-type apf))
-         (untyped-lambda-list (polymorphic-function-lambda-list apf)))
-    (assert (type-list-compatible-p type-list untyped-lambda-list)
-            nil
-            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
-            type-list untyped-lambda-list name)
+  (let* ((apf                        (fdefinition name))
+         (apf-lambda-list-type       (polymorphic-function-lambda-list-type apf))
+         (untyped-lambda-list        (polymorphic-function-lambda-list apf)))
+    (if (eq apf-lambda-list-type 'rest)
+        ;; required-optional can simply be split up into multiple required or required-key
+        (assert (member lambda-list-type '(rest required required-key))
+                nil
+                "&OPTIONAL keyword is not allowed for LAMBDA-LIST~%  ~S~%of the ADHOC-POLYMORPHIC-FUNCTION associated with ~S"
+                untyped-lambda-list name)
+        (assert (type-list-compatible-p type-list untyped-lambda-list)
+                nil
+                "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
+                type-list untyped-lambda-list name))
     (ensure-non-intersecting-type-lists name type-list)
     (with-slots (type-lists polymorphs) apf
       ;; FIXME: Use a type-list equality check, not EQUALP
@@ -177,18 +190,26 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   the second is the function itself,
   the third is the type list corresponding to the polymorph that will be used for dispatch"
   (declare (type function-name name))
-  (let* ((ahp        (fdefinition name))
-         (polymorphs (polymorphic-function-polymorphs ahp)))
+  (let* ((apf                  (fdefinition name))
+         (polymorphs           (polymorphic-function-polymorphs apf))
+         (apf-lambda-list-type (polymorphic-function-lambda-list-type apf)))
     (loop :for polymorph :in polymorphs
-          :do (when (apply (polymorph-applicable-p-function polymorph)
-                           arg-list)
+          :do (when (if (eq 'rest apf-lambda-list-type)
+                        (ignore-errors
+                         (apply
+                          (the function
+                               (polymorph-applicable-p-function polymorph))
+                          arg-list))
+                        (apply
+                         (the function
+                              (polymorph-applicable-p-function polymorph))
+                         arg-list))
                 (return-from retrieve-polymorph
                   (values (polymorph-lambda-body polymorph)
-                          (the function (polymorph-lambda  polymorph))
-                          (polymorph-type-list polymorph)))))
+                          (the function (polymorph-lambda  polymorph))))))
     (error 'no-applicable-polymorph
            :arg-list arg-list
-           :type-lists (polymorphic-function-type-lists ahp))))
+           :type-lists (polymorphic-function-type-lists apf))))
 
 (defun remove-polymorph (name type-list)
   (let ((apf (fdefinition name)))
@@ -217,21 +238,32 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                   ;;   An interested person may look up this link for MAKE-LOAD-FORM
                   ;;   https://blog.cneufeld.ca/2014/03/the-less-familiar-parts-of-lisp-for-beginners-make-load-form/
                   (let*
-                      ((apf        (fdefinition ,name))
-                       (polymorphs (polymorphic-function-polymorphs apf))
+                      ((apf                  (fdefinition ,name))
+                       (polymorphs           (polymorphic-function-polymorphs apf))
+                       (apf-lambda-list-type (polymorphic-function-lambda-list-type apf))
                        ,@(mapcar #'list gensyms arg-list))
                     (declare (optimize speed)
                              (type list                       polymorphs)
                              (type adhoc-polymorphic-function apf))
                     (loop :for polymorph :in polymorphs
-                          :do (when (funcall (the function
-                                                  (polymorph-applicable-p-function polymorph))
-                                             ,@gensyms)
+                          :do (when (if (and (eq 'rest apf-lambda-list-type)
+                                             (listp ,(lastcar gensyms)))
+                                        (ignore-errors
+                                         (apply
+                                          (the function
+                                               (polymorph-applicable-p-function polymorph))
+                                          ,@gensyms))
+                                        (funcall
+                                         (the function
+                                              (polymorph-applicable-p-function polymorph))
+                                         ,@gensyms))
                                 (return-from retrieve-polymorph
                                   (values (polymorph-lambda-body polymorph)
                                           (polymorph-lambda      polymorph)))))
                     (error 'no-applicable-polymorph
-                           :arg-list (list ,@gensyms)
+                           :arg-list (list ,@(if *compiler-macro-expanding-p*
+                                                 arg-list
+                                                 gensyms))
                            :type-lists (polymorphic-function-type-lists apf)))))
              form))
         (t form)))
@@ -241,8 +273,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (type type-list type-list)
            (type function lambda))
 
-  (let* ((apf         (fdefinition name))
-         (lambda-list (polymorphic-function-lambda-list apf))
+  (let* ((apf              (fdefinition name))
+         (lambda-list      (polymorphic-function-lambda-list apf))
          (lambda-list-type (polymorphic-function-lambda-list-type apf))
          (type-list   (let ((key-position (position '&key type-list)))
                         (if key-position
@@ -253,10 +285,16 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                             ;; This sorting allows things to work even though
                             ;; we use EQUALP instead of TYPE-LIST-=
                             type-list))))
-    (assert (type-list-compatible-p type-list lambda-list)
-            nil
-            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
-            type-list lambda-list name)
+    (if (eq lambda-list-type 'rest)
+        ;; required-optional can simply be split up into multiple required or required-key
+        (assert (not (member '&optional type-list))
+                nil
+                "&OPTIONAL keyword is not allowed for LAMBDA-LIST~%  ~S~%of the ADHOC-POLYMORPHIC-FUNCTION associated with ~S"
+                lambda-list name)
+        (assert (type-list-compatible-p type-list lambda-list)
+                nil
+                "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
+                type-list lambda-list name))
     (ensure-non-intersecting-type-lists name type-list)
 
     (with-slots (polymorphs) apf
@@ -275,12 +313,22 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defun retrieve-polymorph-compiler-macro (name &rest arg-list)
   (declare (type function-name name))
-  (let* ((apf        (fdefinition name))
-         (polymorphs (polymorphic-function-polymorphs apf))
-         (type-lists (polymorphic-function-type-lists apf))
+  (let* ((apf                  (fdefinition name))
+         (polymorphs           (polymorphic-function-polymorphs apf))
+         (type-lists           (polymorphic-function-type-lists apf))
+         (apf-lambda-list-type (polymorphic-function-lambda-list-type apf))
          (applicable-polymorphs
            (loop :for polymorph :in polymorphs
-                 :if (polymorph-applicable-p polymorph arg-list)
+                 :if (if (eq 'rest apf-lambda-list-type)
+                         (ignore-errors
+                          (apply
+                           (the function
+                                (polymorph-applicable-p-function polymorph))
+                           arg-list))
+                         (apply
+                          (the function
+                               (polymorph-applicable-p-function polymorph))
+                          arg-list))
                    :collect polymorph)))
     (case (length applicable-polymorphs)
       (1 (polymorph-compiler-macro-lambda (first applicable-polymorphs)))

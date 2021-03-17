@@ -136,7 +136,7 @@
   (is (eq 'string (foz 7)))
   (undefine-polymorphic-function 'foz))
 
-(def-test untyped-rest-correctness ()
+(def-test rest-correctness ()
   (ignoring-error-output
     (eval `(define-polymorphic-function my+ (arg &rest args) :overwrite t))
     (eval `(progn
@@ -144,20 +144,22 @@
                (if numbers
                    (+ num (apply 'my+ numbers))
                    num))
-             (defpolymorph-compiler-macro my+ (number) (&whole form &rest args)
+             (defpolymorph-compiler-macro my+ (number &rest) (&whole form &rest args)
                (declare (ignore args))
                `(list (+ ,@(cdr form))))
              (defun my+-number-caller ()
                (declare (optimize speed))
                (my+ 3 2 8))
-             (defpolymorph my+ ((str string) &rest strings) string
-               (apply 'concatenate 'string str strings))
              (defpolymorph my+ ((l list) &rest lists) list
-               (apply 'append l lists)))))
+               (apply 'append l lists))
+             (defpolymorph my+ ((str string) (num number) &key ((coerce t) nil)) string
+               (if coerce
+                   (concatenate 'string str (write-to-string num))
+                   str)))))
   (is (eq 9 (my+ 2 3 4)))
-  (is (string= "helloworld" (my+ "hello" "world")))
   (is (equalp '(1 2 3) (my+ '(1 2) '(3))))
   (is (equalp '(13) (my+-number-caller)))
+  (is (string= "hello5" (my+ "hello" 5 :coerce t)))
   (undefine-polymorphic-function 'my+)
   (fmakunbound 'my+-number-caller))
 
