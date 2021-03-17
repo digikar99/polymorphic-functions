@@ -8,13 +8,14 @@
 ;;; (iterate::free-variables form) has been tried out proves out to be pretty restrictive
 (defun free-variables-p (form)
   (let (free-variables)
-    (with-output-to-string (*error-output*)
-      (setq free-variables
-            (remove-if-not (lambda (elt)
-                             (typep elt 'hu.dwim.walker:free-variable-reference-form))
-                           (hu.dwim.walker:collect-variable-references
-                            (hu.dwim.walker:walk-form
-                             form)))))
+    (handler-bind ((style-warning #'muffle-warning))
+      (with-output-to-string (*error-output*)
+        (setq free-variables
+              (remove-if-not (lambda (elt)
+                               (typep elt 'hu.dwim.walker:free-variable-reference-form))
+                             (hu.dwim.walker:collect-variable-references
+                              (hu.dwim.walker:walk-form
+                               form))))))
     (mapcar (lambda (free-var-reference-form)
               (slot-value free-var-reference-form 'hu.dwim.walker::name))
             free-variables)))
@@ -198,26 +199,43 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
     (multiple-value-bind (param-list type-list)
         (defun-lambda-list typed-lambda-list :typed t)
       (multiple-value-bind (declarations body) (extract-declarations body)
-        (let (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
-              (free-variable-analysis-form `(lambda ,param-list (block ,block-name ,@body)))
-              (form                        `(defpolymorph ,name ,typed-lambda-list ,@body)))
-          (let* ((lambda-body `(lambda ,param-list
-                                 ,(lambda-declarations typed-lambda-list :typed t)
-                                 ,declarations
-                                 (block ,block-name
-                                   ,@(butlast body)
-                                   (the ,return-type ,@(or (last body) '(nil))))))
-                 ;; TODO: should not contain declarations
-                 (free-variables (free-variables-p free-variable-analysis-form))
-                 #+sbcl
-                 (sbcl-transform `(sb-c:deftransform ,name
-                                      (,param-list ,(if (eq '&rest (lastcar type-list))
-                                                        (butlast type-list)
-                                                        type-list) *
-                                       :policy (< debug speed))
-                                    `(apply ,',lambda-body
-                                            ,@',(sbcl-transform-body-args typed-lambda-list
-                                                                          :typed t)))))
+        (let* (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
+               (free-variable-analysis-form `(lambda ,param-list (block ,block-name ,@body)))
+               (form                        `(defpolymorph ,name ,typed-lambda-list ,@body))
+               (lambda-body `(lambda ,param-list
+                               ,(lambda-declarations typed-lambda-list :typed t)
+                               ,declarations
+                               (block ,block-name
+                                 ,@(butlast body)
+                                 (the ,return-type ,@(or (last body) '(nil))))))
+               ;; TODO: should not contain declarations
+               (free-variables (free-variables-p free-variable-analysis-form))
+               #+sbcl
+               (sbcl-transform `(sb-c:deftransform ,name
+                                    (,param-list ,(if (eq '&rest (lastcar type-list))
+                                                      (butlast type-list)
+                                                      type-list) *
+                                     :policy (< debug speed))
+                                  `(apply ,',lambda-body
+                                          ,@',(sbcl-transform-body-args typed-lambda-list
+                                                                        :typed t)))))
+          (multiple-value-bind (safe-lambda-body note)
+              (if free-variables
+                  (values
+                   nil
+                   (with-output-to-string (*error-output*)
+                     (terpri *error-output*)
+                     (format *error-output* "; Will not inline ~%;   ")
+                     (write-string
+                      (str-replace-all
+                       #\newline
+                       (uiop:strcat #\newline #\; "  ")
+                       (format nil "~S~&" form))
+                      *error-output*)
+                     (format *error-output*
+                             "because free variables ~S were found"
+                             free-variables)))
+                  (values lambda-body nil))
             ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
             ;; and "objects of type FUNCTION can't be dumped into fasl files
             `(progn
@@ -228,23 +246,10 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
                              `(locally (declare (sb-ext:muffle-conditions style-warning))
                                 (handler-bind ((style-warning #'muffle-warning))
                                   ,sbcl-transform))))
+               ,(when note `(write-string ,note *error-output*))
                (eval-when (:compile-toplevel :load-toplevel :execute)
                  (register-polymorph ',name ',type-list
-                                     ',(if free-variables
-                                           (progn
-                                             (terpri *error-output*)
-                                             (format *error-output* "; Will not inline ~%;   ")
-                                             (write-string
-                                              (str-replace-all
-                                               (string #\newline)
-                                               (uiop:strcat #\newline #\; "  ")
-                                               (format nil "~S~&" form))
-                                              *error-output*)
-                                             (format *error-output*
-                                                     "because free variables ~S were found"
-                                                     free-variables)
-                                             nil)
-                                           lambda-body)
+                                     ',safe-lambda-body
                                      ,lambda-body
                                      ',lambda-list-type)
                  ',name))))))))
