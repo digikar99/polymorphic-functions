@@ -197,7 +197,8 @@ Non-examples:
   (5am:is-true  (type-list-compatible-p '(string &key (:d number) (:e string)) '(c &key d e)))
   (5am:is-false (type-list-compatible-p '(string &key (:d number)) '(c &key d e)))
   (5am:is-true  (type-list-compatible-p '(string) '(c &rest e)))
-  (5am:is-false (type-list-compatible-p '(number string) '(c &rest e))))
+  (5am:is-true  (type-list-compatible-p '(number string) '(c &rest e)))
+  (5am:is-false (type-list-compatible-p '(&rest) '(c &rest e))))
 
 ;; APPLICABLE-P-FUNCTION =======================================================
 

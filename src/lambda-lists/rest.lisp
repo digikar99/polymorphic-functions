@@ -87,7 +87,13 @@
 (defmethod %type-list-compatible-p ((type (eql 'rest))
                                     (type-list list)
                                     (untyped-lambda-list list))
-  (= (length type-list) (position '&rest untyped-lambda-list)))
+  (let ((rest-position (position '&rest untyped-lambda-list)))
+    (cond ((member '&rest type-list)
+           (<= rest-position (position '&rest type-list)))
+          ((member '&key type-list)
+           (<= rest-position (position '&key type-list)))
+          (t
+           (<= rest-position (length type-list))))))
 
 (defmethod applicable-p-function ((type (eql 'rest)) (type-list list))
   (let* ((rest-position (position '&rest type-list))

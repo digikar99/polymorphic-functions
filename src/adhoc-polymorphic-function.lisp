@@ -153,16 +153,16 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (let* ((apf                        (fdefinition name))
          (apf-lambda-list-type       (polymorphic-function-lambda-list-type apf))
          (untyped-lambda-list        (polymorphic-function-lambda-list apf)))
-    (if (eq apf-lambda-list-type 'rest)
-        ;; required-optional can simply be split up into multiple required or required-key
-        (assert (member lambda-list-type '(rest required required-key))
-                nil
-                "&OPTIONAL keyword is not allowed for LAMBDA-LIST~%  ~S~%of the ADHOC-POLYMORPHIC-FUNCTION associated with ~S"
-                untyped-lambda-list name)
-        (assert (type-list-compatible-p type-list untyped-lambda-list)
-                nil
-                "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
-                type-list untyped-lambda-list name))
+    (when (eq apf-lambda-list-type 'rest)
+      ;; required-optional can simply be split up into multiple required or required-key
+      (assert (member lambda-list-type '(rest required required-key))
+              nil
+              "&OPTIONAL keyword is not allowed for LAMBDA-LIST~%  ~S~%of the ADHOC-POLYMORPHIC-FUNCTION associated with ~S"
+              untyped-lambda-list name))
+    (assert (type-list-compatible-p type-list untyped-lambda-list)
+            nil
+            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
+            type-list untyped-lambda-list name)
     (ensure-non-intersecting-type-lists name type-list)
     (with-slots (type-lists polymorphs) apf
       ;; FIXME: Use a type-list equality check, not EQUALP
