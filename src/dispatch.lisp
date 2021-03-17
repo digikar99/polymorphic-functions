@@ -95,14 +95,10 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
     `(,@(if optim-debug
             `(progn)
             `(handler-bind ((style-warning #'muffle-warning))))
-      (eval-when (:compile-toplevel)
+      (eval-when (:compile-toplevel :load-toplevel :execute)
         ,(when overwrite
            `(undefine-polymorphic-function ',name))
         (register-polymorphic-function ',name ',untyped-lambda-list))
-      ;; FIXME: What should the exact arrangement be here?
-      (eval-when (:load-toplevel :execute)
-        (unless (fboundp ',name)
-          (register-polymorphic-function ',name ',untyped-lambda-list :overwrite ,overwrite)))
       #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
       (define-compiler-macro ,name (&whole form &rest args &environment env)
         (declare (ignore args))
