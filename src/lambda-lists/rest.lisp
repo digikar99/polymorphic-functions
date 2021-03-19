@@ -63,11 +63,11 @@
 (defmethod %defun-body ((type (eql 'rest)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
   (let ((rest-position (position '&rest defun-lambda-list)))
-    `(apply (nth-value 1 (retrieve-polymorph ',*name*
-                                             ,@(subseq defun-lambda-list
+    `(apply ,(polymorph-retriever-code type *name*
+                                       (append (subseq defun-lambda-list
                                                        0 rest-position)
-                                             ,@(subseq defun-lambda-list
-                                                       (1+ rest-position))))
+                                               (subseq defun-lambda-list
+                                                         (1+ rest-position))))
             ,@(remove '&rest defun-lambda-list))))
 
 (defmethod %sbcl-transform-body-args ((type (eql 'rest)) (typed-lambda-list list))

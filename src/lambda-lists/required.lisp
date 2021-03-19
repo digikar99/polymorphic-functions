@@ -13,7 +13,7 @@
   (is-error (lambda-list-type '(a 5)))
   (is-error (lambda-list-type '(a b &rest))))
 
-(defmethod %defun-lambda-list ((type (eql 'required)) (lambda-list list))  
+(defmethod %defun-lambda-list ((type (eql 'required)) (lambda-list list))
   (if *lambda-list-typed-p*
       (values (mapcar 'first  lambda-list)
               (mapcar 'second lambda-list))
@@ -21,8 +21,8 @@
 
 (defmethod %defun-body ((type (eql 'required)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
-  `(funcall (nth-value 1 (retrieve-polymorph ',*name* ,@defun-lambda-list))
-          ,@defun-lambda-list))
+  `(funcall ,(polymorph-retriever-code type *name* defun-lambda-list)
+            ,@defun-lambda-list))
 
 
 (defmethod %sbcl-transform-body-args ((type (eql 'required)) (typed-lambda-list list))

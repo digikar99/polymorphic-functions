@@ -17,7 +17,7 @@
                           (return-from %lambda-list-type nil))))
         (&optional (cond ((and *lambda-list-typed-p*   (listp elt)
                                (let ((elt (first elt)))
-                                 (and (listp elt)                                    
+                                 (and (listp elt)
                                       (valid-parameter-name-p (first  elt))
                                       (type-specifier-p       (second elt))))
                                (if (null (third elt))
@@ -41,28 +41,28 @@
   (is-error (lambda-list-type '(a &optional 5)))
   (is-error (lambda-list-type '(a &optional b &rest)))
   (is (eq 'required-optional
-          (lambda-list-type '((a string) (b number) &optional 
+          (lambda-list-type '((a string) (b number) &optional
                               ((c number))) ; say if it actually is a null-type?
                             :typed t)))
   (is (eq 'required-optional
-          (lambda-list-type '((a string) (b number) &optional 
+          (lambda-list-type '((a string) (b number) &optional
                               ((c number) 5 c))
                             :typed t)))
   (is (eq 'required-optional
-          (lambda-list-type '((a string) (b number) &optional 
+          (lambda-list-type '((a string) (b number) &optional
                               ((c number) 5 c))
                             :typed t)))
   (is (eq 'required-optional
-          (lambda-list-type '((a string) (b number) &optional 
+          (lambda-list-type '((a string) (b number) &optional
                               ((c number) b c))
                             :typed t)))
-  (is-error (lambda-list-type '((a string) (b number) &optional 
+  (is-error (lambda-list-type '((a string) (b number) &optional
                                 ((c number) 5 6))
                               :typed t))
-  (is-error (lambda-list-type '((a string) (b number) &optional 
+  (is-error (lambda-list-type '((a string) (b number) &optional
                                 ((c number) 5 6 7))
                               :typed t))
-  (is-error (lambda-list-type '((a string) (b number) &optional 
+  (is-error (lambda-list-type '((a string) (b number) &optional
                                 (c number))
                               :typed t)))
 
@@ -106,7 +106,7 @@
     (is (eq 'c (first third)))
     (is (eq 'd (first fourth))))
   (destructuring-bind ((first second third fourth) type-list)
-      (multiple-value-list (defun-lambda-list '((a string) (b number) &optional 
+      (multiple-value-list (defun-lambda-list '((a string) (b number) &optional
                                                 ((c number) 5))
                              :typed t))
     (is (eq first 'a))
@@ -140,10 +140,9 @@
         (let ((optional-p-tree (optional-p-tree defun-lambda-list)))
           (values (with-gensyms (apply-list)
                     `(let ((,apply-list ,optional-p-tree))
-                       (apply (nth-value 1 (apply 'retrieve-polymorph
-                                                  ',*name*
-                                                  ,@(reverse return-list)
-                                                  ,apply-list))
+                       (apply ,(polymorph-retriever-code type *name*
+                                                         (append (reverse return-list)
+                                                                 (list apply-list)))
                               ,@(reverse return-list)
                               ,apply-list)))
                   defun-lambda-list))))))

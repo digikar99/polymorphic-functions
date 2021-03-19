@@ -134,6 +134,29 @@ Non-examples:
     (values (%defun-body *potential-type* defun-lambda-list)
             defun-lambda-list)))
 
+(defun polymorph-retriever-code (lambda-list-type name arg-list)
+  `(block retrieve-polymorph
+     (loop :for polymorph :in (polymorphic-function-polymorphs (function ,name))
+           :do (when ,(case lambda-list-type
+                        (rest `(ignore-errors
+                                (apply
+                                 (the function
+                                      (polymorph-applicable-p-function polymorph))
+                                 ,@arg-list)))
+                        (required `(funcall
+                                    (the function
+                                         (polymorph-applicable-p-function polymorph))
+                                    ,@arg-list))
+                        (t `(apply
+                             (the function
+                                  (polymorph-applicable-p-function polymorph))
+                             ,@arg-list)))
+                 (return-from retrieve-polymorph (polymorph-lambda polymorph))))
+     (error 'no-applicable-polymorph
+            :arg-list (list ,@arg-list)
+            :type-lists (polymorphic-function-type-lists
+                         (function ,name)))))
+
 ;; SBCL-TRANSFORM-BODY-ARGS ====================================================
 
 (define-lambda-list-helper
