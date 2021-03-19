@@ -125,13 +125,14 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (let ((*name* name))
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
       (let ((apf (make-instance 'adhoc-polymorphic-function
-                               :name name
-                               :lambda-list untyped-lambda-list
-                               :lambda-list-type (lambda-list-type untyped-lambda-list))))
+                                :name name
+                                :lambda-list untyped-lambda-list
+                                :lambda-list-type (lambda-list-type untyped-lambda-list))))
+
         (closer-mop:set-funcallable-instance-function
-         apf
-         (compile nil
-                  `(lambda ,lambda-list ,body-form)))
+         apf (compile nil
+                      #+sbcl `(sb-int:named-lambda ,name ,lambda-list ,body-form)
+                      #-sbcl `(lambda ,lambda-list ,body-form)))
         (setf (fdefinition name) apf)))))
 
 (defun register-polymorph (name type-list lambda-body lambda lambda-list-type)
