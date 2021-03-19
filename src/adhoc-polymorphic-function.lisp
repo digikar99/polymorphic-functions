@@ -216,42 +216,74 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (setq form (rest form)))
          (if (eq 'retrieve-polymorph (first form))
              (let ((gensyms (make-gensym-list (length arg-list))))
-               `(block retrieve-polymorph
-                  ;; - TYPE_LISTS and PF-HASH-TABLE will change after the
-                  ;;   "call to RETRIEVE-POLYMORPH" is compiled
-                  ;; - While FUNCTION-WRAPPER can be precompiled, completely dumping it requires
-                  ;;   knowledge of PF-HASH-TABLE that would only be available after
-                  ;;   the call to RETRIEVE-POLYMORPH is compiled. (Am I missing something?)
-                  ;;   An interested person may look up this link for MAKE-LOAD-FORM
-                  ;;   https://blog.cneufeld.ca/2014/03/the-less-familiar-parts-of-lisp-for-beginners-make-load-form/
-                  (let*
-                      ((apf                  (fdefinition ,name))
-                       (polymorphs           (polymorphic-function-polymorphs apf))
-                       (apf-lambda-list-type (polymorphic-function-lambda-list-type apf))
-                       ,@(mapcar #'list gensyms arg-list))
-                    (declare (optimize speed)
-                             (type list                       polymorphs)
-                             (type adhoc-polymorphic-function apf))
-                    (loop :for polymorph :in polymorphs
-                          :do (when (if (and (eq 'rest apf-lambda-list-type)
-                                             (listp ,(lastcar gensyms)))
-                                        (ignore-errors
-                                         (apply
-                                          (the function
-                                               (polymorph-applicable-p-function polymorph))
-                                          ,@gensyms))
-                                        (funcall
-                                         (the function
-                                              (polymorph-applicable-p-function polymorph))
-                                         ,@gensyms))
-                                (return-from retrieve-polymorph
-                                  (values (polymorph-lambda-body polymorph)
-                                          (polymorph-lambda      polymorph)))))
-                    (error 'no-applicable-polymorph
-                           :arg-list (list ,@(if *compiler-macro-expanding-p*
-                                                 arg-list
-                                                 gensyms))
-                           :type-lists (polymorphic-function-type-lists apf)))))
+               ;; - TYPE_LISTS and PF-HASH-TABLE will change after the
+               ;;   "call to RETRIEVE-POLYMORPH" is compiled
+               ;; - While FUNCTION-WRAPPER can be precompiled, completely dumping it requires
+               ;;   knowledge of PF-HASH-TABLE that would only be available after
+               ;;   the call to RETRIEVE-POLYMORPH is compiled. (Am I missing something?)
+               ;;   An interested person may look up this link for MAKE-LOAD-FORM
+               ;;   https://blog.cneufeld.ca/2014/03/the-less-familiar-parts-of-lisp-for-beginners-make-load-form/
+               (if *compiler-macro-expanding-p*
+                   (let* ((apf                  (fdefinition (second name)))
+                          (apf-lambda-list-type (polymorphic-function-lambda-list-type apf)))
+                     `(block retrieve-polymorph
+                        ;; Separating out applicable-p-function into a separate list,
+                        ;; in fact, decreases performance on sbcl
+                        (loop :for polymorph :in (polymorphic-function-polymorphs
+                                                  (function ,(second name)))
+                              :do (when ,(if (eq 'rest apf-lambda-list-type)
+                                             `(ignore-errors
+                                               (apply
+                                                (the function
+                                                     (polymorph-applicable-p-function polymorph))
+                                                ,@arg-list))
+                                             `(funcall
+                                               (the function
+                                                    (polymorph-applicable-p-function polymorph))
+                                               ,@arg-list))
+                                    (return-from retrieve-polymorph
+                                      (values (polymorph-lambda-body polymorph)
+                                              (polymorph-lambda      polymorph)))))
+                        (error 'no-applicable-polymorph
+                               :arg-list (list ,@arg-list)
+                               :type-lists (polymorphic-function-type-lists
+                                            (function ,(second name))))))
+                   `(block retrieve-polymorph
+                      ;; - TYPE_LISTS and PF-HASH-TABLE will change after the
+                      ;;   "call to RETRIEVE-POLYMORPH" is compiled
+                      ;; - While FUNCTION-WRAPPER can be precompiled, completely dumping it requires
+                      ;;   knowledge of PF-HASH-TABLE that would only be available after
+                      ;;   the call to RETRIEVE-POLYMORPH is compiled. (Am I missing something?)
+                      ;;   An interested person may look up this link for MAKE-LOAD-FORM
+                      ;;   https://blog.cneufeld.ca/2014/03/the-less-familiar-parts-of-lisp-for-beginners-make-load-form/
+                      (let*
+                          ((apf                  (fdefinition ,name))
+                           (polymorphs           (polymorphic-function-polymorphs apf))
+                           (apf-lambda-list-type (polymorphic-function-lambda-list-type apf))
+                           ,@(mapcar #'list gensyms arg-list))
+                        (declare (optimize speed)
+                                 (type list                       polymorphs)
+                                 (type adhoc-polymorphic-function apf))
+                        (loop :for polymorph :in polymorphs
+                              :do (when (if (and (eq 'rest apf-lambda-list-type)
+                                                 (listp ,(lastcar gensyms)))
+                                            (ignore-errors
+                                             (apply
+                                              (the function
+                                                   (polymorph-applicable-p-function polymorph))
+                                              ,@gensyms))
+                                            (funcall
+                                             (the function
+                                                  (polymorph-applicable-p-function polymorph))
+                                             ,@gensyms))
+                                    (return-from retrieve-polymorph
+                                      (values (polymorph-lambda-body polymorph)
+                                              (polymorph-lambda      polymorph)))))
+                        (error 'no-applicable-polymorph
+                               :arg-list (list ,@(if *compiler-macro-expanding-p*
+                                                     arg-list
+                                                     gensyms))
+                               :type-lists (polymorphic-function-type-lists apf))))))
              form))
         (t form)))
 

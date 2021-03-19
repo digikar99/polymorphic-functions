@@ -96,9 +96,9 @@ the performance results come out as:
 0.471 sec   | function-=
 0.531 sec   | generic-=
 0.615 sec   | specialized-=
+0.648 sec   | polymorphic-=
+0.839 sec   | polymorphic-=-key
 1.647 sec   | specialized-=-key
-1.151 sec   | polymorphic-=
-1.339 sec   | polymorphic-=-key
 ```
 
 All of `specialization-store` and `adhoc-polymorphic-functions` as well as `fast-generic-functions` or `static-dispatch` provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.

@@ -124,9 +124,12 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
                                    :collect `(,sym ,form)))
                        (block ,block-name
                          (funcall (the function
-                                       (nth-value 1 (retrieve-polymorph
-                                                     ',name
-                                                     ,@gensyms)))
+                                       (nth-value 1
+                                                  ,(compiler-macroexpand
+                                                    `(retrieve-polymorph
+                                                      ',name
+                                                      ,@gensyms)
+                                                    env)))
                                   ,@gensyms)))))
             (let ((arg-list (rest form)))
               (multiple-value-bind (fbody function dispatch-type-list)
