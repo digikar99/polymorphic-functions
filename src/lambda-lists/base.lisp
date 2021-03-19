@@ -136,7 +136,7 @@ Non-examples:
 
 (defun polymorph-retriever-code (lambda-list-type name arg-list)
   `(block retrieve-polymorph
-     (loop :for polymorph :in (polymorphic-function-polymorphs (function ,name))
+     (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition ',name))
            :do (when ,(case lambda-list-type
                         (rest `(ignore-errors
                                 (apply
@@ -154,8 +154,7 @@ Non-examples:
                  (return-from retrieve-polymorph (polymorph-lambda polymorph))))
      (error 'no-applicable-polymorph
             :arg-list (list ,@arg-list)
-            :type-lists (polymorphic-function-type-lists
-                         (function ,name)))))
+            :type-lists (polymorphic-function-type-lists (fdefinition ',name)))))
 
 ;; SBCL-TRANSFORM-BODY-ARGS ====================================================
 

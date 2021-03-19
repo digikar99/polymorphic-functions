@@ -42,9 +42,10 @@
 (defstruct polymorph
   (documentation nil :type (or null string))
   (name (error "NAME must be supplied!"))
+  (return-type)
   (type-list nil)
   (applicable-p-function)
-  (lambda-body)
+  (inline-lambda-body)
   ;; We need the FUNCTION-BODY due to compiler macros,
   ;; and "objects of type FUNCTION can't be dumped into fasl files."
   (lambda)
@@ -130,17 +131,21 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                 :lambda-list-type (lambda-list-type untyped-lambda-list))))
 
         (closer-mop:set-funcallable-instance-function
-         apf (compile nil
-                      #+sbcl `(sb-int:named-lambda ,name ,lambda-list ,body-form)
-                      #-sbcl `(lambda ,lambda-list ,body-form)))
+         apf #+sbcl (compile nil `(sb-int:named-lambda (adhoc-polymorphic-function ,name)
+                                    ,lambda-list ,body-form))
+             ;; FIXME: https://github.com/Clozure/ccl/issues/361
+             #+ccl (eval `(ccl:nfunction (adhoc-polymorphic-function ,name)
+                                         (lambda ,lambda-list ,body-form)))
+             #-(or ccl sbcl) (compile nil `(lambda ,lambda-list ,body-form)))
         (setf (fdefinition name) apf)))))
 
-(defun register-polymorph (name type-list lambda-body lambda lambda-list-type)
+(defun register-polymorph (name type-list return-type inline-lambda-body lambda lambda-list-type)
   ;; TODO: Get rid of APPLICABLE-P-FUNCTION: construct it from type-list
-  (declare (type function-name name)
-           (type function      lambda)
-           (type type-list     type-list)
-           (type list          lambda-body))
+  (declare (type function-name  name)
+           (type function       lambda)
+           (type type-list      type-list)
+           (type type-specifier return-type)
+           (type list           inline-lambda-body))
   (let* ((apf                        (fdefinition name))
          (apf-lambda-list-type       (polymorphic-function-lambda-list-type apf))
          (untyped-lambda-list        (polymorphic-function-lambda-list apf)))
@@ -160,22 +165,26 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       (unless (member type-list type-lists :test 'equalp)
         (setf type-lists (cons type-list type-lists)))
       (if-let (polymorph (find type-list polymorphs :test #'equalp :key #'polymorph-type-list))
-        (setf (polymorph-lambda      polymorph) lambda
-              (polymorph-lambda-body polymorph) lambda-body)
+        (setf (polymorph-lambda             polymorph) lambda
+              (polymorph-inline-lambda-body polymorph) inline-lambda-body
+              (polymorph-return-type        polymorph) return-type)
         (push (make-polymorph :name name
-                              :type-list type-list
+                              :type-list    type-list
+                              :return-type  return-type
                               :applicable-p-function
                               (compile nil (applicable-p-function lambda-list-type
                                                                   type-list))
-                              :lambda-body lambda-body
-                              :lambda      lambda)
+                              :inline-lambda-body inline-lambda-body
+                              :lambda             lambda)
               polymorphs))
       name)))
 
 (defun retrieve-polymorph (name &rest arg-list)
-  "If successful, returns 2 values:
+  "If successful, returns 4 values:
   the first object is the function body,
-  the second is the function itself"
+  the second is the function itself,
+  the third is the type-list,
+  the fourth is the return-type"
   (declare (type function-name name))
   (assert *compiler-macro-expanding-p*)
   (let* ((apf                  (fdefinition name))
@@ -193,8 +202,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               (polymorph-applicable-p-function polymorph))
                          arg-list))
                 (return-from retrieve-polymorph
-                  (values (polymorph-lambda-body polymorph)
-                          (the function (polymorph-lambda  polymorph))))))
+                  ;; All 4 values are used in the "main" compiler-macro
+                  (values (polymorph-inline-lambda-body polymorph)
+                          (the function                 (polymorph-lambda polymorph))
+                          (polymorph-type-list          polymorph)
+                          (polymorph-return-type        polymorph)))))
     (error 'no-applicable-polymorph
            :arg-list arg-list
            :type-lists (polymorphic-function-type-lists apf))))
@@ -245,8 +257,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                               (polymorph-applicable-p-function polymorph))
                                          ,@arg-list))
                               (return-from retrieve-polymorph
-                                (values (polymorph-lambda-body polymorph)
-                                        (polymorph-lambda      polymorph)))))
+                                ;; All 4 values are used in the "main" compiler-macro
+                                (values (polymorph-inline-lambda-body polymorph)
+                                        (the function (polymorph-lambda polymorph))
+                                        (polymorph-type-list          polymorph)
+                                        (polymorph-return-type        polymorph)))))
                   (error 'no-applicable-polymorph
                          :arg-list (list ,@arg-list)
                          :type-lists (polymorphic-function-type-lists
