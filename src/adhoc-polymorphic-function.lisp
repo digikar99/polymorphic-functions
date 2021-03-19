@@ -39,26 +39,16 @@
 
 (deftype type-list () `(satisfies type-list-p))
 
-(defclass polymorph ()
-  ;; TODO: Put these to use
-  (#+sbcl (sb-pcl::source :initarg sb-pcl::source)
-   #+sbcl (sb-pcl::plist :initarg sb-pcl::plist)
-   (documentation :type (or null string) :initarg :documentation)
-   (type-list :initarg :type-list
-              :reader polymorph-type-list)
-   (applicable-p-function :initarg :applicable-p-function
-                          :reader polymorph-applicable-p-function
-                          :type function)
-   ;; We need the LAMBDA-BODY due to compiler macros,
-   ;; and "objects of type FUNCTION can't be dumped into fasl files."
-   (lambda-body :initarg :lambda-body :accessor polymorph-lambda-body)
-   (lambda      :initarg :lambda      :accessor polymorph-lambda)
-   (name        :initarg :name
-                :initform (error "NAME must be supplied!"))
-   (compiler-macro-lambda :initarg :compiler-macro-lambda
-                          :initform nil
-                          :accessor polymorph-compiler-macro-lambda))
-  (:metaclass closer-mop:funcallable-standard-class))
+(defstruct polymorph
+  (documentation nil :type (or null string))
+  (name (error "NAME must be supplied!"))
+  (type-list nil)
+  (applicable-p-function)
+  (lambda-body)
+  ;; We need the FUNCTION-BODY due to compiler macros,
+  ;; and "objects of type FUNCTION can't be dumped into fasl files."
+  (lambda)
+  (compiler-macro-lambda))
 
 (defmethod print-object ((o polymorph) stream)
   (print-unreadable-object (o stream :type t)
@@ -171,17 +161,14 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       (if-let (polymorph (find type-list polymorphs :test #'equalp :key #'polymorph-type-list))
         (setf (polymorph-lambda      polymorph) lambda
               (polymorph-lambda-body polymorph) lambda-body)
-        (push (make-instance 'polymorph
-                             :name name
-                             :type-list type-list
-                             :applicable-p-function
-                             (compile nil (applicable-p-function lambda-list-type
-                                                                 type-list))
-                             :lambda-body lambda-body
-                             :lambda      lambda)
+        (push (make-polymorph :name name
+                              :type-list type-list
+                              :applicable-p-function
+                              (compile nil (applicable-p-function lambda-list-type
+                                                                  type-list))
+                              :lambda-body lambda-body
+                              :lambda      lambda)
               polymorphs))
-      (let ((polymorph (find type-list polymorphs :test #'equalp :key #'polymorph-type-list)))
-        (closer-mop:set-funcallable-instance-function polymorph lambda))
       name)))
 
 (defun retrieve-polymorph (name &rest arg-list)
@@ -302,13 +289,12 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                                     :key #'polymorph-type-list))
         (setf (polymorph-compiler-macro-lambda polymorph) lambda)
         ;; Need below instead of error-ing to define the compiler macro simultaneously
-        (push (make-instance 'polymorph
-                             :name name
-                             :type-list type-list
-                             :applicable-p-function
-                             (compile nil (applicable-p-function lambda-list-type
-                                                                 type-list))
-                             :compiler-macro-lambda lambda)
+        (push (make-polymorph :name name
+                              :type-list type-list
+                              :applicable-p-function
+                              (compile nil (applicable-p-function lambda-list-type
+                                                                  type-list))
+                              :compiler-macro-lambda lambda)
               polymorphs)))))
 
 (defun retrieve-polymorph-compiler-macro (name &rest arg-list)
