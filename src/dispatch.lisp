@@ -119,39 +119,39 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
                                               (eq 'setf (first name)))
                                          (second name)
                                          name)))
+                    ;; This block is necessary for optimization of &optional and &key
+                    ;; and &rest args; otherwise, we will need to cons at runtime!
                     `(block ,block-name
                        (let (,@(loop :for sym :in gensyms
                                      :for form :in (rest form)
                                      :collect `(,sym ,form)))
                          (funcall (the function
-                                       (nth-value 1
-                                                  ,(compiler-macroexpand
-                                                    `(retrieve-polymorph
-                                                      ',name
-                                                      ,@gensyms)
-                                                    env)))
+                                       (polymorph-lambda
+                                        ,(compiler-macroexpand
+                                          `(retrieve-polymorph
+                                            ',name
+                                            ,@gensyms)
+                                          env)))
                                   ,@gensyms)))))
-            (let ((arg-list (rest form)))
-              (multiple-value-bind (fbody function dispatch-type-list return-type)
-                  (apply 'retrieve-polymorph ',name arg-list)
-                (declare (ignore function))
-                (cond (optim-speed
-                       (unless fbody
-                         ;; TODO: Here the reason concerning free-variables is hardcoded
-                         (signal 'polymorph-body-has-free-variables
-                                 :name ',name :type-list dispatch-type-list))
-                       (if-let ((compiler-function (apply
-                                                    'retrieve-polymorph-compiler-macro
-                                                    ',name arg-list)))
-                         (funcall compiler-function
-                                  (cons fbody (rest form))
-                                  env)
-                         ;; TODO: Use some other declaration for inlining as well
-                         ;; Optimized for speed and type information available
-                         (if (recursive-function-p ',name fbody)
-                             (signal 'recursive-expansion-is-possibly-infinite
-                                     :form form)
-                             `(the ,return-type (,fbody ,@(cdr form))))))
+            (let* ((arg-list  (rest form))
+                   (polymorph (apply #'retrieve-polymorph ',name arg-list)))
+              (with-slots (inline-lambda-body return-type type-list
+                           compiler-macro-lambda recursively-safe-p free-variables)
+                  polymorph
+                (cond (compiler-macro-lambda
+                          (funcall compiler-macro-lambda
+                                   (cons inline-lambda-body (rest form))
+                                   env))
+                      (optim-speed
+                       ;; TODO: Use some other declaration for inlining as well
+                       ;; Optimized for speed and type information available
+                       (if free-variables
+                           (signal 'polymorph-body-has-free-variables
+                                   :name ',name :type-list type-list))
+                       (if (not recursively-safe-p)
+                           (signal 'recursive-expansion-is-possibly-infinite
+                                   :form form)                           )
+                       `(the ,return-type (,inline-lambda-body ,@(cdr form))))
                       (optim-debug        original-form)
                       (optim-slight-speed block-form)
                       (t (error "Non-exhaustive cases!")))))))))))
@@ -188,91 +188,94 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
 ;;;    involves the emission of the lambda-body.
 
 (defmacro defpolymorph (name typed-lambda-list return-type &body body &environment env)
-  "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP)."
-  (declare (type function-name name)
-           (type typed-lambda-list typed-lambda-list))
-  (let* ((block-name       (if (and (listp name)
-                                    (eq 'setf (first name)))
-                               (second name)
-                               name))
-         (*environment*    env)
-         (lambda-list-type (lambda-list-type typed-lambda-list :typed t)))
-    (multiple-value-bind (param-list type-list)
-        (defun-lambda-list typed-lambda-list :typed t)
-      (multiple-value-bind (declarations body) (extract-declarations body)
-        (let* (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
-               (free-variable-analysis-form `(lambda ,param-list (block ,block-name ,@body)))
-               (form                        `(defpolymorph ,name ,typed-lambda-list ,@body))
-               (lambda-body #+sbcl
-                            `(sb-int:named-lambda (polymorph ,name ,type-list) ,param-list
-                               ,(lambda-declarations typed-lambda-list :typed t)
-                               ,declarations
-                               (block ,block-name
-                                 ,@(butlast body)
-                                 (the ,return-type ,@(or (last body) '(nil)))))
-                            #+ccl
-                            `(ccl:nfunction (polymorph ,name ,type-list)
-                                            (lambda ,param-list
-                                              ,(lambda-declarations typed-lambda-list :typed t)
-                                              ,declarations
-                                              (block ,block-name
-                                                ,@(butlast body)
-                                                (the ,return-type ,@(or (last body) '(nil))))))
-                            #-(or ccl sbcl)
-                            `(lambda ,param-list
-                               ,(lambda-declarations typed-lambda-list :typed t)
-                               ,declarations
-                               (block ,block-name
-                                 ,@(butlast body)
-                                 (the ,return-type ,@(or (last body) '(nil))))))
-               (inline-lambda-body #-(or ccl sbcl) lambda-body
-                                   #+ccl (nth 2 lambda-body)
-                                   #+sbcl `(lambda ,@(nthcdr 2 lambda-body)))
-               ;; TODO: should not contain declarations
-               (free-variables (free-variables-p free-variable-analysis-form))
-               #+sbcl
-               (sbcl-transform `(sb-c:deftransform ,name
-                                    (,param-list ,(if (eq '&rest (lastcar type-list))
-                                                      (butlast type-list)
-                                                      type-list) *
-                                     :policy (< debug speed))
-                                  `(apply ,',lambda-body
-                                          ,@',(sbcl-transform-body-args typed-lambda-list
-                                                                        :typed t)))))
-          (multiple-value-bind (inline-safe-lambda-body note)
-              (if free-variables
-                  (values
-                   nil
-                   (with-output-to-string (*error-output*)
-                     (terpri *error-output*)
-                     (format *error-output* "; Will not inline ~%;   ")
-                     (write-string
-                      (str-replace-all
-                       #\newline
-                       (uiop:strcat #\newline #\; "  ")
-                       (format nil "~S~&" form))
-                      *error-output*)
-                     (format *error-output*
-                             "because free variables ~S were found"
-                             free-variables)))
-                  (values inline-lambda-body nil))
-            ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
-            ;; and "objects of type FUNCTION can't be dumped into fasl files
-            `(progn
-               #+sbcl ,(unless (or free-variables
-                                   (recursive-function-p name lambda-body))
-                         (if optim-debug
-                             sbcl-transform
-                             `(locally (declare (sb-ext:muffle-conditions style-warning))
-                                (handler-bind ((style-warning #'muffle-warning))
-                                  ,sbcl-transform))))
-               ,(when note `(write-string ,note *error-output*))
-               (eval-when (:compile-toplevel :load-toplevel :execute)
-                 (register-polymorph ',name ',type-list ',return-type
-                                     ',inline-safe-lambda-body
-                                     ,lambda-body
-                                     ',lambda-list-type)
-                 ',name))))))))
+  "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP).
+  NAME could also be (NAME &KEY RECURSIVELY-SAFE-P)"
+  (declare (type typed-lambda-list typed-lambda-list))
+  (destructuring-bind (name &key (recursively-safe-p t rp)) (if (typep name 'function-name)
+                                                                (list name)
+                                                                name)
+    (declare (type function-name name))
+    (let* ((block-name       (if (and (listp name)
+                                      (eq 'setf (first name)))
+                                 (second name)
+                                 name))
+           (*environment*    env)
+           (lambda-list-type (lambda-list-type typed-lambda-list :typed t)))
+      (multiple-value-bind (param-list type-list)
+          (defun-lambda-list typed-lambda-list :typed t)
+        (multiple-value-bind (declarations body) (extract-declarations body)
+          (let* (;; no declarations in FREE-VARIABLE-ANALYSIS-FORM
+                 (free-variable-analysis-form `(lambda ,param-list (block ,block-name ,@body)))
+                 (form                        `(defpolymorph ,name ,typed-lambda-list ,@body))
+                 (lambda-body #+sbcl
+                              `(sb-int:named-lambda (polymorph ,name ,type-list) ,param-list
+                                 ,(lambda-declarations typed-lambda-list :typed t)
+                                 ,declarations
+                                 (block ,block-name
+                                   ,@(butlast body)
+                                   (the ,return-type ,@(or (last body) '(nil)))))
+                              #+ccl
+                              `(ccl:nfunction (polymorph ,name ,type-list)
+                                              (lambda ,param-list
+                                                ,(lambda-declarations typed-lambda-list :typed t)
+                                                ,declarations
+                                                (block ,block-name
+                                                  ,@(butlast body)
+                                                  (the ,return-type ,@(or (last body) '(nil))))))
+                              #-(or ccl sbcl)
+                              `(lambda ,param-list
+                                 ,(lambda-declarations typed-lambda-list :typed t)
+                                 ,declarations
+                                 (block ,block-name
+                                   ,@(butlast body)
+                                   (the ,return-type ,@(or (last body) '(nil))))))
+                 (inline-lambda-body #-(or ccl sbcl) lambda-body
+                                     #+ccl (nth 2 lambda-body)
+                                     #+sbcl `(lambda ,@(nthcdr 2 lambda-body)))
+                 ;; TODO: should not contain declarations
+                 (free-variables (free-variables-p free-variable-analysis-form))
+                 (recursively-safe-p (if rp
+                                         recursively-safe-p
+                                         (not (recursive-function-p name inline-lambda-body))))
+                 #+sbcl
+                 (sbcl-transform `(sb-c:deftransform ,name
+                                      (,param-list ,(if (eq '&rest (lastcar type-list))
+                                                        (butlast type-list)
+                                                        type-list) *
+                                       :policy (< debug speed))
+                                    `(apply ,',lambda-body
+                                            ,@',(sbcl-transform-body-args typed-lambda-list
+                                                                          :typed t)))))
+            (multiple-value-bind (inline-safe-lambda-body note)
+                (cond (free-variables
+                       (values nil
+                               (with-output-to-string (*error-output*)
+                                 (note-no-inline form "free variables ~S were found"
+                                                 free-variables))))
+                      ((not recursively-safe-p)
+                       (values nil
+                               (with-output-to-string (*error-output*)
+                                 (note-no-inline form "it is suspected to result in infinite recursive expansion;~%  supply :RECURSIVELY-SAFE-P T option to override"))))
+                      (t
+                       (values inline-lambda-body nil)))
+              ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
+              ;; and "objects of type FUNCTION can't be dumped into fasl files
+              `(progn
+                 #+sbcl ,(when (and (not free-variables) recursively-safe-p)
+                           (if optim-debug
+                               sbcl-transform
+                               `(locally (declare (sb-ext:muffle-conditions style-warning))
+                                  (handler-bind ((style-warning #'muffle-warning))
+                                    ,sbcl-transform))))
+                 ,(when note `(write-string ,note *error-output*))
+                 (eval-when (:compile-toplevel :load-toplevel :execute)
+                   (register-polymorph ',name ',type-list ',return-type
+                                       ',inline-safe-lambda-body
+                                       ,lambda-body
+                                       ',lambda-list-type
+                                       ,recursively-safe-p
+                                       ',free-variables)
+                   ',name)))))))))
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list
                                        &body body)

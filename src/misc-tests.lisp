@@ -109,7 +109,7 @@
   (undefine-polymorphic-function 'foobar)
   (fmakunbound 'foobar-caller))
 
-(def-test recursive-correctness ()
+(def-test recursively-unsafe ()
   (ignoring-error-output
     (eval `(progn
              (define-polymorphic-function foz (a) :overwrite t)
@@ -134,6 +134,24 @@
   (is (eq 'string (foz "hello")))
   (is (eq 'number (foz "world")))
   (is (eq 'string (foz 7)))
+  (undefine-polymorphic-function 'foz))
+
+(def-test recursively-safe ()
+  (ignoring-error-output
+    (eval `(progn
+             (define-polymorphic-function foz (a) :overwrite t)
+             (defpolymorph (foz :recursively-safe-p t) ((a number)) t
+               (declare (optimize speed)
+                        (ignore a))
+               'number)
+             (defpolymorph foz ((a string)) t
+               (declare (optimize speed))
+               (if (string= a "hello")
+                   'string
+                   (foz 5))))))
+  ;; FIXME: Better test?
+  (5am:is-true  (polymorph-recursively-safe-p (find-polymorph 'foz '(number))))
+  (5am:is-false (polymorph-recursively-safe-p (find-polymorph 'foz '(string))))
   (undefine-polymorphic-function 'foz))
 
 (def-test rest-correctness ()
@@ -220,16 +238,21 @@
     (eval `(progn
              (undefine-polymorphic-function 'intersecting-type-lists-tester)
              (define-polymorphic-function intersecting-type-lists-tester (a))
-             (defpolymorph intersecting-type-lists-tester ((a string)) t)))
-    (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t)))
+             (defpolymorph intersecting-type-lists-tester ((a string)) t
+               (declare (ignore a)))))
+    (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t
+                       (declare (ignore a)))))
     (5am:is-true  (eval `(defpolymorph intersecting-type-lists-tester
-                             ((a (and array (not string)))) t)))
+                             ((a (and array (not string)))) t
+                           (declare (ignore a)))))
     (eval `(undefpolymorph 'intersecting-type-lists-tester
                            '((and array (not string)))))
     (eval `(undefpolymorph 'intersecting-type-lists-tester
                            '(string)))
-    (5am:is-true  (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t)))
-    (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a string)) t)))
+    (5am:is-true  (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t
+                           (declare (ignore a)))))
+    (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a string)) t
+                       (declare (ignore a)))))
     (eval `(undefine-polymorphic-function 'intersecting-type-lists-tester))))
 
 (def-test once-only ()

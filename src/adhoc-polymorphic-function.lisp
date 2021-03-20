@@ -49,7 +49,9 @@
   ;; We need the FUNCTION-BODY due to compiler macros,
   ;; and "objects of type FUNCTION can't be dumped into fasl files."
   (lambda)
-  (compiler-macro-lambda))
+  (compiler-macro-lambda)
+  (recursively-safe-p (error "RECURSIVELY-SAFE-P must be supplied!"))
+  (free-variables nil))
 
 (defmethod print-object ((o polymorph) stream)
   (print-unreadable-object (o stream :type t)
@@ -139,7 +141,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
              #-(or ccl sbcl) (compile nil `(lambda ,lambda-list ,body-form)))
         (setf (fdefinition name) apf)))))
 
-(defun register-polymorph (name type-list return-type inline-lambda-body lambda lambda-list-type)
+(defun register-polymorph (name type-list return-type inline-lambda-body lambda
+                           lambda-list-type recursively-safe-p free-variables)
   ;; TODO: Get rid of APPLICABLE-P-FUNCTION: construct it from type-list
   (declare (type function-name  name)
            (type function       lambda)
@@ -167,7 +170,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       (if-let (polymorph (find type-list polymorphs :test #'equalp :key #'polymorph-type-list))
         (setf (polymorph-lambda             polymorph) lambda
               (polymorph-inline-lambda-body polymorph) inline-lambda-body
-              (polymorph-return-type        polymorph) return-type)
+              (polymorph-return-type        polymorph) return-type
+              (polymorph-recursively-safe-p polymorph) recursively-safe-p)
         (push (make-polymorph :name name
                               :type-list    type-list
                               :return-type  return-type
@@ -175,16 +179,13 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               (compile nil (applicable-p-function lambda-list-type
                                                                   type-list))
                               :inline-lambda-body inline-lambda-body
-                              :lambda             lambda)
+                              :lambda             lambda
+                              :recursively-safe-p recursively-safe-p
+                              :free-variables     free-variables)
               polymorphs))
       name)))
 
 (defun retrieve-polymorph (name &rest arg-list)
-  "If successful, returns 4 values:
-  the first object is the function body,
-  the second is the function itself,
-  the third is the type-list,
-  the fourth is the return-type"
   (declare (type function-name name))
   (assert *compiler-macro-expanding-p*)
   (let* ((apf                  (fdefinition name))
@@ -201,12 +202,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                          (the function
                               (polymorph-applicable-p-function polymorph))
                          arg-list))
-                (return-from retrieve-polymorph
-                  ;; All 4 values are used in the "main" compiler-macro
-                  (values (polymorph-inline-lambda-body polymorph)
-                          (the function                 (polymorph-lambda polymorph))
-                          (polymorph-type-list          polymorph)
-                          (polymorph-return-type        polymorph)))))
+                (return-from retrieve-polymorph polymorph)))
     (error 'no-applicable-polymorph
            :arg-list arg-list
            :type-lists (polymorphic-function-type-lists apf))))
@@ -256,12 +252,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                          (the function
                                               (polymorph-applicable-p-function polymorph))
                                          ,@arg-list))
-                              (return-from retrieve-polymorph
-                                ;; All 4 values are used in the "main" compiler-macro
-                                (values (polymorph-inline-lambda-body polymorph)
-                                        (the function (polymorph-lambda polymorph))
-                                        (polymorph-type-list          polymorph)
-                                        (polymorph-return-type        polymorph)))))
+                              (return-from retrieve-polymorph polymorph)))
                   (error 'no-applicable-polymorph
                          :arg-list (list ,@arg-list)
                          :type-lists (polymorphic-function-type-lists
@@ -308,7 +299,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               :applicable-p-function
                               (compile nil (applicable-p-function lambda-list-type
                                                                   type-list))
-                              :compiler-macro-lambda lambda)
+                              :compiler-macro-lambda lambda
+                              :recursively-safe-p t)
               polymorphs)))))
 
 (defun retrieve-polymorph-compiler-macro (name &rest arg-list)
