@@ -217,21 +217,25 @@
       (is-error (undefine-polymorphic-function-tester "hello")))
     (undefine-polymorphic-function 'undefine-polymorphic-function-tester)))
 
-;; #+sbcl
-;; (def-test polymorph-sbcl-transforms ()
-;;   (with-output-to-string (*error-output*)
-;;     (eval `(progn
-;;              (undefine-polymorphic-function 'sbcl-transform)
-;;              (define-polymorphic-function sbcl-transform (a) :overwrite t)
-;;              (defpolymorph sbcl-transform ((a string)) t))))
-;;   (is (= 1 (length
-;;             (sb-c::fun-info-transforms
-;;              (sb-c::fun-info-or-lose 'sbcl-transform)))))
-;;   (eval `(undefpolymorph 'sbcl-transform '(string)))
-;;   (is (= 0 (length
-;;             (sb-c::fun-info-transforms
-;;              (sb-c::fun-info-or-lose 'sbcl-transform)))))
-;;   (eval `(undefine-polymorphic-function 'sbcl-transform)))
+#+sbcl
+(def-test polymorph-sbcl-transforms ()
+  (with-output-to-string (*error-output*)
+    (eval `(progn
+             (undefine-polymorphic-function 'sbcl-transform)
+             (define-polymorphic-function sbcl-transform (a) :overwrite t)
+             (defpolymorph sbcl-transform ((a string)) t))))
+  (is (= 1 (length
+            (sb-c::fun-info-transforms
+             (sb-c::fun-info-or-lose 'sbcl-transform)))))
+  (eval `(undefpolymorph 'sbcl-transform '(string)))
+  (is (= 0 (length
+            (sb-c::fun-info-transforms
+             (sb-c::fun-info-or-lose 'sbcl-transform)))))
+  (eval `(undefine-polymorphic-function 'sbcl-transform)))
+
+;;; TODO: Add specialization tests pertaining to sbcl-transforms
+;;; It feels non-trivial to check if it was the correct transform that was applied
+;;; or if it was the correct polymorph being called at runtime.
 
 (def-test ambiguous-type-lists ()
   (ignoring-error-output
