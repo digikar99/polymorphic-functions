@@ -127,11 +127,10 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
                                      :collect `(,sym ,form)))
                          (funcall (the function
                                        (polymorph-lambda
-                                        ,(compiler-macroexpand
-                                          `(retrieve-polymorph
-                                            ',name
-                                            ,@gensyms)
-                                          env)))
+                                        ,(retrieve-polymorph-form
+                                          name
+                                          ',(lambda-list-type untyped-lambda-list)
+                                          gensyms)))
                                   ,@gensyms)))))
             (let* ((arg-list  (rest form))
                    (polymorph (apply #'retrieve-polymorph ',name arg-list)))

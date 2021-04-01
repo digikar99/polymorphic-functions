@@ -21,7 +21,7 @@
 
 (defmethod %defun-body ((type (eql 'required)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
-  `(funcall ,(polymorph-retriever-code type *name* defun-lambda-list)
+  `(funcall (polymorph-lambda ,(retrieve-polymorph-form *name* type defun-lambda-list))
             ,@defun-lambda-list))
 
 

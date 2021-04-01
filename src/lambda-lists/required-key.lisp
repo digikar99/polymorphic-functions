@@ -125,8 +125,7 @@
 
 (defmethod %defun-body ((type (eql 'required-key)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
-  (let ((state       :required)
-        (return-list ()))
+  (let ((return-list ()))
     (loop :for elt := (first defun-lambda-list)
           :until (eq elt '&key)
           :do (unless (and (symbolp elt)
@@ -135,8 +134,7 @@
               (push elt return-list)
               (setf defun-lambda-list (rest defun-lambda-list)))
     (when (eq '&key (first defun-lambda-list))
-      (setf state             '&key
-            defun-lambda-list (rest defun-lambda-list))
+      (setf defun-lambda-list (rest defun-lambda-list))
       (labels ((key-p-tree (key-lambda-list)
                  (if (null key-lambda-list)
                      ()
@@ -150,9 +148,10 @@
         (let ((key-p-tree (key-p-tree defun-lambda-list)))
           (values (with-gensyms (apply-list)
                     `(let ((,apply-list ,key-p-tree))
-                       (apply ,(polymorph-retriever-code type *name*
+                       (apply (polymorph-lambda
+                               ,(retrieve-polymorph-form *name* type
                                                          (append (reverse return-list)
-                                                                 (list apply-list)))
+                                                                 (list apply-list))))
                               ,@(reverse return-list)
                               ,apply-list)))
                   defun-lambda-list))))))

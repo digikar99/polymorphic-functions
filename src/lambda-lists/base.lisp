@@ -134,40 +134,6 @@ Non-examples:
     (values (%defun-body *potential-type* defun-lambda-list)
             defun-lambda-list)))
 
-(defun polymorph-retriever-code (lambda-list-type name arg-list)
-  `(block retrieve-polymorph
-     (let ((applicable-polymorph  nil)
-           (applicable-polymorphs nil))
-       (declare (optimize speed))
-       (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition ',name))
-             :do (when ,(case lambda-list-type
-                          (rest `(ignore-errors
-                                  (apply
-                                   (the function
-                                        (polymorph-applicable-p-function polymorph))
-                                   ,@arg-list)))
-                          (required `(funcall
-                                      (the function
-                                           (polymorph-applicable-p-function polymorph))
-                                      ,@arg-list))
-                          (t `(apply
-                               (the function
-                                    (polymorph-applicable-p-function polymorph))
-                               ,@arg-list)))
-                   (cond (applicable-polymorphs (push polymorph applicable-polymorphs))
-                         (applicable-polymorph
-                          (push applicable-polymorph applicable-polymorphs)
-                          (push polymorph            applicable-polymorphs)
-                          (setq applicable-polymorph nil))
-                         (t (setq applicable-polymorph polymorph)))))
-       (cond (applicable-polymorph (polymorph-lambda applicable-polymorph))
-             (applicable-polymorphs
-              (polymorph-lambda (most-specialized-polymorph applicable-polymorphs)))
-             (t
-              (error 'no-applicable-polymorph
-                     :arg-list (list ,@arg-list)
-                     :type-lists (polymorphic-function-type-lists (fdefinition ',name))))))))
-
 ;; SBCL-TRANSFORM-BODY-ARGS ====================================================
 
 (define-lambda-list-helper

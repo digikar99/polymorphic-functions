@@ -117,8 +117,7 @@
 
 (defmethod %defun-body ((type (eql 'required-optional)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
-  (let ((state       :required)
-        (return-list ()))
+  (let ((return-list ()))
     (loop :for elt := (first defun-lambda-list)
           :until (eq elt '&optional)
           :do (unless (and (symbolp elt)
@@ -127,8 +126,7 @@
               (push elt return-list)
               (setf defun-lambda-list (rest defun-lambda-list)))
     (when (eq '&optional (first defun-lambda-list))
-      (setf state             '&optional
-            defun-lambda-list (rest defun-lambda-list))
+      (setf defun-lambda-list (rest defun-lambda-list))
       (labels ((optional-p-tree (optional-lambda-list)
                  (if (null optional-lambda-list)
                      ()
@@ -140,9 +138,10 @@
         (let ((optional-p-tree (optional-p-tree defun-lambda-list)))
           (values (with-gensyms (apply-list)
                     `(let ((,apply-list ,optional-p-tree))
-                       (apply ,(polymorph-retriever-code type *name*
+                       (apply (polymorph-lambda
+                               ,(retrieve-polymorph-form *name* type
                                                          (append (reverse return-list)
-                                                                 (list apply-list)))
+                                                                 (list apply-list))))
                               ,@(reverse return-list)
                               ,apply-list)))
                   defun-lambda-list))))))
