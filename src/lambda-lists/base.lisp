@@ -136,25 +136,37 @@ Non-examples:
 
 (defun polymorph-retriever-code (lambda-list-type name arg-list)
   `(block retrieve-polymorph
-     (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition ',name))
-           :do (when ,(case lambda-list-type
-                        (rest `(ignore-errors
-                                (apply
-                                 (the function
-                                      (polymorph-applicable-p-function polymorph))
-                                 ,@arg-list)))
-                        (required `(funcall
-                                    (the function
-                                         (polymorph-applicable-p-function polymorph))
-                                    ,@arg-list))
-                        (t `(apply
-                             (the function
-                                  (polymorph-applicable-p-function polymorph))
-                             ,@arg-list)))
-                 (return-from retrieve-polymorph (polymorph-lambda polymorph))))
-     (error 'no-applicable-polymorph
-            :arg-list (list ,@arg-list)
-            :type-lists (polymorphic-function-type-lists (fdefinition ',name)))))
+     (let ((applicable-polymorph  nil)
+           (applicable-polymorphs nil))
+       (declare (optimize speed))
+       (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition ',name))
+             :do (when ,(case lambda-list-type
+                          (rest `(ignore-errors
+                                  (apply
+                                   (the function
+                                        (polymorph-applicable-p-function polymorph))
+                                   ,@arg-list)))
+                          (required `(funcall
+                                      (the function
+                                           (polymorph-applicable-p-function polymorph))
+                                      ,@arg-list))
+                          (t `(apply
+                               (the function
+                                    (polymorph-applicable-p-function polymorph))
+                               ,@arg-list)))
+                   (cond (applicable-polymorphs (push polymorph applicable-polymorphs))
+                         (applicable-polymorph
+                          (push applicable-polymorph applicable-polymorphs)
+                          (push polymorph            applicable-polymorphs)
+                          (setq applicable-polymorph nil))
+                         (t (setq applicable-polymorph polymorph)))))
+       (cond (applicable-polymorph (polymorph-lambda applicable-polymorph))
+             (applicable-polymorphs
+              (polymorph-lambda (most-specialized-polymorph applicable-polymorphs)))
+             (t
+              (error 'no-applicable-polymorph
+                     :arg-list (list ,@arg-list)
+                     :type-lists (polymorphic-function-type-lists (fdefinition ',name))))))))
 
 ;; SBCL-TRANSFORM-BODY-ARGS ====================================================
 
@@ -234,28 +246,41 @@ Non-examples:
           "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
 
-;; TYPE-LIST-INTERSECT-P =======================================================
+;; TYPE-LIST-SUBTYPE-P =========================================================
 
-(defun type-list-intersect-p (type-list-1 type-list-2)
-  #.+type-list-intersect-p+
+(defun type-list-subtype-p (type-list-1 type-list-2)
+  #.+type-list-subtype-p+
   (declare (type type-list type-list-1 type-list-2))
   (let ((*lambda-list-typed-p* nil))
-    (%type-list-intersect-p (potential-type-of-lambda-list type-list-1)
-                            (potential-type-of-lambda-list type-list-2)
-                            type-list-1
-                            type-list-2)))
+    (%type-list-subtype-p (potential-type-of-lambda-list type-list-1)
+                          (potential-type-of-lambda-list type-list-2)
+                          type-list-1
+                          type-list-2)))
 
-(defgeneric %type-list-intersect-p (type-1 type-2 type-list-1 type-list-2)
-  (:documentation #.+type-list-intersect-p+))
+(defgeneric %type-list-subtype-p (type-1 type-2 type-list-1 type-list-2)
+  (:documentation #.+type-list-subtype-p+))
 
-(5am:def-suite type-list-intersect-p :in lambda-list)
+(5am:def-suite type-list-subtype-p :in lambda-list)
+
+;; TYPE-LIST-CAUSES-AMBIGUOUS-CALL-P ===========================================
+
+(defun type-list-causes-ambiguous-call-p (type-list-1 type-list-2)
+  #.+type-list-causes-ambiguous-call-p+
+  (declare (type type-list type-list-1 type-list-2))
+  (let ((*lambda-list-typed-p* nil))
+    (%type-list-causes-ambiguous-call-p (potential-type-of-lambda-list type-list-1)
+                                        (potential-type-of-lambda-list type-list-2)
+                                        type-list-1
+                                        type-list-2)))
+
+(defgeneric %type-list-causes-ambiguous-call-p
+    (type-1 type-2 type-list-1 type-list-2)
+  (:documentation #.+type-list-causes-ambiguous-call-p+))
+
+(5am:def-suite type-list-causes-ambiguous-call-p :in lambda-list)
+
 
 ;; MISCELLANEOUS ===============================================================
-
-(defun type-intersect-p (type-1 type-2)
-  ;; TODO: DOes not actually handle intersection
-  (or (subtypep type-1 type-2)
-      (subtypep type-2 type-1)))
 
 (defvar *compiler-macro-expanding-p* nil
   "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")

@@ -7,7 +7,6 @@
                "closer-mop"
                "hu.dwim.walker" ; solely for determining free-variables!
                "introspect-environment"
-               "iterate"
                "fiveam" ;; just keep things together!
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
                "split-sequence")

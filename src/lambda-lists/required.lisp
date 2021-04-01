@@ -53,12 +53,28 @@
                         :for type  :in type-list
                         :collect `(typep ,param ',type)))))))
 
-(defmethod %type-list-intersect-p ((type-1 (eql 'required)) (type-2 (eql 'required))
-                                   list-1 list-2)
+(defmethod %type-list-subtype-p ((type-1 (eql 'required)) (type-2 (eql 'required))
+                                 list-1 list-2)
+  (declare (optimize speed)
+           (type list list-1 list-2))
   (and (length= list-1 list-2)
-       (every #'type-intersect-p list-1 list-2)))
+       (every #'subtypep list-1 list-2)))
 
-(def-test type-list-intersect-required (:suite type-list-intersect-p)
-  (5am:is-true  (type-list-intersect-p '(string string) '(string array)))
-  (5am:is-false (type-list-intersect-p '(string string) '(string number)))
-  (5am:is-false (type-list-intersect-p '(string string) '(string))))
+(def-test type-list-subtype-required (:suite type-list-subtype-p)
+  (5am:is-true  (type-list-subtype-p '(string string) '(string array)))
+  (5am:is-false (type-list-subtype-p '(array string) '(string array)))
+  (5am:is-false (type-list-subtype-p '(string string) '(string number)))
+  (5am:is-false (type-list-subtype-p '(string string) '(string))))
+
+(defmethod %type-list-causes-ambiguous-call-p
+    ((type-1 (eql 'required)) (type-2 (eql 'required)) list-1 list-2)
+  (declare (optimize speed)
+           (type list list-1 list-2))
+  (and (length= list-1 list-2)
+       (every #'type= list-1 list-2)))
+
+(def-test type-list-causes-ambiguous-call-required
+    (:suite type-list-causes-ambiguous-call-p)
+  (5am:is-true  (type-list-causes-ambiguous-call-p '(string array) '(string (array))))
+  (5am:is-false (type-list-causes-ambiguous-call-p '(string string) '(string)))
+  (5am:is-false (type-list-causes-ambiguous-call-p '(string string) '(string array))))

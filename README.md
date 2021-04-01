@@ -14,13 +14,13 @@ The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org
 - ANSI standard provided generic functions work do not work on anything more than classes, structure classes and eql-types; for example, say `(array double-float)`. However, Common Lisp does provide a rich type system.
 - The ANSI standard generic functions are also restricted to specializing on only `required` arguments. Currently, `polymorphic-functions` do have certain restrictions for combinations of optional-keyword and rest arguments; but these are primarily due to my own time-constraints than any limitation within the system.
 - `polymorphic-functions` are implemented using the metaclass `closer-mop:funcallable-standard-class` and `closer-mop:set-funcallable-instance-function`. As such, these are not generic functions, in the sense that at least on SBCL, making `polymorphic-function` a subclass of `generic-function` renders one unable to parse the type-lists aka specializer-lists in the required custom manner. This basically renders one unable to do anything with a form like `(defmethod foo ((a t) &optional ((b number) 4)) (list a b))`.
-- In addition, a compiler-note-providing compiler-macro has also been provided for compile-time optimization facilities.
+- In addition, a compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
 
 ## Related Projects
 
 - [static-dispatch](https://github.com/alex-gutev/static-dispatch) for allowing static-functions to be generic functions to be dispatched at compile-time; this, in turn, is used by [generic-cl](https://github.com/alex-gutev/generic-cl).
 - There exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for types.  `specialization-store` implements a MOP, so can be extensible (at the cost of over-abstraction? I lack the experience and knowledge to comment.) But other than this, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
-- No complaints about `static-dispatch` other than it not being suitable for types.
+- No complaints about `static-dispatch` other than it not being suitable for types. If all you require is type-based dispatch on `required` arguments, it should be possible to use MOP along with `cl:generic-function` to achieve it.
 - As of 2020, there also exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast.
 
 
@@ -44,11 +44,9 @@ This does not allow for a default-value for `b` in the specialization, without r
   'hello)
 ```
 
-If you do not require extensibility on anything other than `required` arguments, you should be happy with `specialization-store`. It also provides great-enough run-time performance comparable to the standard `cl:generic-function`s. (See the next section.)
+If you do not require extensibility on anything other than `required` arguments, you should be happy with `specialization-store`. For `required` arguments (as well as potentially several other cases), it provides great-enough run-time performance comparable to the standard `cl:generic-function`s. (See the next section.)
 
-Further, at the moment, `adhoc-polymorphic-functions` provides no support for dispatching on `&rest` arguments. Raise an issue (and discuss the semantics!) if this support is needed!
-
-`adhoc-polymorphic-functions` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
+OTOH, `adhoc-polymorphic-functions` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
 
 ## Comparison of generics, specializations and adhoc-polymorphic-functions
 
@@ -90,28 +88,28 @@ For a 5,000,000 calls to each in the format
   (time (loop repeat 5000000 do (string= a b))))
 ```
 
-the performance results come out as:
+the performance results come out on my machine as:
 
 ```
 0.471 sec   | function-=
 0.531 sec   | generic-=
 0.615 sec   | specialized-=
-0.648 sec   | polymorphic-=
-0.839 sec   | polymorphic-=-key
+0.691 sec   | polymorphic-=
+0.875 sec   | polymorphic-=-key
 1.647 sec   | specialized-=-key
 ```
+
+Note that `adhoc-polymorphic-functions` do a fair bit of cheating, and performance might decrease rapidly (linearly) with increasing number of polymorphs. (Readers are welcome to write benchmarks :)).
 
 All of `specialization-store` and `adhoc-polymorphic-functions` as well as `fast-generic-functions` or `static-dispatch` provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
 
 | Feature                         | cl:generic-function | specialization-store | adhoc-polymorphic-functions |
 |:--------------------------------|:--------------------|:---------------------|:----------------------------|
 | Method combination              | Yes                 | No                   | No                          |
-| Precedence                      | Yes                 | Partial*             | No                          |
+| Precedence                      | Yes                 | Partial*             | Yes                         |
 | &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                        |
-| Run-time Speed                  | Fast                | Fast                 | Slow                        |
+| Run-time Speed                  | Fast                | Fast                 | Depends                     |
 | Compile-time support            | Partial**           | Yes                  | Yes                         |
-
-\*`specialization-store` allows dispatching on the most specialized specialization; `adhoc-polymorphic-functions` provides no such support. In fact, as of this commit, this library wouldn't allow you to define polymorphs whose type lists are a subtype of each other. While specialization could have been provided, `adhoc-polymorphic-functions` relies on SBCL deftransforms on SBCL for better compile-time support, and this does not (seem to) provide such specialization support. (See [Limitations](#limitations).)
 
 ^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
@@ -197,14 +195,12 @@ CL-USER> (my= 5 "hello")
 
 - SBCL 2.0.9+
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
-- [compiler-macro](https://github.com/Bike/compiler-macro)
 
-## Other Usage Notes
+## Tests
 
-- For the sake of runtime performance, `adhoc-polymorphic-function`'s compiler macros do some things that may make debugging harder. To avoid such ugly things, use `(debug 3)`.
-- `adhoc-polymorphic-functions` intends to check for intersecting type-lists to keep the type-lists of the polymorphs disjoint. However, this support is currently limited to the case wherein one is a proper subtype or supertype of the other.
+Tests are distributed throughout the system. Run `(asdf:test-system "adhoc-polymorphic-functions")`.
 
-### Limitations
+## Limitations
 
 At least one limitation stems from the limitations of the implementations (and CL?) themselves. On SBCL, this is mitigated by the use of `sb-c:deftransform`:
 

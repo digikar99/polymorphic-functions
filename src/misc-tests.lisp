@@ -217,43 +217,69 @@
       (is-error (undefine-polymorphic-function-tester "hello")))
     (undefine-polymorphic-function 'undefine-polymorphic-function-tester)))
 
-#+sbcl
-(def-test polymorph-sbcl-transforms ()
-  (with-output-to-string (*error-output*)
-    (eval `(progn
-             (undefine-polymorphic-function 'sbcl-transform)
-             (define-polymorphic-function sbcl-transform (a) :overwrite t)
-             (defpolymorph sbcl-transform ((a string)) t))))
-  (is (= 1 (length
-            (sb-c::fun-info-transforms
-             (sb-c::fun-info-or-lose 'sbcl-transform)))))
-  (eval `(undefpolymorph 'sbcl-transform '(string)))
-  (is (= 0 (length
-            (sb-c::fun-info-transforms
-             (sb-c::fun-info-or-lose 'sbcl-transform)))))
-  (eval `(undefine-polymorphic-function 'sbcl-transform)))
+;; #+sbcl
+;; (def-test polymorph-sbcl-transforms ()
+;;   (with-output-to-string (*error-output*)
+;;     (eval `(progn
+;;              (undefine-polymorphic-function 'sbcl-transform)
+;;              (define-polymorphic-function sbcl-transform (a) :overwrite t)
+;;              (defpolymorph sbcl-transform ((a string)) t))))
+;;   (is (= 1 (length
+;;             (sb-c::fun-info-transforms
+;;              (sb-c::fun-info-or-lose 'sbcl-transform)))))
+;;   (eval `(undefpolymorph 'sbcl-transform '(string)))
+;;   (is (= 0 (length
+;;             (sb-c::fun-info-transforms
+;;              (sb-c::fun-info-or-lose 'sbcl-transform)))))
+;;   (eval `(undefine-polymorphic-function 'sbcl-transform)))
 
-(def-test intersecting-type-lists ()
+(def-test ambiguous-type-lists ()
   (ignoring-error-output
     (eval `(progn
-             (undefine-polymorphic-function 'intersecting-type-lists-tester)
-             (define-polymorphic-function intersecting-type-lists-tester (a))
-             (defpolymorph intersecting-type-lists-tester ((a string)) t
+             (undefine-polymorphic-function 'ambiguous-type-lists-tester)
+             (define-polymorphic-function ambiguous-type-lists-tester (&key a))
+             (defpolymorph ambiguous-type-lists-tester (&key ((a string))) t
                (declare (ignore a)))))
-    (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t
+    (is-error (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a array))) t
                        (declare (ignore a)))))
-    (5am:is-true  (eval `(defpolymorph intersecting-type-lists-tester
-                             ((a (and array (not string)))) t
-                           (declare (ignore a)))))
-    (eval `(undefpolymorph 'intersecting-type-lists-tester
-                           '((and array (not string)))))
-    (eval `(undefpolymorph 'intersecting-type-lists-tester
-                           '(string)))
-    (5am:is-true  (eval `(defpolymorph intersecting-type-lists-tester ((a array)) t
-                           (declare (ignore a)))))
-    (is-error (eval `(defpolymorph intersecting-type-lists-tester ((a string)) t
+    (is-error (eval `(defpolymorph ambiguous-type-lists-tester
+                         (&key ((a (and array (not string))))) t
                        (declare (ignore a)))))
-    (eval `(undefine-polymorphic-function 'intersecting-type-lists-tester))))
+    (eval `(undefpolymorph 'ambiguous-type-lists-tester
+                           '(&key (:a (and array (not string))))))
+    (eval `(undefpolymorph 'ambiguous-type-lists-tester
+                           '(&key (:a string))))
+    (5am:is-true (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a array))) t
+                          (declare (ignore a)))))
+    (is-error (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a string))) t
+                       (declare (ignore a)))))
+    (eval `(undefine-polymorphic-function 'ambiguous-type-lists-tester))))
+
+(def-test specialized-type-lists ()
+  (ignoring-error-output
+    (eval `(progn
+             (undefine-polymorphic-function 'most-specialized-polymorph-tester)
+             (define-polymorphic-function most-specialized-polymorph-tester (a))
+             (defpolymorph most-specialized-polymorph-tester ((a string)) symbol
+               (declare (ignore a))
+               'string)
+             (defpolymorph-compiler-macro most-specialized-polymorph-tester (string) (a)
+               (declare (ignore a))
+               `'(compiled string))
+             (defpolymorph most-specialized-polymorph-tester ((a array)) symbol
+               (declare (ignore a))
+               'array)
+             (defun most-specialized-polymorph-tester-caller ()
+               (declare (optimize speed))
+               (most-specialized-polymorph-tester "hello"))))
+    (let ((a "string")
+          (b #(a r r a y)))
+      (5am:is-true (eq 'string (most-specialized-polymorph-tester a)))
+      (5am:is-true (eq 'array  (most-specialized-polymorph-tester b)))
+      (5am:is-true (equalp '(compiled string)
+                           (most-specialized-polymorph-tester-caller))))
+    (eval `(undefine-polymorphic-function 'most-specialized-polymorph-tester))
+    (eval `(fmakunbound 'most-specialized-polymorph-tester-caller))))
 
 (def-test once-only ()
   (ignoring-error-output

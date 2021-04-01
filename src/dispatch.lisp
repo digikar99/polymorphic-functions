@@ -169,6 +169,17 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
         (t
          (values `(declare) body))))
 
+(defun ensure-unambiguous-call (name type-list)
+  (loop :for list :in (polymorphic-function-type-lists
+                       (fdefinition
+                        name))
+        :do (when (and (type-list-causes-ambiguous-call-p type-list list)
+                       (not (equalp type-list list)))
+              (error "The given TYPE-LIST ~%  ~S~%will cause ambiguous call with the type list ~%  ~S~% of an existing polymorph"
+                     type-list
+                     list)
+              (return))))
+
 (defun ensure-non-intersecting-type-lists (name type-list)
   (loop :for list :in (polymorphic-function-type-lists
                        (fdefinition
@@ -237,15 +248,25 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
                  (recursively-safe-p (if rp
                                          recursively-safe-p
                                          (not (recursive-function-p name inline-lambda-body))))
+                 ;; TODO: Update SBCL for most-specialized-dispatch
+                 ;; #+sbcl (sbcl-transform nil)
+                 #+sbcl
+                 (node (gensym "NODE"))
                  #+sbcl
                  (sbcl-transform `(sb-c:deftransform ,name
                                       (,param-list ,(if (eq '&rest (lastcar type-list))
                                                         (butlast type-list)
                                                         type-list) *
-                                       :policy (< debug speed))
-                                    `(apply ,',lambda-body
-                                            ,@',(sbcl-transform-body-args typed-lambda-list
-                                                                          :typed t)))))
+                                       :policy (< debug speed)
+                                       :node ,node)
+                                    ;; FIXME: This leads to an O(n^2) complexity
+                                    ;; Could sorting help?
+                                    (if (most-specialized-applicable-transform-p
+                                         ',name ,node ',type-list)
+                                        `(apply ,',lambda-body
+                                                ,@',(sbcl-transform-body-args typed-lambda-list
+                                                                              :typed t))
+                                        (sb-c::give-up-ir1-transform)))))
             (multiple-value-bind (inline-safe-lambda-body note)
                 (cond (free-variables
                        (values nil

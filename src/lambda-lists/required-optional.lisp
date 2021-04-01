@@ -207,21 +207,56 @@
                         :collect `(or (not ,supplied-p)
                                       (typep ,param ',type))))))))
 
-(defmethod %type-list-intersect-p ((type-1 (eql 'required-optional))
-                                   (type-2 (eql 'required-optional))
-                                   list-1 list-2)
+(defmethod %type-list-subtype-p ((type-1 (eql 'required-optional))
+                                 (type-2 (eql 'required-optional))
+                                 list-1 list-2)
+  (declare (optimize speed)
+           (type list list-1 list-2))
+  (let ((optional-position-1 (position '&optional list-1))
+        (optional-position-2 (position '&optional list-2)))
+    (if (= optional-position-1 optional-position-2)
+        (and (every #'subtypep
+                    (subseq list-1 0 optional-position-1)
+                    (subseq list-2 0 optional-position-2))
+             (every #'subtypep
+                    (subseq list-1 (1+ optional-position-1))
+                    (subseq list-2 (1+ optional-position-2))))
+        ;; Let's hope that this case will be caught by the ambiguous-call-p
+        ;; functionality. Let's have this hope for the second part of and above
+        ;; as well.
+        (error "This case has not been handled!"))))
+
+(def-test type-list-subtype-optional (:suite type-list-subtype-p)
+  (5am:is-true  (type-list-subtype-p '(string &optional string)
+                                     '(string &optional array)))
+  (5am:is-true  (type-list-subtype-p '(&optional string)
+                                     '(&optional string number)))
+  (5am:is-false (type-list-subtype-p '(string &optional string)
+                                     '(string &optional number)))
+  (5am:is-false (type-list-subtype-p '(string &optional string)
+                                     '(number &optional string))))
+
+(defmethod %type-list-causes-ambiguous-call-p
+    ((type-1 (eql 'required-optional))
+     (type-2 (eql 'required-optional))
+     list-1 list-2)
   (let ((optional-position-1 (position '&optional list-1))
         (optional-position-2 (position '&optional list-2)))
     ;; What if position of optional arguments is not same? Or if lengths are different?
-    ;; '(&optional string) and '(&optional string number) do intersect
-    ;; Well, yes, but then, any type-list with 0 required arguments intersects with them!
+    ;; Eg. '(&optional string) and '(&optional string number) cause an ambiguous call
+    ;; Well, yes, but then, any type-list with 0 required arguments would cause an ambiguity.
     (and (= optional-position-1 optional-position-2)
-         (every #'type-intersect-p
+         (every #'type=
                 (subseq list-1 0 optional-position-1)
                 (subseq list-2 0 optional-position-2)))))
 
-(def-test type-list-intersect-optional (:suite type-list-intersect-p)
-  (5am:is-true  (type-list-intersect-p '(string &optional string) '(string &optional array)))
-  (5am:is-true  (type-list-intersect-p '(string &optional string) '(string &optional number)))
-  (5am:is-true  (type-list-intersect-p '(&optional string) '(&optional string number)))
-  (5am:is-false (type-list-intersect-p '(string &optional string) '(number &optional string))))
+(def-test type-list-causes-ambiguous-call-optional
+    (:suite type-list-causes-ambiguous-call-p)
+  (5am:is-true  (type-list-causes-ambiguous-call-p '(string &optional string)
+                                                   '(string &optional array)))
+  (5am:is-true  (type-list-causes-ambiguous-call-p '(&optional string)
+                                                   '(&optional string number)))
+  (5am:is-true  (type-list-causes-ambiguous-call-p '(string &optional string)
+                                                   '(string &optional number)))
+  (5am:is-false (type-list-causes-ambiguous-call-p '(string &optional string)
+                                                   '(number &optional string))))
