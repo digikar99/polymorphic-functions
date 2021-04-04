@@ -5,7 +5,6 @@
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
                "closer-mop"
-               "hu.dwim.walker" ; solely for determining free-variables!
                "introspect-environment"
                "fiveam" ;; just keep things together!
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types

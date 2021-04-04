@@ -48,6 +48,9 @@
         (t
          (error "~%We shouldn't have reached here!"))))
 
+;;; Preferably avoid adding implementation specific parts here.
+;;; On SBCL, the implementation specific part is essentially the DEFTRANSFORM's.
+
 (defgeneric %form-type (first form))
 
 (defmethod %form-type (first form) nil)

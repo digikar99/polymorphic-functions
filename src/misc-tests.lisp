@@ -3,7 +3,8 @@
 (5am:in-suite :adhoc-polymorphic-functions)
 
 (defmacro ignoring-error-output (&body body)
-  `(with-output-to-string (*error-output*) ,@body))
+  `(locally (declare #+sbcl(sb-ext:muffle-conditions style-warning))
+     (with-output-to-string (*error-output*) ,@body)))
 
 (def-test required-args-correctness ()
   (ignoring-error-output
@@ -57,30 +58,6 @@
               '(("hello" 9 7))))
   (undefine-polymorphic-function 'bar)
   (fmakunbound 'bar-caller))
-
-(def-test non-null-environment-correctness ()
-  (ignoring-error-output
-    (eval `(define-polymorphic-function baz (c &optional d) :overwrite t))
-    (eval `(let ((a "hello")
-                 (b 5))
-             (defpolymorph baz ((c string) &optional ((d integer) b)) t
-               (declare (ignore c))
-               (list a d))))
-    (eval `(defun baz-caller (a1 a2)
-             (baz a1 a2)))
-    (eval `(defun baz-caller-inline (a1 a2)
-             (declare (type string a1)
-                      (type integer a2)
-                      (optimize speed))
-             (baz a1 a2)))
-    (is (equalp (baz-caller "world" 7)
-                '("hello" 7)))
-    (is (equalp (baz-caller-inline "world" 7)
-                '("hello" 7)))
-    (eval `(progn
-             (undefine-polymorphic-function 'baz)
-             (fmakunbound 'baz-caller)
-             (fmakunbound 'baz-caller-inline)))))
 
 (def-test typed-key-correctness ()
   (ignoring-error-output
@@ -136,23 +113,8 @@
   (is (eq 'string (foz 7)))
   (undefine-polymorphic-function 'foz))
 
-(def-test recursively-safe ()
-  (ignoring-error-output
-    (eval `(progn
-             (define-polymorphic-function foz (a) :overwrite t)
-             (defpolymorph (foz :recursively-safe-p t) ((a number)) t
-               (declare (optimize speed)
-                        (ignore a))
-               'number)
-             (defpolymorph foz ((a string)) t
-               (declare (optimize speed))
-               (if (string= a "hello")
-                   'string
-                   (foz 5))))))
-  ;; FIXME: Better test?
-  (5am:is-true  (polymorph-recursively-safe-p (find-polymorph 'foz '(number))))
-  (5am:is-false (polymorph-recursively-safe-p (find-polymorph 'foz '(string))))
-  (undefine-polymorphic-function 'foz))
+;;; FIXME: Add a test for recursive safety
+;;; How to distinguish between runtime call vs compile time call?
 
 (def-test rest-correctness ()
   (ignoring-error-output
@@ -223,7 +185,8 @@
     (eval `(progn
              (undefine-polymorphic-function 'sbcl-transform)
              (define-polymorphic-function sbcl-transform (a) :overwrite t)
-             (defpolymorph sbcl-transform ((a string)) t))))
+             (defpolymorph sbcl-transform ((a string)) t
+               (declare (ignore a))))))
   (is (= 1 (length
             (sb-c::fun-info-transforms
              (sb-c::fun-info-or-lose 'sbcl-transform)))))

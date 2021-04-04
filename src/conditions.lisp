@@ -41,8 +41,19 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                      (arg-list condition)
                      (type-lists condition)))))
 
+(defun note-null-env (form datum &rest arguments)
+  (format *error-output* "~%; Inlining ~%; ~Ain null environment leads to the following warnings:~%;   ~A~%"
+          (str-replace-all #\newline
+                           (uiop:strcat #\newline #\; " ")
+                           (format nil "~S~&" form))
+          (str-replace-all #\newline
+                           (uiop:strcat #\newline #\; " ")
+                           (format nil "~A~&"
+                                   (handler-case (apply #'signal datum arguments)
+                                     (condition (c) c))))))
+
 (defun note-no-inline (form datum &rest arguments)
-  (format *error-output* "~%; Will not inline ~%;   ~Abecause~%;   ~A"
+  (format *error-output* "~%; Will not inline ~%; ~Abecause~%;   ~A"
           (str-replace-all #\newline
                            (uiop:strcat #\newline #\; " ")
                            (format nil "~S~&" form))
@@ -59,27 +70,14 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
   (:report (lambda (condition stream)
              (format stream "~%Type of ~%  ~S~%could not be determined" (form condition)))))
 
-(define-condition polymorph-body-has-free-variables (warning)
+(define-condition polymorph-has-no-inline-lambda-body (condition)
   ((name :initarg :name
          :initform (error "NAME not specified")
          :reader name)
    (type-list :initarg :type-list
               :initform (error "TYPE-LIST not specified")
-              :reader type-list)
-   (free-variables :initarg :free-variables
-                   :reader free-variables
-                   :initform nil))
+              :reader type-list))
   (:report (lambda (condition stream)
-             (format stream "~&~S with TYPE-LIST ~S will not be inlined due to free-variables ~S"
+             (format stream "~&~S with TYPE-LIST ~S will not be inlined because INLINE-LAMBDA-BODY~&was not stored while compiling the polymorph."
                      (name condition)
-                     (type-list condition)
-                     (free-variables condition)))))
-
-(define-condition recursive-expansion-is-possibly-infinite (condition)
-  ((form :initarg :form
-         :initform (error "FORM not specified")
-         :reader form))
-  (:report (lambda (condition stream)
-             (format stream "~&Inlining ~S results in (potentially infinite) recursive expansion.
-Supply :RECURSIVELY-SAFE-P T option while defining the DEFPOLYMORPH form to enable inlining."
-                     (form condition)))))
+                     (type-list condition)))))
