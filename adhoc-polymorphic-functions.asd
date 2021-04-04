@@ -5,10 +5,9 @@
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
                "closer-mop"
-               "introspect-environment"
                "fiveam" ;; just keep things together!
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
-               "split-sequence")
+               "introspect-environment")
   :pathname #P"src/"
   :components ((:file "package")
                (:file "adhoc-polymorphic-function" :depends-on ("package"))

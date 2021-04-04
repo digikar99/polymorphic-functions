@@ -29,12 +29,3 @@
                                              (/= 3 (policy-quality 'speed env))
                                              (<= (policy-quality 'debug env)
                                                  (policy-quality 'speed env))))
-
-(defun str-split (separator string)
-  (split-sequence:split-sequence separator string))
-
-(defun str-join (separator strings)
-  (format nil (uiop:strcat "~{~A~^" separator "~}") strings))
-
-(defun str-replace-all (old new s)
-  (str-join new (str-split old s)))

@@ -42,26 +42,28 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                      (type-lists condition)))))
 
 (defun note-null-env (form datum &rest arguments)
-  (format *error-output* "~%; Inlining ~%; ~Ain null environment leads to the following warnings:~%;   ~A~%"
-          (str-replace-all #\newline
-                           (uiop:strcat #\newline #\; " ")
-                           (format nil "~S~&" form))
-          (str-replace-all #\newline
-                           (uiop:strcat #\newline #\; " ")
-                           (format nil "~A~&"
-                                   (handler-case (apply #'signal datum arguments)
-                                     (condition (c) c))))))
+  (let ((*print-pretty* t))
+    (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+      (format *error-output* "~%Inlining~%~A~%in null environment leads to the following warnings~%~A"
+              (with-output-to-string (*error-output*)
+                (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+                  (format *error-output* "~S" form)))
+              (format nil "~&  ~A"
+                      (handler-case (apply #'signal datum arguments)
+                        (condition (c) c)))))))
 
 (defun note-no-inline (form datum &rest arguments)
-  (format *error-output* "~%; Will not inline ~%; ~Abecause~%;   ~A"
-          (str-replace-all #\newline
-                           (uiop:strcat #\newline #\; " ")
-                           (format nil "~S~&" form))
-          (str-replace-all #\newline
-                           (uiop:strcat #\newline #\; " ")
-                           (format nil "~A~&"
-                                   (handler-case (apply #'signal datum arguments)
-                                     (condition (c) c))))))
+  (let ((*print-pretty* t))
+    (pprint-logical-block (*error-output* nil :per-line-prefix "; " :suffix (string #\newline))
+      (format *error-output* "~%Will not inline~%~A~%because~A"
+              (with-output-to-string (*error-output*)
+                (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+                  (format *error-output* "~S" form)))
+              (if (string= "" datum)
+                  ""
+                  (format nil "~&~A"
+                          (handler-case (apply #'signal datum arguments)
+                            (condition (c) c))))))))
 
 (define-condition form-type-failure (condition)
   ((form :initarg :form
@@ -78,6 +80,6 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
               :initform (error "TYPE-LIST not specified")
               :reader type-list))
   (:report (lambda (condition stream)
-             (format stream "~&~S with TYPE-LIST ~S will not be inlined because INLINE-LAMBDA-BODY~&was not stored while compiling the polymorph."
+             (format stream "~S with TYPE-LIST ~%  ~S~%has no stored INLINE-LAMBDA-BODY"
                      (name condition)
                      (type-list condition)))))

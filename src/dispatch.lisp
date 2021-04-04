@@ -19,24 +19,29 @@
 (defmacro with-compiler-note (&body body)
   `(handler-case (progn ,@body)
      (no-applicable-polymorph (condition)
-       (format *error-output*
-               "~%; While compiling ~S: ~&; ~A"
-               form
-               (str-join (uiop:strcat #\newline ";  ")
-                         (str-split #\newline (format nil "~A" condition))))
+       (format *error-output* "~%~%")
+       (let ((*print-pretty* t))
+         (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+           (format *error-output*
+                   "While compiling ~%")
+           (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+             (format *error-output* "~S" form))
+           (format *error-output* "~A" condition)))
        original-form)
      (form-type-failure (condition)
        (when optim-speed
-         (format *error-output*
-                 (uiop:strcat "~%; Optimization of ~&;  "
-                              (str-join (uiop:strcat #\newline ";  ")
-                                        (str-split #\newline (format nil " ~S"
-                                                                     original-form)))
-                              "~%; is left to ~A because ADHOC-POLYMORPHIC-FUNCTIONS "
-                              "is unable to optimize it ~%; because~&; ~A~&; ~&")
-                 (lisp-implementation-type)
-                 (str-join (uiop:strcat #\newline ";  ")
-                           (str-split #\newline (format nil "~A" condition)))))
+         (format *error-output* "~%~%")
+         (let ((*print-pretty* t))
+           (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+             (write-string "Optimization of" *error-output*)
+             (terpri *error-output*)
+             (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+               (format *error-output* "~S" original-form))
+             (format *error-output* "~%is left to ~A because ADHOC-POLYMORPHIC-FUNCTIONS~%"
+                     (lisp-implementation-type))
+             (format *error-output* "is unable to optimize it because~&")
+             (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+               (format *error-output* "~A" condition)))))
        (cond (optim-debug original-form)
              ((and optim-speed
                    (member :sbcl *features*)
@@ -45,12 +50,15 @@
              (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!"))))
      (polymorph-has-no-inline-lambda-body (condition)
        (when optim-speed
-         (format *error-output*
-                 (uiop:strcat "~&; "
-                              (format nil "Unable to optimize ~S because:" original-form)
-                              "~&;  ~A")
-                 (str-join (uiop:strcat #\newline ";  ")
-                           (str-split #\newline (format nil "~A" condition)))))
+         (format *error-output* "~%~%")
+         (let ((*print-pretty* t))
+           (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+             (format *error-output* "Unable to optimize")
+             (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+               (format *error-output* "~S" original-form))
+             (format *error-output* "~&because~&")
+             (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+               (format *error-output* "~A" condition)))))
        ;; FIXME: Will SBCL optimize these cases - should these conditions be merged
        ;; into the previous FORM-TYPE-FAILURE case?
        (cond (optim-debug original-form)
@@ -292,7 +300,7 @@ at your own risk."
                                    (note-no-inline form "")
                                    (note-null-env inline-lambda-body
                                                   null-env-compilation-warnings)
-                                   (format *error-output* "~&; PROCEED AT YOUR OWN RISK!")))
+                                   (format *error-output* "~&; PROCEED AT YOUR OWN RISK!~&")))
                          (values inline-lambda-body
                                  nil))))
               ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
