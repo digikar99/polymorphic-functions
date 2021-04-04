@@ -43,19 +43,20 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
 
 (defun note-null-env (form datum &rest arguments)
   (let ((*print-pretty* t))
-    (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
-      (format *error-output* "~%Inlining~%~A~%in null environment leads to the following warnings~%~A"
-              (with-output-to-string (*error-output*)
-                (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-                  (format *error-output* "~S" form)))
-              (format nil "~&  ~A"
-                      (handler-case (apply #'signal datum arguments)
-                        (condition (c) c)))))))
+    (pprint-logical-block (*error-output* nil :per-line-prefix "; " :suffix (string #\newline))
+      (format *error-output* "~%Inlining~%")
+      (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+        (format *error-output* "~S" form))
+      (format *error-output* "~&in null environment is not without warnings:~%")
+      (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+        (format *error-output* "~A"
+                (handler-case (apply #'signal datum arguments)
+                  (condition (c) c)))))))
 
 (defun note-no-inline (form datum &rest arguments)
   (let ((*print-pretty* t))
     (pprint-logical-block (*error-output* nil :per-line-prefix "; " :suffix (string #\newline))
-      (format *error-output* "~%Will not inline~%~A~%because~A"
+      (format *error-output* "Will not inline~%~A~%because~A"
               (with-output-to-string (*error-output*)
                 (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
                   (format *error-output* "~S" form)))

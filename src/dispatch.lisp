@@ -19,7 +19,7 @@
 (defmacro with-compiler-note (&body body)
   `(handler-case (progn ,@body)
      (no-applicable-polymorph (condition)
-       (format *error-output* "~%~%")
+       (format *error-output* "~%")
        (let ((*print-pretty* t))
          (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
            (format *error-output*
@@ -30,7 +30,7 @@
        original-form)
      (form-type-failure (condition)
        (when optim-speed
-         (format *error-output* "~%~%")
+         (format *error-output* "~%")
          (let ((*print-pretty* t))
            (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
              (write-string "Optimization of" *error-output*)
@@ -50,7 +50,7 @@
              (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!"))))
      (polymorph-has-no-inline-lambda-body (condition)
        (when optim-speed
-         (format *error-output* "~%~%")
+         (format *error-output* "~%")
          (let ((*print-pretty* t))
            (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
              (format *error-output* "Unable to optimize")
@@ -175,23 +175,22 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
               (return))))
 
 (defun null-env-compilation-warnings (lambda-form)
-  (let* ((warnings)
-         (error-output
-           (with-output-to-string (apf-error-output)
-             (with-output-to-string (*error-output*)
-               (let (#+sbcl (sb-c::*in-compilation-unit* nil))
-                 (#+sbcl progn
-                  #-sbcl with-compilation-unit #-sbcl (:override t)
-                  ;; TODO: Improve error reporting on other systems
-                  ;; This works on SBCL and CCL
-                   (handler-bind ((warning (lambda (c)
-                                             (push c warnings)
-                                             (format apf-error-output "~&~A~&" c)
-                                             (muffle-warning c))))
-                     (compile nil lambda-form))))))))
-    (if warnings error-output nil)))
+  (let* ((warnings))
+    (with-output-to-string (*error-output*)
+      (let (#+sbcl (sb-c::*in-compilation-unit* nil))
+        (#+sbcl progn
+         #-sbcl with-compilation-unit #-sbcl (:override t)
+         ;; TODO: Improve error reporting on other systems
+         ;; This works on SBCL and CCL
+         (handler-bind ((warning (lambda (c)
+                                   (push c warnings)
+                                   (muffle-warning c))))
+           (compile nil lambda-form)))))
+    (if warnings
+        (format nil "~{~A~^~%~}" (nreverse warnings))
+        nil)))
 
-;;; Earlier (prior to commit e7f11394023cf06075459ea4baa735ec8bda89f3),
+;;; Earlier (until commit e7f11394023cf06075459ea4baa735ec8bda89f3),
 ;;; we attempted to use a code-walker to determine if there are
 ;;; free variables in the form, and accordingly decline to inline
 ;;; the polymorph. However, cases such as this (and while this is nonsense):
@@ -300,7 +299,7 @@ at your own risk."
                                    (note-no-inline form "")
                                    (note-null-env inline-lambda-body
                                                   null-env-compilation-warnings)
-                                   (format *error-output* "~&; PROCEED AT YOUR OWN RISK!~&")))
+                                   (format *error-output* "~&; PROCEED AT YOUR OWN RISK!~%~%")))
                          (values inline-lambda-body
                                  nil))))
               ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
