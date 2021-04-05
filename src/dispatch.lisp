@@ -68,7 +68,8 @@
              ((or optim-speed optim-slight-speed) block-form)
              (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!"))))))
 
-(defmacro define-polymorphic-function (name untyped-lambda-list &key overwrite &environment env)
+(defmacro define-polymorphic-function (name untyped-lambda-list
+                                       &key overwrite (documentation nil docp) &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH
 for specializing on various argument types.
 
@@ -77,7 +78,7 @@ and new polymorphs will be ready to be installed.
 If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has changed."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
-  ;; TODO: Handle the case of redefinition
+  (when docp (check-type documentation string))
   (let ((*name*        name)
         (*environment*  env))
     `(,@(if optim-debug
@@ -86,7 +87,7 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
       (eval-when (:compile-toplevel :load-toplevel :execute)
         ,(when overwrite
            `(undefine-polymorphic-function ',name))
-        (register-polymorphic-function ',name ',untyped-lambda-list))
+        (register-polymorphic-function ',name ',untyped-lambda-list ,documentation))
       #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
       (define-compiler-macro ,name (&whole form &rest args &environment env)
         (declare (ignore args))

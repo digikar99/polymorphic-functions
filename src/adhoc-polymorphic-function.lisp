@@ -78,8 +78,6 @@
                 :reader polymorphic-function-lambda-list)
    (type-lists  :initform nil :type list
                 :accessor polymorphic-function-type-lists)
-   ;; (root-dispatch-node :initform (make-dispatch-node)
-   ;;                     :accessor polymorphic-function-root-dispatch-node)
    (lambda-list-type :type lambda-list-type
                      :initarg :lambda-list-type
                      :initform (error "LAMBDA-LIST-TYPE must be supplied.")
@@ -109,8 +107,9 @@
       "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH for
 use by functions like TYPE-LIST-APPLICABLE-P")
 
-(defun register-polymorphic-function (name untyped-lambda-list &key overwrite)
+(defun register-polymorphic-function (name untyped-lambda-list documentation &key overwrite)
   (declare (type function-name       name)
+           (type (or null string)    documentation)
            (type untyped-lambda-list untyped-lambda-list))
   (unless overwrite ; so, OVERWRITE is NIL
     (when-let (apf (and (fboundp name) (fdefinition name)))
@@ -129,6 +128,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
     (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
       (let ((apf (make-instance 'adhoc-polymorphic-function
                                 :name name
+                                :documentation documentation
                                 :lambda-list untyped-lambda-list
                                 :lambda-list-type (lambda-list-type untyped-lambda-list))))
 
@@ -139,7 +139,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
              #+ccl (eval `(ccl:nfunction (adhoc-polymorphic-function ,name)
                                          (lambda ,lambda-list ,body-form)))
              #-(or ccl sbcl) (compile nil `(lambda ,lambda-list ,body-form)))
-        (setf (fdefinition name) apf)))))
+        (setf (fdefinition name) apf)
+        (setf (documentation name 'function) documentation)))))
 
 (defun register-polymorph (name type-list return-type inline-lambda-body lambda
                            lambda-list-type)
