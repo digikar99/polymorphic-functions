@@ -20,9 +20,13 @@
                              (:file "required-key")
                              (:file "rest")))
                (:file "conditions"                 :depends-on ("package"))
-               (:file "dispatch"                   :depends-on ("adhoc-polymorphic-function"
+               (:file "compiler-macro"             :depends-on ("adhoc-polymorphic-function"
                                                                 "lambda-lists"
                                                                 "conditions"))
+               (:file "dispatch"                   :depends-on ("adhoc-polymorphic-function"
+                                                                "lambda-lists"
+                                                                "conditions"
+                                                                "compiler-macro"))
                (:file "misc-tests"                 :depends-on ("dispatch")))
   :perform (test-op (o c)
                     (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)

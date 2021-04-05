@@ -221,7 +221,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                :type-lists (polymorphic-function-type-lists (fdefinition name))))))
 
 (defun retrieve-polymorph-form (name lambda-list-type arg-list)
-  ;; This is called either while the main polymorphic-function itself is begin compiled,
+  ;; This is called either while the main polymorphic-function itself is being compiled,
   ;; or while the compiler-macro associated with it is being compiled.
   (assert (every #'symbolp arg-list))
   ;; Introduce gensyms the day this asserition fails: is this premature-optimization?

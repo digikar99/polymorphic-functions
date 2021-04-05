@@ -16,58 +16,6 @@
 ;;;   - GET-TYPE-LIST
 ;;;   - DEFPOLYMORPH-COMPILER-MACRO
 
-(defmacro with-compiler-note (&body body)
-  `(handler-case (progn ,@body)
-     (no-applicable-polymorph (condition)
-       (format *error-output* "~%")
-       (let ((*print-pretty* t))
-         (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
-           (format *error-output*
-                   "While compiling ~%")
-           (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-             (format *error-output* "~S" form))
-           (format *error-output* "~A" condition)))
-       original-form)
-     (form-type-failure (condition)
-       (when optim-speed
-         (format *error-output* "~%")
-         (let ((*print-pretty* t))
-           (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
-             (write-string "Optimization of" *error-output*)
-             (terpri *error-output*)
-             (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-               (format *error-output* "~S" original-form))
-             (format *error-output* "~%is left to ~A because ADHOC-POLYMORPHIC-FUNCTIONS~%"
-                     (lisp-implementation-type))
-             (format *error-output* "is unable to optimize it because~&")
-             (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-               (format *error-output* "~A" condition)))))
-       (cond (optim-debug original-form)
-             ((and optim-speed
-                   (member :sbcl *features*)
-                   original-form))
-             ((or optim-speed optim-slight-speed) block-form)
-             (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!"))))
-     (polymorph-has-no-inline-lambda-body (condition)
-       (when optim-speed
-         (format *error-output* "~%")
-         (let ((*print-pretty* t))
-           (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
-             (format *error-output* "Unable to optimize")
-             (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-               (format *error-output* "~S" original-form))
-             (format *error-output* "~&because~&")
-             (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-               (format *error-output* "~A" condition)))))
-       ;; FIXME: Will SBCL optimize these cases - should these conditions be merged
-       ;; into the previous FORM-TYPE-FAILURE case?
-       (cond (optim-debug original-form)
-             ((and optim-speed
-                   (member :sbcl *features*)
-                   original-form))
-             ((or optim-speed optim-slight-speed) block-form)
-             (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!"))))))
-
 (defmacro define-polymorphic-function (name untyped-lambda-list
                                        &key overwrite (documentation nil docp) &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH
@@ -81,64 +29,15 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
   (when docp (check-type documentation string))
   (let ((*name*        name)
         (*environment*  env))
-    `(,@(if optim-debug
-            `(progn)
-            `(handler-bind ((style-warning #'muffle-warning))))
-      (eval-when (:compile-toplevel :load-toplevel :execute)
-        ,(when overwrite
-           `(undefine-polymorphic-function ',name))
-        (register-polymorphic-function ',name ',untyped-lambda-list ,documentation))
-      #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-      (define-compiler-macro ,name (&whole form &rest args &environment env)
-        (declare (ignore args))
-        ;; FIXME: Is the assumption that FORM either starts with ',NAME or FUNCALL correct?
-        (let ((*environment*                 env)
-              (*compiler-macro-expanding-p*    t)
-              (original-form                form)
-              (block-form                    nil))
-          (with-compiler-note
-            (when (eq 'funcall (car form))
-              (setf form (cons (second (second form))
-                               (cddr form))))
-            (setq block-form
-                  (let* ((name       (first form))
-                         (gensyms    (make-gensym-list (length (rest form))))
-                         (block-name (if (and (listp name)
-                                              (eq 'setf (first name)))
-                                         (second name)
-                                         name)))
-                    ;; This block is necessary for optimization of &optional and &key
-                    ;; and &rest args; otherwise, we will need to cons at runtime!
-                    `(block ,block-name
-                       (let (,@(loop :for sym :in gensyms
-                                     :for form :in (rest form)
-                                     :collect `(,sym ,form)))
-                         (funcall (the function
-                                       (polymorph-lambda
-                                        ,(retrieve-polymorph-form
-                                          name
-                                          ',(lambda-list-type untyped-lambda-list)
-                                          gensyms)))
-                                  ,@gensyms)))))
-            (let* ((arg-list  (rest form))
-                   (polymorph (apply #'retrieve-polymorph ',name arg-list)))
-              (with-slots (inline-lambda-body return-type type-list
-                           compiler-macro-lambda)
-                  polymorph
-                (cond (compiler-macro-lambda
-                          (funcall compiler-macro-lambda
-                                   (cons inline-lambda-body (rest form))
-                                   env))
-                      (optim-speed
-                       ;; TODO: Use some other declaration for inlining as well
-                       ;; Optimized for speed and type information available
-                       (if inline-lambda-body
-                           `(the ,return-type (,inline-lambda-body ,@(cdr form)))
-                           (signal 'polymorph-has-no-inline-lambda-body
-                                   :name ',name :type-list type-list)))
-                      (optim-debug        original-form)
-                      (optim-slight-speed block-form)
-                      (t (error "Non-exhaustive cases!")))))))))))
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         ,(when overwrite
+            `(undefine-polymorphic-function ',name))
+         (register-polymorphic-function ',name ',untyped-lambda-list ,documentation)
+         #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
+         (setf (compiler-macro-function ',name)
+               (apf-compiler-macro-lambda ',name ',untyped-lambda-list)))
+      (fdefinition ',name))))
 
 (defun extract-declarations (body)
   "Returns two values: DECLARATIONS and remaining BODY"
