@@ -232,11 +232,22 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                `(fdefinition ',name)))
          (applicable-p-form (if *compiler-macro-expanding-p*
                                 (if (eq 'rest lambda-list-type)
-                                    `(ignore-errors
-                                      (apply
-                                       (the function
-                                            (polymorph-applicable-p-function polymorph))
-                                       ,@arg-list))
+                                    `(if (not (listp ,(lastcar arg-list)))
+                                         (funcall
+                                          (the function
+                                               (polymorph-applicable-p-function polymorph))
+                                          ,@arg-list)
+                                         (or
+                                          (ignore-errors
+                                           (funcall
+                                            (the function
+                                                 (polymorph-applicable-p-function polymorph))
+                                            ,@arg-list))
+                                          (ignore-errors
+                                           (apply
+                                            (the function
+                                                 (polymorph-applicable-p-function polymorph))
+                                            ,@arg-list))))
                                     `(funcall
                                       (the function
                                            (polymorph-applicable-p-function polymorph))
