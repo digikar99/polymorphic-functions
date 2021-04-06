@@ -32,14 +32,14 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
   ((arg-list :initarg :arg-list
              :initform (error "ARG-LIST not specified")
              :reader arg-list)
-   (type-lists :initarg :type-lists
-               :initform (error "TYPE-LISTS not specified")
-               :reader type-lists))
+   (effective-type-lists :initarg :effective-type-lists
+               :initform (error "EFFECTIVE-TYPE-LISTS not specified")
+               :reader effective-type-lists))
   (:report (lambda (condition stream)
              (format stream
-                     "~%No applicable POLYMORPH discovered for ARG-LIST ~S.~%Available TYPE-LISTs include:~%   ~{~S~^~%   ~}"
+                     "~%No applicable POLYMORPH discovered for ARG-LIST ~S.~%Available Effective-Type-Lists include:~%   ~{~S~^~%   ~}"
                      (arg-list condition)
-                     (type-lists condition)))))
+                     (effective-type-lists condition)))))
 
 (defun note-null-env (form datum &rest arguments)
   (let ((*print-pretty* t))

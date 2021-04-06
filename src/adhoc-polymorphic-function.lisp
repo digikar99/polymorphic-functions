@@ -44,6 +44,7 @@
   (name (error "NAME must be supplied!"))
   (return-type)
   (type-list nil)
+  (effective-type-list nil)
   (applicable-p-function)
   (inline-lambda-body)
   ;; We need the FUNCTION-BODY due to compiler macros,
@@ -76,8 +77,6 @@
    (lambda-list :initarg :lambda-list :type list
                 :initform (error "LAMBDA-LIST must be supplied.")
                 :reader polymorphic-function-lambda-list)
-   (type-lists  :initform nil :type list
-                :accessor polymorphic-function-type-lists)
    (lambda-list-type :type lambda-list-type
                      :initarg :lambda-list-type
                      :initform (error "LAMBDA-LIST-TYPE must be supplied.")
@@ -95,8 +94,15 @@
 
 (defmethod print-object ((o adhoc-polymorphic-function) stream)
   (print-unreadable-object (o stream :type t)
-    (with-slots (name type-lists) o
-      (format stream "~S (~S)" name (length type-lists)))))
+    (with-slots (name polymorphs) o
+      (format stream "~S (~S)" name (length polymorphs)))))
+
+(defun polymorphic-function-type-lists (polymorphic-function)
+  (mapcar #'polymorph-type-list (polymorphic-function-polymorphs polymorphic-function)))
+
+(defun polymorphic-function-effective-type-lists (polymorphic-function)
+  (mapcar #'polymorph-effective-type-list
+          (polymorphic-function-polymorphs polymorphic-function)))
 
 (defvar *name*)
 (setf (documentation '*name* 'variable)
@@ -142,12 +148,14 @@ use by functions like TYPE-LIST-APPLICABLE-P")
         (setf (fdefinition name) apf)
         (setf (documentation name 'function) documentation)))))
 
-(defun register-polymorph (name type-list return-type inline-lambda-body lambda
+(defun register-polymorph (name type-list effective-type-list
+                           return-type inline-lambda-body lambda
                            lambda-list-type)
   ;; TODO: Get rid of APPLICABLE-P-FUNCTION: construct it from type-list
   (declare (type function-name  name)
            (type function       lambda)
            (type type-list      type-list)
+           (type type-list      effective-type-list)
            (type type-specifier return-type)
            (type list           inline-lambda-body))
   (let* ((apf                        (fdefinition name))
@@ -163,25 +171,25 @@ use by functions like TYPE-LIST-APPLICABLE-P")
             nil
             "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
             type-list untyped-lambda-list name)
-    ;; (ensure-non-intersecting-type-lists name type-list)
-    (ensure-unambiguous-call name type-list)
-    (with-slots (type-lists polymorphs) apf
+    (ensure-unambiguous-call name type-list effective-type-list)
+    (let* ((polymorphs (polymorphic-function-polymorphs apf))
+           (polymorph  (find type-list polymorphs :test #'equalp :key #'polymorph-type-list)))
       ;; FIXME: Use a type-list equality check, not EQUALP
-      (unless (member type-list type-lists :test 'equalp)
-        (setf type-lists (cons type-list type-lists)))
-      (if-let (polymorph (find type-list polymorphs :test #'equalp :key #'polymorph-type-list))
-        (setf (polymorph-lambda             polymorph) lambda
-              (polymorph-inline-lambda-body polymorph) inline-lambda-body
-              (polymorph-return-type        polymorph) return-type)
-        (push (make-polymorph :name name
-                              :type-list    type-list
-                              :return-type  return-type
-                              :applicable-p-function
-                              (compile nil (applicable-p-function lambda-list-type
-                                                                  type-list))
-                              :inline-lambda-body inline-lambda-body
-                              :lambda             lambda)
-              polymorphs))
+      ;; FIXME: A trivial fix for &key args is to sort them lexically
+      (setf (polymorphic-function-polymorphs apf)
+            (cons (make-polymorph :name name
+                                  :type-list    type-list
+                                  :return-type  return-type
+                                  :effective-type-list effective-type-list
+                                  :applicable-p-function
+                                  (compile nil (applicable-p-function lambda-list-type
+                                                                      effective-type-list))
+                                  :inline-lambda-body inline-lambda-body
+                                  :lambda             lambda
+                                  :compiler-macro-lambda
+                                  (when polymorph
+                                    (polymorph-compiler-macro-lambda polymorph)))
+                  (remove type-list polymorphs :test #'equalp :key #'polymorph-type-list)))
       name)))
 
 ;; TODO: Implement caching for retrieving polymorphs
@@ -218,7 +226,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
         (most-specialized-polymorph applicable-polymorphs)
         (error 'no-applicable-polymorph
                :arg-list arg-list
-               :type-lists (polymorphic-function-type-lists (fdefinition name))))))
+               :effective-type-lists
+               (polymorphic-function-effective-type-lists (fdefinition name))))))
 
 (defun retrieve-polymorph-form (name lambda-list-type arg-list)
   ;; This is called either while the main polymorphic-function itself is being compiled,
@@ -290,7 +299,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                (t
                 (error 'no-applicable-polymorph
                        :arg-list (list ,@arg-list)
-                       :type-lists (polymorphic-function-type-lists ,apf-form))))))))
+                       :effective-type-lists
+                       (polymorphic-function-effective-type-lists ,apf-form))))))))
 
 #+sbcl
 (defun most-specialized-applicable-transform-p (name node type-list)
@@ -312,7 +322,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
             (polymorph-type-list (most-specialized-polymorph applicable-polymorphs)))))
 
 (defun most-specialized-polymorph (polymorphs)
-  (declare (optimize speed))
+  (declare (optimize debug))
   (cond ((null polymorphs) nil)
         ((null (rest polymorphs)) (first polymorphs))
         (t
@@ -326,14 +336,12 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (let ((apf (fdefinition name)))
     (when apf
       (removef (polymorphic-function-polymorphs apf) type-list
-               :test #'equalp :key #'polymorph-type-list)
-      (removef (polymorphic-function-type-lists apf) type-list :test 'equalp))))
+               :test #'equalp :key #'polymorph-type-list))))
 
 (defun register-polymorph-compiler-macro (name type-list lambda)
   (declare (type function-name name)
            (type type-list type-list)
            (type function lambda))
-
   (let* ((apf              (fdefinition name))
          (lambda-list      (polymorphic-function-lambda-list apf))
          (lambda-list-type (polymorphic-function-lambda-list-type apf))
@@ -356,8 +364,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                 nil
                 "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
                 type-list lambda-list name))
-    (ensure-unambiguous-call name type-list)
-
+    ;; FIXME: How should we account for EFFECTIVE-TYPE-LIST here?
+    (ensure-unambiguous-call name type-list type-list)
     (with-slots (polymorphs) apf
       (if-let (polymorph (find type-list polymorphs :test #'equalp
                                                     :key #'polymorph-type-list))

@@ -52,26 +52,18 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
         (t
          (values `(declare) body))))
 
-(defun ensure-unambiguous-call (name type-list)
-  (loop :for list :in (polymorphic-function-type-lists
-                       (fdefinition
-                        name))
-        :do (when (and (type-list-causes-ambiguous-call-p type-list list)
-                       (not (equalp type-list list)))
-              (error "The given TYPE-LIST ~%  ~S~%will cause ambiguous call with the type list ~%  ~S~% of an existing polymorph"
+(defun ensure-unambiguous-call (name type-list effective-type-list)
+  (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition name))
+        :for existing-type-list := (polymorph-type-list polymorph)
+        :for existing-effective-type-list := (polymorph-effective-type-list polymorph)
+        :do (when (and (type-list-causes-ambiguous-call-p effective-type-list
+                                                          existing-effective-type-list)
+                       (not (equalp type-list existing-type-list)))
+              (error "The given TYPE-LIST ~%  ~S~%effectively~%  ~S~%will cause ambiguous call with an existing polymorph with type list ~%  ~S~%and effective type list~%  ~S~%"
                      type-list
-                     list)
-              (return))))
-
-(defun ensure-non-intersecting-type-lists (name type-list)
-  (loop :for list :in (polymorphic-function-type-lists
-                       (fdefinition
-                        name))
-        :do (when (and (type-list-intersect-p type-list list)
-                       (not (equalp type-list list)))
-              (error "The given TYPE-LIST ~%  ~S~%intersects with the type list ~%  ~S~% of an existing polymorph"
-                     type-list
-                     list)
+                     effective-type-list
+                     existing-type-list
+                     existing-effective-type-list)
               (return))))
 
 (defun null-env-compilation-warnings (lambda-form)
@@ -129,7 +121,7 @@ at your own risk."
                                  name))
            (*environment*    env)
            (lambda-list-type (lambda-list-type typed-lambda-list :typed t)))
-      (multiple-value-bind (param-list type-list)
+      (multiple-value-bind (param-list type-list effective-type-list)
           (defun-lambda-list typed-lambda-list :typed t)
         (multiple-value-bind (declarations body) (extract-declarations body)
           (let* ((lambda-body #+sbcl
@@ -213,7 +205,9 @@ at your own risk."
                                     ,sbcl-transform))))
                  ,(when inline-note `(write-string ,inline-note *error-output*))
                  (eval-when (:compile-toplevel :load-toplevel :execute)
-                   (register-polymorph ',name ',type-list ',return-type
+                   (register-polymorph ',name ',type-list
+                                       ',effective-type-list
+                                       ',return-type
                                        ',inline-safe-lambda-body
                                        ,lambda-body
                                        ',lambda-list-type)

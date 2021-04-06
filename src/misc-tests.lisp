@@ -205,12 +205,12 @@
     (eval `(progn
              (undefine-polymorphic-function 'ambiguous-type-lists-tester)
              (define-polymorphic-function ambiguous-type-lists-tester (&key a))
-             (defpolymorph ambiguous-type-lists-tester (&key ((a string))) t
+             (defpolymorph ambiguous-type-lists-tester (&key ((a string) "")) t
                (declare (ignore a)))))
-    (is-error (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a array))) t
+    (is-error (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a array) #())) t
                        (declare (ignore a)))))
     (is-error (eval `(defpolymorph ambiguous-type-lists-tester
-                         (&key ((a (and array (not string))))) t
+                         (&key ((a (and array (not string))) #())) t
                        (declare (ignore a)))))
     (eval `(undefpolymorph 'ambiguous-type-lists-tester
                            '(&key (:a (and array (not string))))))
@@ -218,8 +218,8 @@
                            '(&key (:a string))))
     (5am:is-true (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a array))) t
                           (declare (ignore a)))))
-    (is-error (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a string))) t
-                       (declare (ignore a)))))
+    (5am:is-true (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a string) "")) t
+                          (declare (ignore a)))))
     (eval `(undefine-polymorphic-function 'ambiguous-type-lists-tester))))
 
 (def-test specialized-type-lists ()

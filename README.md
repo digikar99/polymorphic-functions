@@ -2,51 +2,85 @@
 
 Provides `polymorphic-functions` to allow for dispatching on types instead of classes. See [examples](#examples).
 
->This library is still experimental. There have been two renamings so far. Please use package-local-nicknames, and be okay to use global search replace.
->However, I have no intention of renaming it further.
->
->The interface for &rest args is especially unstable being added very recently.
+>This library is still experimental. Interface can change in backward-incompatible ways.
 
 The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism). This is not [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) since individual implementations do differ. I also do not see how the latter is implementable without the former.
 
-## Why?
+## Rationale
 
-- ANSI standard provided generic functions work do not work on anything more than classes, structure classes and eql-types; for example, say `(array double-float)`. However, Common Lisp does provide a rich type system.
-- The ANSI standard generic functions are also restricted to specializing on only `required` arguments. Currently, `polymorphic-functions` do have certain restrictions for combinations of optional-keyword and rest arguments; but these are primarily due to my own time-constraints than any limitation within the system.
-- `polymorphic-functions` are implemented using the metaclass `closer-mop:funcallable-standard-class` and `closer-mop:set-funcallable-instance-function`. As such, these are not generic functions, in the sense that at least on SBCL, making `polymorphic-function` a subclass of `generic-function` renders one unable to parse the type-lists aka specializer-lists in the required custom manner. This basically renders one unable to do anything with a form like `(defmethod foo ((a t) &optional ((b number) 4)) (list a b))`.
-- In addition, a compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
+`polymorphic-function` are implemented using the metaclass `closer-mop:funcallable-standard-class` and `closer-mop:set-funcallable-instance-function`.
+
+As per [CLHS](http://www.lispworks.com/documentation/HyperSpec/Body/t_generi.htm#generic-function),
+
+>A generic function is a function whose behavior depends on the classes or identities of the arguments supplied to it.
+
+By contrast, adhoc-polymorphic-functions dispatch on the types of the arguments supplied to it. This helps dispatching on specialized arrays as well as user-defined types.
+
+apf comprises of the `polymorphic-functions` (analogous to `generic-functions`) and its associated `polymorphs` (analogous to `methods`). Wherever possible, apf provides compiler notes for [inline optimizations](#inline-optimizations) as well as a certain amount of type checking.
+
+In contrast to [sealable-metaobjects](https://github.com/marcoheisig/sealable-metaobjects) and [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions), adhoc-polymorphic-functions does not make any assumptions about the sealedness of a domain for purposes of inlining. Thus, users are expected to abide by the same precautions for inline optimizations here as they do while inlining normal functions. In particular, users are expected to recompile their code after additional polymorphs are defined, and also accordingly manage the compilation order of their files and systems.
+
+A related project [specialization-store](https://github.com/markcox80/specialization-store) also provides support for type-based dispatch:
+
+>A premise of specialization store is that all specializations should perform the same task. Specializations should only differ in how the task is performed. This premise resolves ambiguities that arise when using types, rather than classes, to select the most specific specialization to apply.
+
+However, the implications of this assumption are that individual specializations in each store-object of specialization-store [do not have initializer forms for optional or keyword arguments](https://github.com/markcox80/specialization-store/wiki/Tutorial-2:-Optional,-Keyword-and-Rest-Arguments).
+
+By contrast, like usual generic-functions, apf does allow initializer forms for optional and keywords arguments for individual polymorphs.
+
+In addition to being dispatched on types, apf also provides the ability to install compiler-macros for individual `polymorphs`.
+
+## Inline Optimizations
+
+A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
+
+- A speed=3 optimization coupled with debug<3 optimization results in (attempts to) inline-optimizations.
+- A debug=3 optimization leaves things as they are and avoids any sort of optimizations.
+- Inline optimizations may be avoided by `(declare (notinline my-polymorph))` - however, inlining is the only way to optimize polymorphs.
+
+It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under some definition of same-ness.
+
+For instance, consider
+
+```lisp
+(define-polymorphic-function my-type (obj))
+(defpolymorph my-type ((obj vector)) symbol
+  (declare (ignore obj))
+  'vector)
+(defpolymorph my-type ((obj string)) symbol
+  (declare (ignore obj))
+  'string)
+```
+
+Then, the behavior of `my-type-caller` depends on optimization policies:
+
+```lisp
+(defun my-type-caller (a)
+  (declare (optimize debug))
+  (my-type a))
+(my-type-caller "hello") ;=> STRING
+
+;;; VS
+
+(defun my-type-caller (a)
+  (declare (optimize speed)
+           (type vector a))
+  (my-type a))
+(my-type-caller "hello") ;=> VECTOR
+```
+
+The mistake here is polymorph with type list `(vector)` produces a different behavior as compared to polymorph with type list `(string)`. (The behavior is "same" in the sense that `"hello"` is indeed a `vector`; perspective matters?)
+
+This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way adhoc-polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
+
+Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. (In this sense, `generic-cl` fails to be of use for fast mathematical libraries; for those projects, one could use inlined-generic-functions [superseded by fast-generic-functions] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.)
 
 ## Related Projects
 
-- [static-dispatch](https://github.com/alex-gutev/static-dispatch) for allowing static-functions to be generic functions to be dispatched at compile-time; this, in turn, is used by [generic-cl](https://github.com/alex-gutev/generic-cl).
-- There exists [specialization-store](https://github.com/markcox80/specialization-store) that provides support for types.  `specialization-store` implements a MOP, so can be extensible (at the cost of over-abstraction? I lack the experience and knowledge to comment.) But other than this, there are some aspects of `specialization-store` I didn't find very convenient. See [the section below](#comparison-with-specialization-store).
-- No complaints about `static-dispatch` other than it not being suitable for types. If all you require is type-based dispatch on `required` arguments, it should be possible to use MOP along with `cl:generic-function` to achieve it.
-- As of 2020, there also exists [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) that allows generic-functions to be, well, fast.
-
-
-## Comparison with specialization-store
-
-A more broader concern is the premise of specialization-store: no matter what specialization is invoked, the final-result should be the same. What may differ is the *process* in which the result is computed.
-
-This [manifests itself](https://github.com/markcox80/specialization-store/issues/8) in differing approaches about how the `&optional` and `&key` dispatching plays out. For instance, consider
-
-```lisp
-(defstore foo (a &key b))
-(defspecialization foo ((a string) &key (b string)) t
-  'hello)
-```
-
-This does not allow for a default-value for `b` in the specialization, without redefining the `(defstore foo ...)` form to include a newer `init-form` for `b`. (Though, one could very well, write a wrapper macro for this. Of the 1.6k LoC in `adhoc-polymorphic-functions`, 950 LoC are for processing lambda lists(!))
-
-```lisp
-(define-polymorphic-function foo (a &key b))
-(defpolymorph foo ((a string) &key ((b string) "hello")) t
-  'hello)
-```
-
-If you do not require extensibility on anything other than `required` arguments, you should be happy with `specialization-store`. For `required` arguments (as well as potentially several other cases), it provides great-enough run-time performance comparable to the standard `cl:generic-function`s. (See the next section.)
-
-OTOH, `adhoc-polymorphic-functions` should provide quite a few compiler-notes to aid the user in debugging and optimizing; it should be possible to provide this for `specialization-store` using a wrapper macro. See [this discussion](https://github.com/markcox80/specialization-store/issues/6#issuecomment-692958498) for a start.
+- [static-dispatch](https://github.com/alex-gutev/static-dispatch)
+- [specialization-store](https://github.com/markcox80/specialization-store)
+- [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions)
+- [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function)
 
 ## Comparison of generics, specializations and adhoc-polymorphic-functions
 

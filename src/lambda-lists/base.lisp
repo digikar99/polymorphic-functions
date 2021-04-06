@@ -279,10 +279,7 @@ Non-examples:
       (case type
         (&key (list (intern (symbol-name (first type-specifier))
                             :adhoc-polymorphic-functions)
-                    nil
-                    (gensym (concatenate 'string
-                                         (write-to-string (first type-specifier))
-                                         "-SUPPLIED-P"))))
+                    nil))
         (&optional (list (gensym (write-to-string type-specifier))
                          nil
                          (gensym (concatenate 'string

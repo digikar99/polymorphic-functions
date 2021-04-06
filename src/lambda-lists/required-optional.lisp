@@ -93,7 +93,8 @@
                     (t
                      (return-from %defun-lambda-list nil))))))
     (values (nreverse param-list)
-            (nreverse  type-list))))
+            (reverse  type-list)
+            (reverse  type-list))))
 
 (def-test defun-lambda-list-optional (:suite defun-lambda-list)
   (is (equalp '(a b &optional)
@@ -105,7 +106,7 @@
     (is (eq second '&optional))
     (is (eq 'c (first third)))
     (is (eq 'd (first fourth))))
-  (destructuring-bind ((first second third fourth) type-list)
+  (destructuring-bind ((first second third fourth) type-list effective-type-list)
       (multiple-value-list (defun-lambda-list '((a string) (b number) &optional
                                                 ((c number) 5))
                              :typed t))
@@ -113,7 +114,8 @@
     (is (eq second 'b))
     (is (eq third '&optional))
     (is (equalp '(c 5) fourth))
-    (is (equalp type-list '(string number &optional number)))))
+    (is (equalp type-list '(string number &optional number)))
+    (is (equalp effective-type-list '(string number &optional number)))))
 
 (defmethod %defun-body ((type (eql 'required-optional)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))

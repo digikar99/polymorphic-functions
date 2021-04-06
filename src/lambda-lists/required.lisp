@@ -16,6 +16,7 @@
 (defmethod %defun-lambda-list ((type (eql 'required)) (lambda-list list))
   (if *lambda-list-typed-p*
       (values (mapcar 'first  lambda-list)
+              (mapcar 'second lambda-list)
               (mapcar 'second lambda-list))
       (copy-list lambda-list)))
 

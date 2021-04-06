@@ -38,6 +38,8 @@
         (values (append (mapcar 'first (subseq lambda-list 0 rest-position))
                         (subseq lambda-list rest-position))
                 (append (mapcar #'second (subseq lambda-list 0 rest-position))
+                        '(&rest))
+                (append (mapcar #'second (subseq lambda-list 0 rest-position))
                         '(&rest)))
         (copy-list lambda-list))))
 
@@ -50,7 +52,7 @@
     (is (eq first 'a))
     (is (eq second '&rest))
     (is (eq 'c third)))
-  (destructuring-bind ((first second third fourth) type-list)
+  (destructuring-bind ((first second third fourth) type-list effective-type-list)
       (multiple-value-list (defun-lambda-list '((a string) (b number) &rest
                                                 c)
                              :typed t))
@@ -58,7 +60,9 @@
     (is (eq second 'b))
     (is (eq third '&rest))
     (is (eq fourth 'c))
-    (is (equalp type-list '(string number &rest)))))
+    (is (equalp type-list '(string number &rest)))
+    (is (equalp effective-type-list
+                '(string number &rest)))))
 
 (defmethod %defun-body ((type (eql 'rest)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
