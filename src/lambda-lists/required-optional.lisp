@@ -92,9 +92,11 @@
                      (push (cadar elt) type-list))
                     (t
                      (return-from %defun-lambda-list nil))))))
-    (values (nreverse param-list)
-            (reverse  type-list)
-            (reverse  type-list))))
+    (if *lambda-list-typed-p*
+        (values (nreverse param-list)
+                (reverse  type-list)
+                (reverse  type-list))
+        (nreverse param-list))))
 
 (def-test defun-lambda-list-optional (:suite defun-lambda-list)
   (is (equalp '(a b &optional)
@@ -119,34 +121,26 @@
 
 (defmethod %defun-body ((type (eql 'required-optional)) (defun-lambda-list list))
   (assert (not *lambda-list-typed-p*))
-  (let ((return-list ()))
-    (loop :for elt := (first defun-lambda-list)
-          :until (eq elt '&optional)
-          :do (unless (and (symbolp elt)
-                           (not (member elt lambda-list-keywords)))
-                (return-from %defun-body nil))
-              (push elt return-list)
-              (setf defun-lambda-list (rest defun-lambda-list)))
-    (when (eq '&optional (first defun-lambda-list))
-      (setf defun-lambda-list (rest defun-lambda-list))
-      (labels ((optional-p-tree (optional-lambda-list)
-                 (if (null optional-lambda-list)
-                     ()
-                     (destructuring-bind (sym default symp) (first optional-lambda-list)
-                       (declare (ignore default))
-                       `(if ,symp
-                            (cons ,sym ,(optional-p-tree (rest optional-lambda-list)))
-                            ())))))
-        (let ((optional-p-tree (optional-p-tree defun-lambda-list)))
-          (values (with-gensyms (apply-list)
-                    `(let ((,apply-list ,optional-p-tree))
-                       (apply (polymorph-lambda
-                               ,(retrieve-polymorph-form *name* type
-                                                         (append (reverse return-list)
-                                                                 (list apply-list))))
-                              ,@(reverse return-list)
-                              ,apply-list)))
-                  defun-lambda-list))))))
+  (let* ((optional-position   (position '&optional defun-lambda-list))
+         (required-parameters  (subseq defun-lambda-list 0 optional-position))
+         (optional-parameters  (subseq defun-lambda-list (1+ optional-position))))
+    `((cond ,@(loop :for (name default supplied-p) :in (reverse optional-parameters)
+                    :for optional-idx :downfrom (length optional-parameters) :above 0
+                    :for parameters := (append required-parameters
+                                               (mapcar #'first
+                                                       (subseq optional-parameters
+                                                               0 optional-idx)))
+                    ;; FIXME: Is this slower than the consing alternative?
+                    :collect `(,supplied-p
+                               (funcall
+                                (polymorph-lambda
+                                 ,(retrieve-polymorph-form
+                                   *name* type parameters))
+                                ,@parameters)))
+            (t
+             (funcall (polymorph-lambda ,(retrieve-polymorph-form
+                                          *name* type required-parameters))
+                      ,@required-parameters))))))
 
 (defmethod %sbcl-transform-body-args ((type (eql 'required-optional)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)

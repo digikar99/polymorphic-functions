@@ -256,15 +256,22 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                            (polymorph-applicable-p-function polymorph))
                                       ,@arg-list))
                                 (case lambda-list-type
-                                  (rest `(ignore-errors
-                                          (apply
-                                           (the function
-                                                (polymorph-applicable-p-function polymorph))
-                                           ,@arg-list)))
-                                  (required `(funcall
-                                              (the function
-                                                   (polymorph-applicable-p-function polymorph))
-                                              ,@arg-list))
+                                  (rest
+                                   `(ignore-errors
+                                     (apply
+                                      (the function
+                                           (polymorph-applicable-p-function polymorph))
+                                      ,@arg-list)))
+                                  (required
+                                   `(funcall
+                                     (the function
+                                          (polymorph-applicable-p-function polymorph))
+                                     ,@arg-list))
+                                  (required-optional
+                                   `(funcall
+                                     (the function
+                                          (polymorph-applicable-p-function polymorph))
+                                     ,@arg-list))
                                   (t `(apply
                                        (the function
                                             (polymorph-applicable-p-function polymorph))
