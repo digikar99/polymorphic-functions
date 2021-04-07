@@ -131,7 +131,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                           "Yes, delete existing FUNCTION associated with ~S and associate an ADHOC-POLYMORPHIC-FUNCTION" name)
                   'not-a-ahp :name name))))
   (let ((*name* name))
-    (multiple-value-bind (body-form lambda-list) (defun-body untyped-lambda-list)
+    (multiple-value-bind (body-forms lambda-list) (defun-body untyped-lambda-list)
       (let ((apf (make-instance 'adhoc-polymorphic-function
                                 :name name
                                 :documentation documentation
@@ -140,18 +140,17 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 
         (closer-mop:set-funcallable-instance-function
          apf #+sbcl (compile nil `(sb-int:named-lambda (adhoc-polymorphic-function ,name)
-                                    ,lambda-list ,body-form))
+                                    ,lambda-list ,@body-forms))
              ;; FIXME: https://github.com/Clozure/ccl/issues/361
              #+ccl (eval `(ccl:nfunction (adhoc-polymorphic-function ,name)
-                                         (lambda ,lambda-list ,body-form)))
-             #-(or ccl sbcl) (compile nil `(lambda ,lambda-list ,body-form)))
+                                         (lambda ,lambda-list ,@body-forms)))
+             #-(or ccl sbcl) (compile nil `(lambda ,lambda-list ,@body-forms)))
         (setf (fdefinition name) apf)
         (setf (documentation name 'function) documentation)))))
 
 (defun register-polymorph (name type-list effective-type-list
                            return-type inline-lambda-body lambda
                            lambda-list-type)
-  ;; TODO: Get rid of APPLICABLE-P-FUNCTION: construct it from type-list
   (declare (type function-name  name)
            (type function       lambda)
            (type type-list      type-list)
@@ -182,8 +181,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                   :return-type  return-type
                                   :effective-type-list effective-type-list
                                   :applicable-p-function
-                                  (compile nil (applicable-p-function lambda-list-type
-                                                                      effective-type-list))
+                                  (compile nil (print (applicable-p-function lambda-list-type
+                                                                             effective-type-list)))
                                   :inline-lambda-body inline-lambda-body
                                   :lambda             lambda
                                   :compiler-macro-lambda
@@ -269,7 +268,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                   (t `(apply
                                        (the function
                                             (polymorph-applicable-p-function polymorph))
-                                       ,@arg-list))))))
+                                       ,@arg-list)))))
+         (no-polymorph-arg-list (case lambda-list-type
+                                  (required-key `(nconc (list ,@(butlast arg-list))
+                                                        ,(lastcar arg-list)))
+                                  (t `(list ,@arg-list)))))
     ;; - TYPE_LISTS and PF-HASH-TABLE will change after the
     ;;   "call to RETRIEVE-POLYMORPH" is compiled
     ;; - While FUNCTION-WRAPPER can be precompiled, completely dumping it requires
@@ -298,7 +301,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                 (most-specialized-polymorph applicable-polymorphs))
                (t
                 (error 'no-applicable-polymorph
-                       :arg-list (list ,@arg-list)
+                       :arg-list ,no-polymorph-arg-list
                        :effective-type-lists
                        (polymorphic-function-effective-type-lists ,apf-form))))))))
 
