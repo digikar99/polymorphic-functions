@@ -1,5 +1,9 @@
 (in-package :adhoc-polymorphic-functions)
 
+(defvar *note-on-apf-form-type-failure* t
+  "If non-NIL, the compiler macro of ADHOC-POLYMORPHIC-FUNCTIONS emits FORM-TYPE
+inference failure notes to aid portable optimizations.")
+
 (defmacro with-compiler-note (&body body)
   `(handler-case (progn ,@body)
      (no-applicable-polymorph (condition)
@@ -13,7 +17,7 @@
            (format *error-output* "~A" condition)))
        original-form)
      (form-type-failure (condition)
-       (when optim-speed
+       (when (and optim-speed *note-on-apf-form-type-failure*)
          (format *error-output* "~%")
          (let ((*print-pretty* t))
            (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
@@ -43,8 +47,7 @@
              (format *error-output* "~&because~&")
              (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
                (format *error-output* "~A" condition)))))
-       ;; FIXME: Will SBCL optimize these cases - should these conditions be merged
-       ;; into the previous FORM-TYPE-FAILURE case?
+       ;; SBCL cannot optimize these cases, since no deftransform was produced
        (cond (optim-debug original-form)
              ((and optim-speed
                    (member :sbcl *features*)

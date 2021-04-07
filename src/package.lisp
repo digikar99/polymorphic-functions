@@ -7,7 +7,8 @@
            :defpolymorph
            :defpolymorph-compiler-macro
            :undefpolymorph
-           :find-polymorph))
+           :find-polymorph
+           :*note-on-apf-form-type-failure*))
 
 (in-package :adhoc-polymorphic-functions)
 
