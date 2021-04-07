@@ -44,6 +44,7 @@
   (name (error "NAME must be supplied!"))
   (return-type)
   (type-list nil)
+  (lambda-list-type nil)
   (effective-type-list nil)
   (applicable-p-function)
   (inline-lambda-body)
@@ -177,12 +178,13 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       ;; FIXME: A trivial fix for &key args is to sort them lexically
       (setf (polymorphic-function-polymorphs apf)
             (cons (make-polymorph :name name
-                                  :type-list    type-list
-                                  :return-type  return-type
+                                  :type-list        type-list
+                                  :return-type      return-type
+                                  :lambda-list-type lambda-list-type
                                   :effective-type-list effective-type-list
                                   :applicable-p-function
-                                  (compile nil (print (applicable-p-function lambda-list-type
-                                                                             effective-type-list)))
+                                  (compile nil (applicable-p-function lambda-list-type
+                                                                      effective-type-list))
                                   :inline-lambda-body inline-lambda-body
                                   :lambda             lambda
                                   :compiler-macro-lambda
@@ -238,44 +240,23 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                ;; than FUNCTION on SBCL
                                `(function ,name)
                                `(fdefinition ',name)))
+         (funcall-form     `(funcall (the function
+                                          (polymorph-applicable-p-function polymorph))
+                                     ,@arg-list))
+         (apply-form       `(apply (the function
+                                        (polymorph-applicable-p-function polymorph))
+                                   ,@arg-list))
          (applicable-p-form (if *compiler-macro-expanding-p*
                                 (if (eq 'rest lambda-list-type)
-                                    `(or
-                                      (ignore-errors
-                                       (funcall
-                                        (the function
-                                             (polymorph-applicable-p-function polymorph))
-                                        ,@arg-list))
-                                      (ignore-errors
-                                       (apply
-                                        (the function
-                                             (polymorph-applicable-p-function polymorph))
-                                        ,@arg-list)))
-                                    `(funcall
-                                      (the function
-                                           (polymorph-applicable-p-function polymorph))
-                                      ,@arg-list))
-                                (case lambda-list-type
-                                  (rest
-                                   `(ignore-errors
-                                     (apply
-                                      (the function
-                                           (polymorph-applicable-p-function polymorph))
-                                      ,@arg-list)))
-                                  (required
-                                   `(funcall
-                                     (the function
-                                          (polymorph-applicable-p-function polymorph))
-                                     ,@arg-list))
-                                  (required-optional
-                                   `(funcall
-                                     (the function
-                                          (polymorph-applicable-p-function polymorph))
-                                     ,@arg-list))
-                                  (t `(apply
-                                       (the function
-                                            (polymorph-applicable-p-function polymorph))
-                                       ,@arg-list)))))
+                                    `(ignore-errors
+                                      (ecase (polymorph-lambda-list-type polymorph)
+                                        ((required required-optional) ,funcall-form)
+                                        ((rest required-key) ,apply-form)))
+                                    funcall-form)
+                                (ecase lambda-list-type
+                                  (rest `(ignore-errors ,apply-form))
+                                  (required-key apply-form)
+                                  ((required required-optional) funcall-form))))
          (no-polymorph-arg-list (case lambda-list-type
                                   (required-key `(nconc (list ,@(butlast arg-list))
                                                         ,(lastcar arg-list)))
@@ -383,6 +364,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
         ;; Need below instead of error-ing to define the compiler macro simultaneously
         (push (make-polymorph :name name
                               :type-list type-list
+                              :lambda-list-type lambda-list-type
                               :applicable-p-function
                               (compile nil (applicable-p-function lambda-list-type
                                                                   type-list))

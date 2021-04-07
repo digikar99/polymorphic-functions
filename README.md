@@ -128,8 +128,8 @@ the performance results come out on my machine as:
 0.471 sec   | function-=
 0.531 sec   | generic-=
 0.615 sec   | specialized-=
-0.691 sec   | polymorphic-=
-0.875 sec   | polymorphic-=-key
+0.671 sec   | polymorphic-=
+0.855 sec   | polymorphic-=-key
 1.647 sec   | specialized-=-key
 ```
 
