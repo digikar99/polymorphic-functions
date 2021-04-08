@@ -61,10 +61,13 @@ for static-dispatch of ADHOC-POLYMORPHIC-FUNCTION"
   (compile nil
            (parse-compiler-macro
             name
+            ;; FIXME: We should be using gensyms?
             '(&whole form &rest args &environment env)
             `((declare (ignore args))
-              ;; FIXME: Is the assumption that FORM either starts with ',NAME
-              ;; or FUNCALL correct?
+              (unless (member (first form) '(,name funcall))
+                (format *error-output* "~A can optimize cases other than FUNCALL and raw call!~%Assk maintainer of ADHOC-POLYMORPHIC-FUNCTIONS to provide support for this case!"
+                        (lisp-implementation-type))
+                (return-from ,name form))
               (let ((*environment*                 env)
                     (*compiler-macro-expanding-p*    t)
                     (original-form                form)
@@ -81,7 +84,7 @@ for static-dispatch of ADHOC-POLYMORPHIC-FUNCTION"
                                                (second name)
                                                name)))
                           ;; This block is necessary for optimization of &optional and &key
-                          ;; and &rest args; otherwise, we will need to cons at runtime!
+                          ;; and &rest args
                           `(block ,block-name
                              (let (,@(loop :for sym :in gensyms
                                            :for form :in (rest form)

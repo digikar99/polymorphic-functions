@@ -248,10 +248,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                    ,@arg-list))
          (applicable-p-form (if *compiler-macro-expanding-p*
                                 (if (eq 'rest lambda-list-type)
-                                    `(ignore-errors
-                                      (ecase (polymorph-lambda-list-type polymorph)
-                                        ((required required-optional) ,funcall-form)
-                                        ((rest required-key) ,apply-form)))
+                                    `(ignore-errors ,funcall-form)
                                     funcall-form)
                                 (ecase lambda-list-type
                                   (rest `(ignore-errors ,apply-form))
