@@ -109,7 +109,6 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
 
   **Note**: `:inline t` can result in infinite expansions for recursive polymorphs. Proceed
 at your own risk."
-  (declare (type typed-lambda-list typed-lambda-list))
   (destructuring-bind (name &key (inline t ip))
       (if (typep name 'function-name)
           (list name)
@@ -120,7 +119,9 @@ at your own risk."
                                  (second name)
                                  name))
            (*environment*    env)
-           (lambda-list-type (lambda-list-type typed-lambda-list :typed t)))
+           (typed-lambda-list (normalize-typed-lambda-list typed-lambda-list))
+           (lambda-list-type  (lambda-list-type typed-lambda-list :typed t)))
+      (declare (type typed-lambda-list typed-lambda-list))
       (multiple-value-bind (param-list type-list effective-type-list)
           (defun-lambda-list typed-lambda-list :typed t)
         (multiple-value-bind (declarations body) (extract-declarations body)

@@ -286,3 +286,37 @@ Non-examples:
                                               (write-to-string type-specifier)
                                               "-SUPPLIED-P"))))
         (t (gensym (write-to-string type-specifier))))))
+
+(defun normalize-typed-lambda-list (typed-lambda-list)
+  (let ((state           'required)
+        (normalized-list ()))
+    (dolist (elt typed-lambda-list)
+      (if (member elt lambda-list-keywords)
+          (progn
+            (setq state elt)
+            (push elt normalized-list))
+          (push (case state
+                  (required
+                   (if (listp elt)
+                       elt
+                       (list elt t)))
+                  ((&optional &key)
+                   (cond ((not (listp elt))
+                          (list (list elt t) nil))
+                         ((not (listp (first elt)))
+                          (list (list (first elt) t)
+                                (second elt)))
+                         (t elt)))
+                  (&rest elt))
+                normalized-list)))
+    (nreverse normalized-list)))
+
+(def-test normalize-typed-lambda-list (:suite lambda-list)
+  (5am:is-true (equalp '((a t))
+                       (normalize-typed-lambda-list '(a))))
+  (5am:is-true (equalp '(&optional ((a t) nil))
+                       (normalize-typed-lambda-list '(&optional a))))
+  (5am:is-true (equalp '(&key ((a t) nil))
+                       (normalize-typed-lambda-list '(&key a))))
+  (5am:is-true (equalp '(&rest a)
+                       (normalize-typed-lambda-list '(&rest a)))))
