@@ -35,8 +35,7 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
             `(undefine-polymorphic-function ',name))
          (register-polymorphic-function ',name ',untyped-lambda-list ,documentation)
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-         (setf (compiler-macro-function ',name)
-               (apf-compiler-macro-lambda ',name ',untyped-lambda-list)))
+         (setf (compiler-macro-function ',name) #'apf-compiler-macro))
       (fdefinition ',name))))
 
 (defun extract-declarations (body)
