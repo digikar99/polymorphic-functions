@@ -259,24 +259,29 @@
                     a))))
   (undefine-polymorphic-function 'my=))
 
-
-;;; FIXME: This does not work on CCL; even on SBCL, at least a few improvements
-;;; are necessary to be table to handle compiler-macros for setf forms
-;;; effectively.
-#-ccl
 (def-test setf-polymorphs ()
   (ignoring-error-output
     (eval `(progn
              (define-polymorphic-function (setf foo) (a b) :overwrite t)
-             (defpolymorph (setf foo) ((a t) (b t)) t
+             (defpolymorph (setf foo) ((a number) (b number)) t
                (list a b))
-             (defpolymorph-compiler-macro (setf foo) (t t) (a b)
-               (print (list a b))
-               `(list ,a ,b))
+             (defpolymorph-compiler-macro (setf foo) (number number) (a b)
+               `(list 'compiler-macro ,a ,b))
              (defun setf-foo-caller (a b)
-               (declare (optimize speed))
-               (setf (foo b) a)))))
+               (declare (optimize speed)
+                        (type number a b))
+               (funcall #'(setf foo) (the number (+ a b)) b))
+             (defun setf-foo-caller-direct (a b)
+               (declare (optimize speed)
+                        (type number a b))
+               (setf (foo b) (the number (+ a b)))))))
   (is (equalp '(2 3) (setf (foo 3) 2)))
-  (is (equalp '(2 3) (setf-foo-caller 2 3)))
+  (is (equalp '(compiler-macro 5 3) (setf-foo-caller 2 3)))
+  ;; FIXME: SBCL uses a gensym thus losing the type information,
+  ;; may be setf-expanders could work
+  #-sbcl
+  (is (equalp '(compiler-macro 5 3) (setf-foo-caller-direct 2 3)))
+  #+sbcl
+  (5am:is-false (equalp '(compiler-macro 5 3) (setf-foo-caller-direct 2 3)))
   (fmakunbound 'setf-foo-caller)
   (undefine-polymorphic-function '(setf foo)))

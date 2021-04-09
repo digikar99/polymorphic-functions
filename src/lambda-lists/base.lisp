@@ -253,6 +253,7 @@ Non-examples:
 
 (defun our-typep (arg type)
   (assert *compiler-macro-expanding-p*)
+  (when (type= t type) (return-from our-typep t))
   (when (and (symbolp arg)              ; type-declared-p
              (not (member arg '(nil t)))
              (not (cdr (assoc 'type
