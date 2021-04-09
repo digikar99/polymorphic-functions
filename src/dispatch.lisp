@@ -221,7 +221,10 @@ at your own risk."
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (register-polymorph-compiler-macro
         ',name ',type-list
-        (compile nil (parse-compiler-macro nil
+        (compile nil (parse-compiler-macro ',(if (and (listp name)
+                                                      (eq 'setf (first name)))
+                                                 (second name)
+                                                 name)
                                            ',compiler-macro-lambda-list
                                            ',body)))
        ',name))
