@@ -60,3 +60,48 @@
 
 (defmethod %form-type ((first (eql 'the)) form)
   (second form))
+
+(defmethod %form-type ((first (eql 'make-instance)) form)
+  (if (constantp (second form) *environment*)
+      (constant-form-value (second form) *environment*)
+      t))
+
+
+
+(defmethod %form-type ((first (eql 'make-array)) form)
+  (let* ((element-type   (if-let (key-pos  (position :element-type form))
+                           (let ((elt-form (elt form (1+ key-pos))))
+                             (if (constantp elt-form *environment*)
+                                 (constant-form-value elt-form *environment*)
+                                 'cl:*))
+                           'cl:*))
+         (dimensions     (let ((dim-form (second form)))
+                           (if (constantp dim-form *environment*)
+                               (ensure-list (constant-form-value dim-form *environment*))
+                               'cl:*)))
+         ;; Assume that we can know if or not the array is adjustable
+         (adjustable-p-p t)
+         (adjustable-p   (if-let (key-pos (position :adjustable form))
+                           (let ((value-form (elt form (+ 1 key-pos))))
+                             (if (constantp value-form *environment*)
+                                 ;; It may be simple if it is not adjustable
+                                 (constant-form-value value-form *environment*)
+                                 ;; In this case, we do not even know if or
+                                 ;; not the array is adjustable
+                                 (setq adjustable-p-p nil)))
+                           nil))
+         (fill-pointer-p (find :fill-pointer form))
+         (displaced-p    (intersection '(:displaced-index-offset :displaced-to)
+                                       form)))
+
+    (let ((simple-p (if (null adjustable-p-p)
+                        nil ; we cannot tell if or not the array is adjustable
+                        (and (null adjustable-p)
+                             (null fill-pointer-p)
+                             (null displaced-p)))))
+
+      (if simple-p
+          `(simple-array ,element-type ,dimensions)
+          `(array ,element-type ,dimensions)))))
+
+
