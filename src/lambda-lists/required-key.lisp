@@ -99,8 +99,12 @@
                     (*lambda-list-typed-p*
                      ;; TODO: Handle the case when keyword is non-default
                      ;; TODO: Handle supplied-p parameter
-                     (destructuring-bind ((name type) &optional (default nil defaultp)) elt
-                       (push (list name default) param-list)
+                     (destructuring-bind ((name type) &optional (default nil defaultp)
+                                                        name-supplied-p-arg) elt
+                       (push (if name-supplied-p-arg
+                                 (list name default name-supplied-p-arg)
+                                 (list name default))
+                             param-list)
                        (push (list (intern (symbol-name name) :keyword)
                                    type)
                              type-list)
