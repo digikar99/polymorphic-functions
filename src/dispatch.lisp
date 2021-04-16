@@ -151,22 +151,30 @@ at your own risk."
                                        #+ccl (nth 2 lambda-body)
                                        #+sbcl `(lambda ,@(nthcdr 2 lambda-body))))
                  #+sbcl
-                 (node (gensym "NODE"))
-                 #+sbcl
-                 (sbcl-transform `(sb-c:deftransform ,name
-                                      (,param-list ,(if (eq '&rest (lastcar type-list))
-                                                        (butlast type-list)
-                                                        type-list) *
-                                       :policy (< debug speed)
-                                       :node ,node)
-                                    ;; FIXME: This leads to an O(n^2) complexity
-                                    ;; Could sorting help?
-                                    (if (most-specialized-applicable-transform-p
-                                         ',name ,node ',type-list)
-                                        `(apply ,',lambda-body
-                                                ,@',(sbcl-transform-body-args typed-lambda-list
-                                                                              :typed t))
-                                        (sb-c::give-up-ir1-transform)))))
+                 (sbcl-transform
+                   (with-gensyms (node args env compiler-macro-lambda)
+                     `(sb-c:deftransform ,name
+                          (,param-list ,(if (eq '&rest (lastcar type-list))
+                                            (butlast type-list)
+                                            type-list) *
+                           :policy (< debug speed)
+                           :node ,node)
+                        ;; FIXME: This leads to an O(n^2) complexity
+                        ;; Could sorting help?
+                        (unless (most-specialized-applicable-transform-p
+                                 ',name ,node ',type-list)
+                          (sb-c::give-up-ir1-transform))
+                        (let ((,args (sbcl-transform-body-args ',typed-lambda-list
+                                                               :typed t)))
+                          (if-let ((,compiler-macro-lambda
+                                     (polymorph-compiler-macro-lambda
+                                      (find-polymorph ',name ',type-list)))
+                                   (,env (sb-c::node-lexenv ,node)))
+                            (funcall ,compiler-macro-lambda
+                                     (cons ',inline-lambda-body
+                                           (apply #'list* ,args))
+                                     ,env)
+                            `(apply ,',lambda-body ,@,args)))))))
             (multiple-value-bind (inline-safe-lambda-body inline-note)
                 (cond ((and ip inline)
                        (values inline-lambda-body

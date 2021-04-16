@@ -277,11 +277,8 @@
                (setf (foo b) (the number (+ a b)))))))
   (is (equalp '(2 3) (setf (foo 3) 2)))
   (is (equalp '(compiler-macro 5 3) (setf-foo-caller 2 3)))
-  ;; FIXME: SBCL uses a gensym thus losing the type information,
-  ;; may be setf-expanders could work
-  #-sbcl
+  ;; On SBCL this passed after incorporating compiler macro inside deftransform
+  ;; > Don't ask me why it works
   (is (equalp '(compiler-macro 5 3) (setf-foo-caller-direct 2 3)))
-  #+sbcl
-  (5am:is-false (equalp '(compiler-macro 5 3) (setf-foo-caller-direct 2 3)))
   (fmakunbound 'setf-foo-caller)
   (undefine-polymorphic-function '(setf foo)))
