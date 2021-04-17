@@ -25,6 +25,8 @@
 (defmacro is-error (form)
   `(5am:signals error ,form))
 
+(define-symbol-macro optim-safety (= 3 (policy-quality 'safety env)))
+
 (define-symbol-macro optim-debug (or (= 3 (policy-quality 'debug env))
                                      (> (policy-quality 'debug env)
                                         (policy-quality 'speed env))))
