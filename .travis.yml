@@ -9,6 +9,7 @@ env:
 install:
   - bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
   - git clone https://github.com/digikar99/trivial-types
+  - git clone https://github.com/digikar99/trivial-form-type
 
 script:
   - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
