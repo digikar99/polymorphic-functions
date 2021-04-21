@@ -232,6 +232,36 @@ CL-USER> (my= 5 "hello")
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
 - [trivial-form-type](https://github.com/digikar99/trivial-form-type)
 
+### Getting it from ultralisp
+
+[Ultralisp](https://ultralisp.org/) recently added a feature to allow [custom dists](https://github.com/ultralisp/ultralisp/pull/87). While quicklisp will take a while to update trivial-types (and cl-syntax which several other projects depend upon) to the new repositories since the originals have been archived and trivial-types is still incomplete wrt CLHS, we can use the custom dists to distribute this (and related) libraries.
+
+To do this, add the following to your implementation init file (since you'll possibly need this to keep with the project updates):
+
+```lisp
+;;; An attempt was made to include the enumeration function natively at
+;;;   https://github.com/quicklisp/quicklisp-client/pull/206
+;;; but it was rejected, so we do this:
+(defun digikar99-dist-enumeration-function ()
+  "The default function used for producing a list of dist objects."
+  (loop for file in (directory (ql-dist::qmerge "dists/digikar99/*/distinfo.txt"))
+        collect (ql-dist::make-dist-from-file file)))
+(push 'digikar99-dist-enumeration-function ql::*dist-enumeration-functions*)
+```
+
+Once the function is pushed, install the dist:
+
+```lisp
+;;; See https://ultralisp.org/dists/digikar99/specialized-array-dispatch for related projects
+(ql-dist:install-dist "http://dist.ultralisp.org/digikar99/specialized-array-dispatch.txt"
+                      :prompt nil)
+;;; If the install-dist step gives a "can't create directory" error, manually
+;;; create the directory $QUICKLISP_HOME/dists/digikar99
+(ql:update-dist "digikar99/specialized-array-dispatch")
+(ql:quickload "adhoc-polymorphic-functions")
+(asdf:test-system "adhoc-polymorphic-functions")
+```
+
 ## Tests
 
 Tests are distributed throughout the system. Run `(asdf:test-system "adhoc-polymorphic-functions")`.
