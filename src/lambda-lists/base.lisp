@@ -260,7 +260,8 @@ Non-examples:
                               (nth-value 2
                                          (variable-information arg *environment*))))))
     (signal 'form-type-failure :form arg))
-  (subtypep (form-type arg *environment*) type *environment*))
+  (multiple-value-bind (typep known) (form-typep arg type *environment*)
+    (if known typep (signal 'form-type-failure :form arg))))
 
 (def-test our-typep (:suite :adhoc-polymorphic-functions)
   (macrolet ((with-compile-time (&rest body)

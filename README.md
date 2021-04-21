@@ -4,7 +4,7 @@ Provides `polymorphic-functions` to allow for dispatching on types instead of cl
 
 >This library is still experimental. Interface can change in backward-incompatible ways.
 
-The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism). This is not [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) since individual implementations do differ. I also do not see how the latter is implementable without the former.
+The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism). This is not [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) since individual implementations do differ. I also do not see how the latter is implementable without the former. See [specialized-function](https://github.com/numcl/specialized-function) for parametric polymorphism.
 
 ## Rationale
 
@@ -73,7 +73,7 @@ The mistake here is polymorph with type list `(vector)` produces a different beh
 
 This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way adhoc-polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
 
-Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. (In this sense, `generic-cl` fails to be of use for fast mathematical libraries; for those projects, one could use inlined-generic-functions [superseded by fast-generic-functions] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.)
+Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. `generic-cl` (since `static-dispatch` version 0.5) overcomes this on SBCL by using `sb-c:deftransform`; for portable projects, one could use `inlined-generic-functions` [superseded by `fast-generic-functions`] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.
 
 ## Related Projects
 
@@ -211,7 +211,8 @@ CL-USER> (my= (make-array 1 :element-type 'single-float)
 HELLO
 CL-USER> (defun baz (a b)
            (declare (type string a)
-                    (type integer b))
+                    (type integer b)
+                    (optimize safety))
            (my= a b))
 ; While compiling (MY= A B):
 ;
@@ -229,6 +230,7 @@ CL-USER> (my= 5 "hello")
 
 - SBCL 2.0.9+
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
+- [trivial-form-type](https://github.com/digikar99/trivial-form-type)
 
 ## Tests
 

@@ -1,6 +1,6 @@
 
 (uiop:define-package :adhoc-polymorphic-functions
-  (:mix :trivial-types :cl :alexandria :introspect-environment)
+  (:mix :trivial-form-type :trivial-types :cl :alexandria :introspect-environment)
   (:import-from :5am :is :def-test)
   (:export :define-polymorphic-function
            :undefine-polymorphic-function

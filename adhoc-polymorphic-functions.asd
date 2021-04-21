@@ -7,14 +7,14 @@
                "closer-mop"
                "fiveam" ;; just keep things together!
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
+               "trivial-form-type"
                "introspect-environment")
   :pathname #P"src/"
   :components ((:file "package")
                (:file "adhoc-polymorphic-function" :depends-on ("package"))
                (:module "lambda-lists"             :depends-on ("package")
                 :components ((:file "doc")
-                             (:file "form-type")
-                             (:file "base"         :depends-on ("doc" "form-type"))
+                             (:file "base"         :depends-on ("doc"))
                              (:file "required")
                              (:file "required-optional")
                              (:file "required-key")
