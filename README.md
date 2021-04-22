@@ -243,6 +243,11 @@ To do this, add the following to your implementation init file (since you'll pos
 ;;; An attempt was made to include the enumeration function natively at
 ;;;   https://github.com/quicklisp/quicklisp-client/pull/206
 ;;; but it was rejected, so we do this:
+(defun ql-dist::dist-name-pathname (name)
+  "Return the pathname that would be used for an installed dist with
+the given NAME."
+  (ql-dist::qmerge (make-pathname :directory (list* :relative "dists"
+                                             (uiop:split-string name :separator "/")))))
 (defun digikar99-dist-enumeration-function ()
   "The default function used for producing a list of dist objects."
   (loop for file in (directory (ql-dist::qmerge "dists/digikar99/*/distinfo.txt"))
