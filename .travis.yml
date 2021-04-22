@@ -8,17 +8,34 @@ env:
 
 install:
   - bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
-  - git clone https://github.com/digikar99/trivial-types
-  - git clone https://github.com/digikar99/trivial-form-type
+  - mkdir -p ~/quicklisp/dists/digikar99
+  - ls -l ~/quicklisp/dists
 
 script:
-  - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
-                      (ql:quickload "adhoc-polymorphic-functions")
-                      (uiop:quit 0))'
-  - cl --eval '(progn (push (uiop:getcwd) ql:*local-project-directories*)
-                      (ql:quickload "adhoc-polymorphic-functions")
-                      (asdf:test-system :adhoc-polymorphic-functions)
-                      (uiop:quit 0))'
+  - cl --eval '(progn
+                 (defun digikar99-dist-enumeration-function ()
+                   "The default function used for producing a list of dist objects."
+                   (loop for file
+                       in (directory (ql-dist::qmerge "dists/digikar99/*/distinfo.txt"))
+                     collect (ql-dist::make-dist-from-file file)))
+                 (push (quote digikar99-dist-enumeration-function)
+                       ql::*dist-enumeration-functions*)
+                 (ql-dist:install-dist
+                  "http://dist.ultralisp.org/digikar99/specialized-array-dispatch.txt"
+                  :prompt nil)
+                 (ql:quickload "adhoc-polymorphic-functions")
+                 (uiop:quit 0))'
+  - cl --eval '(progn
+                 (defun digikar99-dist-enumeration-function ()
+                   "The default function used for producing a list of dist objects."
+                   (loop for file
+                       in (directory (ql-dist::qmerge "dists/digikar99/*/distinfo.txt"))
+                     collect (ql-dist::make-dist-from-file file)))
+                 (push (quote digikar99-dist-enumeration-function)
+                       ql::*dist-enumeration-functions*)
+                 (ql:quickload "adhoc-polymorphic-functions")
+                 (asdf:test-system :adhoc-polymorphic-functions)
+                 (uiop:quit 0))'
 
 notifications:
   email: false

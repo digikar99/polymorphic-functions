@@ -231,6 +231,7 @@ CL-USER> (my= 5 "hello")
 - SBCL 2.0.9+
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
 - [trivial-form-type](https://github.com/digikar99/trivial-form-type)
+  - [cl-environments 0.3](https://github.com/alex-gutev/cl-environments)
 
 ### Getting it from ultralisp
 
