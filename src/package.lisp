@@ -10,7 +10,6 @@
            :find-polymorph
 
            ;; Unstable API
-           :*note-on-apf-form-type-failure*
            :adhoc-polymorphic-function
            :polymorph))
 

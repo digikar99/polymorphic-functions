@@ -37,9 +37,13 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                :reader effective-type-lists))
   (:report (lambda (condition stream)
              (format stream
-                     "~%No applicable POLYMORPH discovered for ARG-LIST ~S.~%Available Effective-Type-Lists include:~%   ~{~S~^~%   ~}"
+                     "No applicable POLYMORPH discovered for ARG-LIST ~S.~%Available Effective-Type-Lists include:~{~^~%  ~S~}"
                      (arg-list condition)
                      (effective-type-lists condition)))))
+
+(define-condition no-applicable-polymorph/compiler-note
+    (no-applicable-polymorph compiler-macro-notes:note)
+  ())
 
 (defun note-null-env (form datum &rest arguments)
   (let ((*print-pretty* t))
@@ -66,14 +70,15 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                           (handler-case (apply #'signal datum arguments)
                             (condition (c) c))))))))
 
-(define-condition form-type-failure (condition)
+(define-condition form-type-failure (compiler-macro-notes:optimization-failure-note)
   ((form :initarg :form
          :initform (error "FORM not specified")
          :reader form))
   (:report (lambda (condition stream)
-             (format stream "~%Type of ~%  ~S~%could not be determined" (form condition)))))
+             (format stream "Type of~%  ~S~%could not be determined" (form condition)))))
 
-(define-condition polymorph-has-no-inline-lambda-body (condition)
+(define-condition polymorph-has-no-inline-lambda-body
+    (compiler-macro-notes:optimization-failure-note)
   ((name :initarg :name
          :initform (error "NAME not specified")
          :reader name)
@@ -84,3 +89,5 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
              (format stream "~S with TYPE-LIST ~%  ~S~%has no stored INLINE-LAMBDA-BODY"
                      (name condition)
                      (type-list condition)))))
+
+;; TODO: Add a NOT-THE-MOST-SPECIALIZED-POLYMORPH condition
