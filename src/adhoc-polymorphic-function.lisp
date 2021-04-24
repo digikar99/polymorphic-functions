@@ -226,10 +226,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
     (or applicable-polymorph
         (most-specialized-polymorph applicable-polymorphs)
         ;; TODO: Add a NOT-THE-MOST-SPECIALIZED-POLYMORPH condition
-        (signal 'no-applicable-polymorph/compiler-note
-                :arg-list arg-list
-                :effective-type-lists
-                (polymorphic-function-effective-type-lists (fdefinition name))))))
+        (if optim-debug
+            (signal 'no-applicable-polymorph/compiler-note
+                    :arg-list arg-list
+                    :effective-type-lists
+                    (polymorphic-function-effective-type-lists (fdefinition name)))))))
 
 (defun retrieve-polymorph-form (name lambda-list-type arg-list)
   ;; This is called either while the main polymorphic-function itself is being compiled,

@@ -41,6 +41,14 @@
                        :optimization-note-condition optim-speed)
       (let* ((arg-list  (rest form))
              (polymorph (apply #'retrieve-polymorph name arg-list)))
+        (unless polymorph
+          (return-from apf-compiler-macro
+            (cond (optim-debug        original-form)
+                  ((and optim-speed
+                        (member :sbcl *features*))
+                   original-form)
+                  ((or optim-speed optim-slight-speed) block-form)
+                  (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!")))))
         (with-slots (inline-lambda-body return-type type-list
                      compiler-macro-lambda)
             polymorph
