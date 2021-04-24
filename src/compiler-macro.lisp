@@ -38,17 +38,32 @@
                           ,@gensyms)))))
     (compiler-macro-notes:with-notes
         (original-form :name (fdefinition name)
+                       :unwind-on-signal nil
                        :optimization-note-condition optim-speed)
       (let* ((arg-list  (rest form))
-             (polymorph (apply #'retrieve-polymorph name arg-list)))
-        (unless polymorph
+             (form-type-failure-signalled)
+             (polymorph (handler-case (apply #'retrieve-polymorph name arg-list)
+                          (form-type-failure (c)
+                            (signal c)
+                            (setq form-type-failure-signalled t)
+                            nil))))
+        (when optim-debug
+          (return-from apf-compiler-macro original-form))
+        (when (and (or optim-speed optim-safety)
+                   (null polymorph)
+                   (not form-type-failure-signalled))
+          (signal 'no-applicable-polymorph/compiler-note
+                  :arg-list arg-list
+                  :effective-type-lists
+                  (polymorphic-function-effective-type-lists (fdefinition name))))
+        (when (null polymorph)
           (return-from apf-compiler-macro
-            (cond (optim-debug        original-form)
-                  ((and optim-speed
+            (cond ((and optim-speed
                         (member :sbcl *features*))
+                   ;; Transforms will take care of them
                    original-form)
                   ((or optim-speed optim-slight-speed) block-form)
-                  (t (error "Non-exhaustive cases in WITH-COMPILER-NOTE!")))))
+                  (t (error "Non exhaustive cases! (loc 2)")))))
         (with-slots (inline-lambda-body return-type type-list
                      compiler-macro-lambda)
             polymorph
@@ -62,8 +77,9 @@
                    ;; Optimized for speed and type information available
                    (if inline-lambda-body
                        `(the ,return-type (,inline-lambda-body ,@(cdr form)))
-                       (signal 'polymorph-has-no-inline-lambda-body
-                               :name name :type-list type-list)))
-                  (optim-debug        original-form)
+                       (progn
+                         (signal 'polymorph-has-no-inline-lambda-body
+                                 :name name :type-list type-list)
+                         block-form)))
                   (optim-slight-speed block-form)
-                  (t (error "Non-exhaustive cases!")))))))))
+                  (t (error "Non exhaustive cases! (loc 1)")))))))))
