@@ -35,11 +35,14 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
    (effective-type-lists :initarg :effective-type-lists
                :initform (error "EFFECTIVE-TYPE-LISTS not specified")
                :reader effective-type-lists))
-  (:report (lambda (condition stream)
-             (format stream
-                     "No applicable POLYMORPH discovered for ARG-LIST ~S.~%Available Effective-Type-Lists include:~{~^~%  ~S~}"
-                     (arg-list condition)
-                     (effective-type-lists condition)))))
+  (:report (lambda (condition s)
+             (pprint-logical-block (s nil)
+               (format s "No applicable POLYMORPH discovered for ARG-LIST:~%~%")
+               (pprint-logical-block (s nil :per-line-prefix "  ")
+                 (format s "~S" (arg-list condition)))
+               (format s
+                       "~%~%Available Effective-Type-Lists include:~{~^~%  ~S~}"
+                       (effective-type-lists condition))))))
 
 (define-condition no-applicable-polymorph/compiler-note
     (no-applicable-polymorph compiler-macro-notes:note)
