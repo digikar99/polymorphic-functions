@@ -7,8 +7,8 @@
                "closer-mop"
                "compiler-macro-notes"
                "fiveam" ;; just keep things together!
-               "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
                "trivial-form-type"
+               "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
                "introspect-environment")
   :pathname #P"src/"
   :components ((:file "package")
@@ -28,7 +28,8 @@
                                                                 "lambda-lists"
                                                                 "conditions"
                                                                 "compiler-macro"))
-               (:file "misc-tests"                 :depends-on ("dispatch")))
+               (:file "misc-tests"                 :depends-on ("dispatch"))
+               (:file "benchmark"                  :depends-on ("misc-tests")))
   :perform (test-op (o c)
                     (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
                                                    (5AM:*ON-ERROR* :DEBUG))
