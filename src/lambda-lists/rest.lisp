@@ -144,18 +144,35 @@
     `(and ,@(loop :for param :in (subseq param-list 0 rest-position)
                   :for type  :in (subseq type-list  0 rest-position)
                   :collect `(typep ,param ',type))
-          ,@(cond ((null (intersection lambda-list-keywords type-list))
-                   nil)
-                  ((equalp (intersection lambda-list-keywords type-list)
-                           '(&rest))
-                   nil)
-                  ((member '&key type-list)
-                   (let ((param-type (subseq type-list (1+ (position '&key type-list)))))
-                     (loop :for i :from 1 :by 2
-                           :for (param type) :in param-type
-                           :collect `(typep (nth ,i ,rest-arg) ',type))))
-                  (t
-                   (error "Not expected to reach here"))))))
+          ,@(let* ((type-list    (subseq type-list rest-position))
+                   (min-rest-length (or (position '&key type-list)
+                                        (position '&rest type-list)
+                                        (length type-list)))
+                   (max-rest-length (if (null (intersection type-list
+                                                            lambda-list-keywords))
+                                        (length type-list)
+                                        nil)))
+              (cons (if (zerop min-rest-length)
+                        t
+                        `(nthcdr ,(1- min-rest-length) ,rest-arg))
+                    (cond ((null (intersection lambda-list-keywords type-list))
+                           (cons `(null (nthcdr ,max-rest-length
+                                                ,rest-arg))
+                                 (loop :for i :from 0
+                                       :for type :in type-list
+                                       :collect `(typep (nth ,i ,rest-arg) ',type))))
+                          ((equalp (intersection lambda-list-keywords type-list)
+                                   '(&rest))
+                           (loop :for i :from 0
+                                 :for type :in (butlast type-list)
+                                 :collect `(typep (nth ,i ,rest-arg) ',type)))
+                          ((member '&key type-list)
+                           (let ((param-type (subseq type-list (1+ (position '&key type-list)))))
+                             (loop :for i :from 1 :by 2
+                                   :for (param type) :in param-type
+                                   :collect `(typep (nth ,i ,rest-arg) ',type))))
+                          (t
+                           (error "Not expected to reach here"))))))))
 
 (5am:def-suite type-list-subtype-rest :in type-list-subtype-p)
 
