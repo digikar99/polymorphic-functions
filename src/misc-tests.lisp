@@ -6,6 +6,8 @@
   `(locally (declare #+sbcl(sb-ext:muffle-conditions style-warning))
      (with-output-to-string (*error-output*) ,@body)))
 
+;; unwind-protect (apparantly) does not have an effect in the def-test forms below :/
+
 (def-test required-args-correctness ()
   (ignoring-error-output
     (eval `(progn
@@ -27,6 +29,8 @@
         (obj3 "hello")
         (obj4 5)
         (obj5 5.0))
+    ;; Cannot use an `eval` here, because we do want to test if the
+    ;; things work correctly in a non-null lexical environment
     (is (eq t   (my= obj1 obj3)))
     (is (eq nil (my= obj1 obj2)))
     (is (eq t   (my= obj4 obj5)))
@@ -48,13 +52,13 @@
              (defun bar-caller ()
                (declare (optimize speed))
                (bar "hello" 9)))))
-  (is (equalp (bar "hello")
+  (is (equalp (eval `(bar "hello"))
               '("hello" 5 7)))
-  (is (equalp (bar "hello" 6)
+  (is (equalp (eval `(bar "hello" 6))
               '("hello" 6 7)))
-  (is (equalp (bar "hello" 6 9)
+  (is (equalp (eval `(bar "hello" 6 9))
               '("hello" 6 9)))
-  (is (equalp (bar-caller)
+  (is (equalp (eval `(bar-caller))
               '(("hello" 9 7))))
   (undefine-polymorphic-function 'bar)
   (fmakunbound 'bar-caller))
@@ -76,13 +80,13 @@
              (defun foobar-caller ()
                (declare (optimize speed))
                (foobar 7 :key 10)))))
-  (is (equalp '(string 5 "world")    (foobar "hello")))
-  (is (equalp '(string 5.6 "world")  (foobar "hello" :key 5.6)))
-  (is (equalp '(number 6 "world")    (foobar 5.6)))
-  (is (equalp '(number 9 "world")    (foobar 5.6 :key 9)))
-  (is (equalp '((number 10 "world")) (foobar-caller)))
-  (is (equalp '(number 6 "bye")      (foobar 5.6 :b "bye")))
-  (is (equalp '(number 4.4 "bye")    (foobar 5.6 :b "bye" :key 4.4)))
+  (is (equalp '(string 5 "world")    (eval `(foobar "hello"))))
+  (is (equalp '(string 5.6 "world")  (eval `(foobar "hello" :key 5.6))))
+  (is (equalp '(number 6 "world")    (eval `(foobar 5.6))))
+  (is (equalp '(number 9 "world")    (eval `(foobar 5.6 :key 9))))
+  (is (equalp '((number 10 "world")) (eval `(foobar-caller))))
+  (is (equalp '(number 6 "bye")      (eval `(foobar 5.6 :b "bye"))))
+  (is (equalp '(number 4.4 "bye")    (eval `(foobar 5.6 :b "bye" :key 4.4))))
   (undefine-polymorphic-function 'foobar)
   (fmakunbound 'foobar-caller))
 
@@ -107,10 +111,10 @@
                (if (= a 5)
                    'number
                    (foz "hello"))))))
-  (is (eq 'number (foz 5)))
-  (is (eq 'string (foz "hello")))
-  (is (eq 'number (foz "world")))
-  (is (eq 'string (foz 7)))
+  (is (eq 'number (eval `(foz 5))))
+  (is (eq 'string (eval `(foz "hello"))))
+  (is (eq 'number (eval `(foz "world"))))
+  (is (eq 'string (eval `(foz 7))))
   (undefine-polymorphic-function 'foz))
 
 ;;; FIXME: Add a test for recursive safety
@@ -136,10 +140,10 @@
                (if coerce
                    (concatenate 'string str (write-to-string num))
                    str)))))
-  (is (eq 9 (my+ 2 3 4)))
-  (is (equalp '(1 2 3) (my+ '(1 2) '(3))))
-  (is (equalp '(13) (my+-number-caller)))
-  (is (string= "hello5" (my+ "hello" 5 :coerce t)))
+  (is (eq 9 (eval `(my+ 2 3 4))))
+  (is (equalp '(1 2 3) (eval `(my+ '(1 2) '(3)))))
+  (is (equalp '(13) (eval `(my+-number-caller))))
+  (is (string= "hello5" (eval `(my+ "hello" 5 :coerce t))))
   (undefine-polymorphic-function 'my+)
   (fmakunbound 'my+-number-caller))
 
@@ -275,10 +279,9 @@
                (declare (optimize speed)
                         (type number a b))
                (setf (foo b) (the number (+ a b)))))))
-  (is (equalp '(2 3) (setf (foo 3) 2)))
-  (is (equalp '(compiler-macro 5 3) (setf-foo-caller 2 3)))
+  (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller 2 3))))
   ;; On SBCL this passed after incorporating compiler macro inside deftransform
   ;; > Don't ask me why it works
-  (is (equalp '(compiler-macro 5 3) (setf-foo-caller-direct 2 3)))
+  (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller-direct 2 3))))
   (fmakunbound 'setf-foo-caller)
   (undefine-polymorphic-function '(setf foo)))

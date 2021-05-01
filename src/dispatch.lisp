@@ -252,4 +252,5 @@ at your own risk."
 (defun undefine-polymorphic-function (name)
   "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH"
   (fmakunbound name)
+  #+sbcl (sb-c::undefine-fun-name name)
   (setf (compiler-macro-function name) nil))
