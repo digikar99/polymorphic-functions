@@ -30,126 +30,6 @@ By contrast, like usual generic-functions, apf does allow initializer forms for 
 
 In addition to being dispatched on types, apf also provides the ability to install compiler-macros for individual `polymorphs`.
 
-## Inline Optimizations
-
-A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
-
-- A speed=3 optimization coupled with debug<3 optimization results in (attempts to) inline-optimizations.
-- A debug=3 optimization leaves things as they are and avoids any sort of optimizations.
-- Inline optimizations may be avoided by `(declare (notinline my-polymorph))` - however, inlining is the only way to optimize polymorphs.
-
-It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under some definition of same-ness.
-
-For instance, consider
-
-```lisp
-(define-polymorphic-function my-type (obj))
-(defpolymorph my-type ((obj vector)) symbol
-  (declare (ignore obj))
-  'vector)
-(defpolymorph my-type ((obj string)) symbol
-  (declare (ignore obj))
-  'string)
-```
-
-Then, the behavior of `my-type-caller` depends on optimization policies:
-
-```lisp
-(defun my-type-caller (a)
-  (declare (optimize debug))
-  (my-type a))
-(my-type-caller "hello") ;=> STRING
-
-;;; VS
-
-(defun my-type-caller (a)
-  (declare (optimize speed)
-           (type vector a))
-  (my-type a))
-(my-type-caller "hello") ;=> VECTOR
-```
-
-The mistake here is polymorph with type list `(vector)` produces a different behavior as compared to polymorph with type list `(string)`. (The behavior is "same" in the sense that `"hello"` is indeed a `vector`; perspective matters?)
-
-This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way adhoc-polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
-
-Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. `generic-cl` (since `static-dispatch` version 0.5) overcomes this on SBCL by using `sb-c:deftransform`; for portable projects, one could use `inlined-generic-functions` [superseded by `fast-generic-functions`] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.
-
-## Related Projects
-
-- [static-dispatch](https://github.com/alex-gutev/static-dispatch)
-- [specialization-store](https://github.com/markcox80/specialization-store)
-- [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions)
-- [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function)
-
-## Comparison of generics, specializations and adhoc-polymorphic-functions
-
-For the run-time performance, consider the below definitions
-
-```lisp
-(defpackage :perf-test
-  (:use :cl :specialization-store :adhoc-polymorphic-functions))
-(in-package :perf-test)
-
-(defun function-= (a b)
-  (string= a b))
-
-(defmethod generic-= ((a string) (b string))
-  (string= a b))
-
-(defstore specialized-= (a b))
-(defspecialization (specialized-= :inline t) ((a string) (b string)) t
-  (string= a b))
-
-(defstore specialized-=-key (&key a b))
-(defspecialization (specialized-=-key :inline t) (&key (a string) (b string)) t
-  (string= a b))
-
-(define-polymorphic-function polymorphic-= (a b))
-(defpolymorph polymorphic-= ((a string) (b string)) t
-  (string= a b))
-
-(define-polymorphic-function polymorphic-=-key (&key a b))
-(defpolymorph polymorphic-=-key (&key ((a string) "") ((b string) "")) t
-  (string= a b))
-```
-
-For a 5,000,000 calls to each in the format
-
-```lisp
-(let ((a "hello")
-      (b "world"))
-  (time (loop repeat 5000000 do (string= a b))))
-```
-
-the performance results come out on my machine as:
-
-```
-0.471 sec   | function-=
-0.531 sec   | generic-=
-0.615 sec   | specialized-=
-0.671 sec   | polymorphic-=
-0.855 sec   | polymorphic-=-key
-1.647 sec   | specialized-=-key
-```
-
-Note that `adhoc-polymorphic-functions` do a fair bit of cheating, and performance might decrease rapidly (linearly) with increasing number of polymorphs. (Readers are welcome to write benchmarks :)).
-
-All of `specialization-store` and `adhoc-polymorphic-functions` as well as `fast-generic-functions` or `static-dispatch` provide support for compile-time optimizations via type-declarations and/or inlining. If performance is a concern, one'd therefore rather want to use compile-time optimizations.
-
-| Feature                         | cl:generic-function | specialization-store | adhoc-polymorphic-functions |
-|:--------------------------------|:--------------------|:---------------------|:----------------------------|
-| Method combination              | Yes                 | No                   | No                          |
-| Precedence                      | Yes                 | Partial*             | Yes                         |
-| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                        |
-| Run-time Speed                  | Fast                | Fast                 | Depends                     |
-| Compile-time support            | Partial**           | Yes                  | Yes                         |
-
-^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
-Well...
-
-\*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries.
-
 ## Examples
 
 See [src/misc-tests.lisp](src/misc-tests.lisp) for some more examples.
@@ -223,7 +103,7 @@ CL-USER> (defun baz (a b)
 ;      (STRING STRING)
 BAZ
 CL-USER> (my= 5 "hello")
-; Evaluation aborted on #<ADHOC-POLYMORPHIC-FUNCTIONS::NO-APPLICABLE-POLYMORPH {103A713D13}>.
+; Evaluation aborted on #<ADHOC-POLYMORPHIC-FUNCTIONS::NO-APPLICABLE-POLYMORPH/ERROR {103A713D13}>.
 ```
 
 ## Dependencies outside quicklisp
@@ -232,6 +112,7 @@ CL-USER> (my= 5 "hello")
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
 - [trivial-form-type](https://github.com/digikar99/trivial-form-type)
   - [cl-environments 0.3](https://github.com/alex-gutev/cl-environments)
+- [compiler-macro-noes](https://github.com/digikar99/compiler-macro-notes)
 
 ### Getting it from ultralisp
 
@@ -272,9 +153,77 @@ Once the function is pushed, install the dist:
 
 Tests are distributed throughout the system. Run `(asdf:test-system "adhoc-polymorphic-functions")`.
 
+## Inline Optimizations
+
+A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
+
+- A speed=3 optimization coupled with debug<3 optimization results in (attempts to) inline-optimizations.
+- A debug=3 optimization leaves things as they are and avoids any sort of optimizations.
+- Inline optimizations may be avoided by `(declare (notinline my-polymorph))` - however, inlining is the only way to optimize polymorphs.
+
+It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under some definition of same-ness.
+
+For instance, consider
+
+```lisp
+(define-polymorphic-function my-type (obj))
+(defpolymorph my-type ((obj vector)) symbol
+  (declare (ignore obj))
+  'vector)
+(defpolymorph my-type ((obj string)) symbol
+  (declare (ignore obj))
+  'string)
+```
+
+Then, the behavior of `my-type-caller` depends on optimization policies:
+
+```lisp
+(defun my-type-caller (a)
+  (declare (optimize debug))
+  (my-type a))
+(my-type-caller "hello") ;=> STRING
+
+;;; VS
+
+(defun my-type-caller (a)
+  (declare (optimize speed)
+           (type vector a))
+  (my-type a))
+(my-type-caller "hello") ;=> VECTOR
+```
+
+The mistake here is polymorph with type list `(vector)` produces a different behavior as compared to polymorph with type list `(string)`. (The behavior is "same" in the sense that `"hello"` is indeed a `vector`; perspective matters?)
+
+This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way adhoc-polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
+
+Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. `generic-cl` (since `static-dispatch` version 0.5) overcomes this on SBCL by using `sb-c:deftransform`; for portable projects, one could use `inlined-generic-functions` [superseded by `fast-generic-functions`] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.
+
+## Related Projects
+
+- [static-dispatch](https://github.com/alex-gutev/static-dispatch)
+- [specialization-store](https://github.com/markcox80/specialization-store)
+- [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions)
+- [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function)
+
+
+## Feature Parity
+
+| Feature                         | cl:generic-function | specialization-store | adhoc-polymorphic-functions |
+|:--------------------------------|:--------------------|:---------------------|:----------------------------|
+| Method combination              | Yes                 | No                   | No                          |
+| Precedence                      | Yes                 | Partial*             | Yes                         |
+| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                        |
+| Run-time Speed                  | Fast                | Fast                 | Fast                        |
+| Compile-time support            | Partial**           | Yes                  | Yes                         |
+
+^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
+Well...
+
+\*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries. But, there's also [static-dispatch](https://github.com/alex-gutev/static-dispatch).
+
 ## Limitations
 
-At least one limitation stems from the limitations of the implementations (and CL?) themselves. On SBCL, this is mitigated by the use of `sb-c:deftransform`:
+At least one limitation stems from the limitations of the implementations (and CL?) themselves. On SBCL, this is mitigated by the use of `sb-c:deftransform`. For limited portability, an attempt is made to do this task of compile time type inference using [trivial-form-type](https://github.com/digikar99/trivial-form-type):
 
 ```lisp
 CL-USER> (defun bar ()

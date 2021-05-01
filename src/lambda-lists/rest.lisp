@@ -32,7 +32,7 @@
                             :typed t)))
   (is-error (lambda-list-type '((a string) &rest (args number)) :typed t)))
 
-(defmethod %defun-lambda-list ((type (eql 'rest)) (lambda-list list))
+(defmethod %effective-lambda-list ((type (eql 'rest)) (lambda-list list))
   (let ((rest-position (position '&rest lambda-list)))
     (if *lambda-list-typed-p*
         (values (append (mapcar 'first (subseq lambda-list 0 rest-position))
@@ -43,19 +43,19 @@
                         '(&rest)))
         (copy-list lambda-list))))
 
-(def-test defun-lambda-list-rest (:suite defun-lambda-list)
+(def-test effective-lambda-list-rest (:suite effective-lambda-list)
   (is (equalp '(a b &rest c)
-              (defun-lambda-list '(a b &rest c))))
-  (is-error (defun-lambda-list '(a b &rest)))
+              (compute-effective-lambda-list '(a b &rest c))))
+  (is-error (compute-effective-lambda-list '(a b &rest)))
   (destructuring-bind (first second third)
-      (defun-lambda-list '(a &rest c))
+      (compute-effective-lambda-list '(a &rest c))
     (is (eq first 'a))
     (is (eq second '&rest))
     (is (eq 'c third)))
   (destructuring-bind ((first second third fourth) type-list effective-type-list)
-      (multiple-value-list (defun-lambda-list '((a string) (b number) &rest
-                                                c)
-                             :typed t))
+      (multiple-value-list (compute-effective-lambda-list '((a string) (b number) &rest
+                                                            c)
+                                                          :typed t))
     (is (eq first 'a))
     (is (eq second 'b))
     (is (eq third '&rest))
@@ -64,16 +64,36 @@
     (is (equalp effective-type-list
                 '(string number &rest)))))
 
-(defmethod %defun-body ((type (eql 'rest)) (defun-lambda-list list))
-  (assert (not *lambda-list-typed-p*))
-  (let ((rest-position (position '&rest defun-lambda-list)))
-    `((apply (polymorph-lambda
-              ,(retrieve-polymorph-form *name* type
-                                        (append (subseq defun-lambda-list
-                                                        0 rest-position)
-                                                (subseq defun-lambda-list
-                                                        (1+ rest-position)))))
-             ,@(remove '&rest defun-lambda-list)))))
+(defmethod compute-polymorphic-function-lambda-body
+    ((type (eql 'rest)) (untyped-lambda-list list))
+  (let* ((rest-position       (position '&rest untyped-lambda-list))
+         (rest-args           (nth (1+ rest-position) untyped-lambda-list))
+         (required-parameters (subseq untyped-lambda-list 0 rest-position)))
+    `((declare (ignorable ,@required-parameters)
+               (dynamic-extent ,rest-args)
+               (optimize speed))
+      ,(if (not (fboundp *name*))
+           `(error 'no-applicable-polymorph/error
+                   :effective-type-lists nil
+                   :arg-list (list* ,@required-parameters ,rest-args))
+           `(apply
+             (the function
+                  (polymorph-lambda
+                   (cond
+                     ,@(loop
+                         :for i :from 0
+                         :for polymorph :in (polymorphic-function-polymorphs
+                                             (fdefinition *name*))
+                         :for applicable-p-form
+                           := (polymorph-applicable-p-form polymorph)
+                         :collect
+                         `(,applicable-p-form ,polymorph))
+                     (t
+                      (error 'no-applicable-polymorph/error
+                             :arg-list (list* ,@required-parameters ,rest-args)
+                             :effective-type-lists
+                             (polymorphic-function-effective-type-lists (function ,*name*)))))))
+             ,@required-parameters ,rest-args)))))
 
 (defmethod %sbcl-transform-body-args ((type (eql 'rest)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
@@ -100,7 +120,7 @@
           (t
            (<= rest-position (length type-list))))))
 
-(defmethod applicable-p-function ((type (eql 'rest)) (type-list list))
+(defmethod applicable-p-lambda-body ((type (eql 'rest)) (type-list list))
   (let* ((rest-position (position '&rest type-list))
          (param-list (append (mapcar #'type->param (subseq type-list 0 rest-position))
                              `(&rest ,(gensym)))))
@@ -115,9 +135,32 @@
                         :for type  :in (subseq type-list  0 rest-position)
                         :collect `(typep ,param ',type)))))))
 
+(defmethod applicable-p-form ((type (eql 'rest))
+                              (untyped-lambda-list list)
+                              (type-list list))
+  (let* ((rest-position (position '&rest untyped-lambda-list))
+         (param-list    untyped-lambda-list)
+         (rest-arg      (nth (1+ rest-position) untyped-lambda-list)))
+    `(and ,@(loop :for param :in (subseq param-list 0 rest-position)
+                  :for type  :in (subseq type-list  0 rest-position)
+                  :collect `(typep ,param ',type))
+          ,@(cond ((null (intersection lambda-list-keywords type-list))
+                   nil)
+                  ((equalp (intersection lambda-list-keywords type-list)
+                           '(&rest))
+                   nil)
+                  ((member '&key type-list)
+                   (let ((param-type (subseq type-list (1+ (position '&key type-list)))))
+                     (loop :for i :from 1 :by 2
+                           :for (param type) :in param-type
+                           :collect `(typep (nth ,i ,rest-arg) ',type))))
+                  (t
+                   (error "Not expected to reach here"))))))
+
 (5am:def-suite type-list-subtype-rest :in type-list-subtype-p)
 
-(defmethod %type-list-subtype-p ((type-1 (eql 'rest)) (type-2 (eql 'rest)) list-1 list-2)
+(defmethod %type-list-subtype-p
+    ((type-1 (eql 'rest)) (type-2 (eql 'rest)) list-1 list-2)
   (let ((rest-position-1 (position '&rest list-1))
         (rest-position-2 (position '&rest list-2)))
     (every #'subtypep
@@ -129,7 +172,8 @@
   (5am:is-true  (type-list-subtype-p '(string string &rest) '(string &rest)))
   (5am:is-false (type-list-subtype-p '(string string &rest) '(string number &rest))))
 
-(defmethod %type-list-subtype-p ((type-1 (eql 'rest)) (type-2 (eql 'required)) list-1 list-2)
+(defmethod %type-list-subtype-p
+    ((type-1 (eql 'rest)) (type-2 (eql 'required)) list-1 list-2)
   ;; No way the first is going to be a subtype of the other
   ;; The first type-list will either dominate the second or be orthogonal to it
   ;; Or a bit dirty!
@@ -143,7 +187,8 @@
   (5am:is-false (type-list-subtype-p '(string string &rest) '(string)))
   (5am:is-false (type-list-subtype-p '(string string &rest) '(string number))))
 
-(defmethod %type-list-subtype-p ((type-1 (eql 'required)) (type-2 (eql 'rest)) list-1 list-2)
+(defmethod %type-list-subtype-p
+    ((type-1 (eql 'required)) (type-2 (eql 'rest)) list-1 list-2)
   (let ((list-1-length (length list-1))
         (rest-position (position '&rest list-2)))
     (cond ((< list-1-length rest-position)
@@ -474,12 +519,12 @@
   (%type-list-causes-ambiguous-call-p type-2 type-1 list-2 list-1))
 
 (defmethod %type-list-causes-ambiguous-call-p ((type-1 (eql 'required-key))
-                                   (type-2 (eql 'rest))
-                                   list-1 list-2)
+                                               (type-2 (eql 'rest))
+                                               list-1 list-2)
   (%type-list-causes-ambiguous-call-p type-2 type-1 list-2 list-1))
 
 (defmethod %type-list-causes-ambiguous-call-p ((type-1 (eql 'required-key))
-                                   (type-2 (eql 'required))
-                                   list-1 list-2)
+                                               (type-2 (eql 'required))
+                                               list-1 list-2)
   (%type-list-causes-ambiguous-call-p type-2 type-1 list-2 list-1))
 

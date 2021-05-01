@@ -3,10 +3,16 @@
 ;; In this file, our main functions/macros are
 ;; - DEFINE-LAMBDA-LIST-HELPER
 ;; - LAMBDA-LIST-TYPE
-;; - DEFUN-LAMBDA-LIST
-;; - DEFUN-BODY
+;; - EFFECTIVE-LAMBDA-LIST
+;; - COMPUTE-POLYMORPHIC-FUNCTION-BODY
+;; - SBCL-TRANSFORM-BODY-ARGS
 ;; - LAMBDA-DECLARATIONS
-;; - TYPE-LIST-APPLICABLE-P
+;; - TYPE-LIST-COMPATIBLE-P
+;; - APPLICABLE-P-LAMBDA-BODY
+;; - APPLICABLE-P-FORM
+;; - TYPE-LIST-SUBTYPE-P
+;; - TYPE-LIST-CAUSES-AMBIGUOUS-CALL-P
+;; - MISCELLANEOUS
 
 ;; THE BASICS ==================================================================
 
@@ -116,23 +122,21 @@ Non-examples:
   ((a integer) &optional ((b integer) 0 b-supplied-p))"
   `(satisfies typed-lambda-list-p))
 
-;; DEFUN-LAMBDA-LIST ===========================================================
+;; EFFECTIVE-LAMBDA-LIST ===============================================
 
+;; FIXME: Implement a SLOT-UNBOUND method for lambda list
 (define-lambda-list-helper
-    (defun-lambda-list  #.+defun-lambda-list-doc+)
-    (%defun-lambda-list #.+defun-lambda-list-doc-helper+)
-  (%defun-lambda-list *potential-type* *lambda-list*))
+    (compute-effective-lambda-list  #.+compute-effective-lambda-list-doc+)
+    (%effective-lambda-list #.+effective-lambda-list-doc-helper+)
+  (%effective-lambda-list *potential-type* *lambda-list*))
 
-(5am:def-suite defun-lambda-list :in lambda-list)
+(5am:def-suite effective-lambda-list :in lambda-list)
 
-;; DEFUN-BODY ==================================================================
+;; COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY ============================================
 
-(define-lambda-list-helper
-    (defun-body  #.+defun-body-doc+)
-    (%defun-body #.+defun-body-doc-helper+)
-  (let ((defun-lambda-list (%defun-lambda-list *potential-type* *lambda-list*)))
-    (values (%defun-body *potential-type* defun-lambda-list)
-            defun-lambda-list)))
+(defgeneric compute-polymorphic-function-lambda-body
+    (lambda-list-type effective-untyped-lambda-list)
+  (:documentation #.+compute-polymorphic-function-lambda-body-doc+))
 
 ;; SBCL-TRANSFORM-BODY-ARGS ====================================================
 
@@ -146,9 +150,9 @@ Non-examples:
 (def-test sbcl-transform-body-args (:suite lambda-list)
   (is (equalp '(a b nil) (sbcl-transform-body-args '((a number) (b string)) :typed t)))
   (is (equalp '(a b nil) (sbcl-transform-body-args '((a number) &optional ((b string) "hello"))
-                                               :typed t)))
+                                                   :typed t)))
   (is (equalp '(a :b b nil) (sbcl-transform-body-args '((a number) &key ((b string) "hello"))
-                                                  :typed t)))
+                                                      :typed t)))
   (is (equalp '(a args) (sbcl-transform-body-args '((a number) &rest args)
                                                   :typed t))))
 
@@ -163,16 +167,12 @@ Non-examples:
 
 ;; TYPE-LIST-COMPATIBLE-P ======================================================
 
-(defun type-list-compatible-p (type-list untyped-lambda-list)
+(defun type-list-compatible-p (lambda-list-type type-list effective-untyped-lambda-list)
   "Returns T if the given TYPE-LIST is compatible with the given UNTYPED-LAMBDA-LIST."
-  (declare (type type-list                     type-list)
-           (type untyped-lambda-list untyped-lambda-list))
+  (declare (type type-list type-list))
   (let ((*lambda-list-typed-p* nil)
-        (*potential-type* (potential-type-of-lambda-list untyped-lambda-list)))
-    (if (%lambda-list-type *potential-type* untyped-lambda-list)
-        (%type-list-compatible-p *potential-type* type-list untyped-lambda-list)
-        (error "UNTYPED-LAMBDA-LIST ~A is neither of ~%  ~A" untyped-lambda-list
-               +lambda-list-types+))))
+        (*potential-type* lambda-list-type))
+    (%type-list-compatible-p *potential-type* type-list effective-untyped-lambda-list)))
 
 (defgeneric %type-list-compatible-p
     (potential-lambda-list-type type-list untyped-lambda-list))
@@ -186,31 +186,57 @@ Non-examples:
   (assert (typep type-list 'type-list) nil
           "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
   (assert (typep untyped-lambda-list 'untyped-lambda-list) nil
-                "Expected ~A to be a UNTYPED-LAMBDA-LIST" untyped-lambda-list)
+          "Expected ~A to be a UNTYPED-LAMBDA-LIST" untyped-lambda-list)
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
 
 (def-test type-list-compatible-p (:suite lambda-list)
-  (5am:is-true  (type-list-compatible-p '(string string) '(c d)))
-  (5am:is-false (type-list-compatible-p '(string) '(c d)))
-  (5am:is-true  (type-list-compatible-p '(string number &optional t) '(c d &optional e)))
-  (5am:is-false (type-list-compatible-p '(number) '(c d &optional d)))
-  (5am:is-true  (type-list-compatible-p '(string &key (:d number) (:e string)) '(c &key d e)))
-  (5am:is-false (type-list-compatible-p '(string &key (:d number)) '(c &key d e)))
-  (5am:is-true  (type-list-compatible-p '(string) '(c &rest e)))
-  (5am:is-true  (type-list-compatible-p '(number string) '(c &rest e)))
-  (5am:is-false (type-list-compatible-p '(&rest) '(c &rest e))))
+  (5am:is-true  (type-list-compatible-p 'required '(string string) '(c d)))
+  (5am:is-false (type-list-compatible-p 'required '(string) '(c d)))
+  (5am:is-true  (type-list-compatible-p 'required-optional
+                                        '(string number &optional t) '(c d &optional e)))
+  (5am:is-false (type-list-compatible-p 'required-optional
+                                        '(number) '(c d &optional d)))
+  (5am:is-true  (type-list-compatible-p 'required-key
+                                        '(string &key (:d number) (:e string))
+                                        '(c &rest args &key (d nil dp) (e nil ep))))
+  (5am:is-false (type-list-compatible-p 'required-key
+                                        '(string &key (:d number))
+                                        '(c &rest args &key (d nil dp) (e nil ep))))
+  (5am:is-true  (type-list-compatible-p 'rest
+                                        '(string) '(c &rest e)))
+  (5am:is-true  (type-list-compatible-p 'rest
+                                        '(number string) '(c &rest e)))
+  (5am:is-false (type-list-compatible-p 'rest
+                                        '(&rest) '(c &rest e))))
 
-;; APPLICABLE-P-FUNCTION =======================================================
+;; APPLICABLE-P-LAMBDA-BODY ====================================================
 
-(defgeneric applicable-p-function (lambda-list-type type-list))
+(defgeneric applicable-p-lambda-body (lambda-list-type type-list))
 
-(defmethod applicable-p-function ((type t) (type-list t))
+(defmethod applicable-p-lambda-body ((type t) (type-list t))
   (assert (typep type 'lambda-list-type) nil
           "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
           +lambda-list-types+ type)
   (assert (typep type-list 'type-list) nil
           "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
+
+;; APPLICABLE-P-FORM ===========================================================
+
+(defgeneric applicable-p-form
+    (lambda-list-type untyped-lambda-list type-list))
+
+(defmethod applicable-p-form ((type t) (untyped-lambda-list t) (type-list t))
+  (assert (typep type 'lambda-list-type) nil
+          "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
+          +lambda-list-types+ type)
+  (assert (typep untyped-lambda-list 'untyped-lambda-list) nil
+          "Expected UNTYPED-LAMBDA-LIST to be a UNTYPED-LAMBDA-LIST %but is ~a"
+          untyped-lambda-list)
+  (assert (typep type-list 'type-list) nil
+          "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
+  (error "This code shouldn't have reached here; perhaps file a bug report!"))
+
 
 ;; TYPE-LIST-SUBTYPE-P =========================================================
 

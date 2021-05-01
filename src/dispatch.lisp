@@ -122,7 +122,7 @@ at your own risk."
            (lambda-list-type  (lambda-list-type typed-lambda-list :typed t)))
       (declare (type typed-lambda-list typed-lambda-list))
       (multiple-value-bind (param-list type-list effective-type-list)
-          (defun-lambda-list typed-lambda-list :typed t)
+          (compute-effective-lambda-list typed-lambda-list :typed t)
         (multiple-value-bind (declarations body) (extract-declarations body)
           (let* ((lambda-body #+sbcl
                               `(sb-int:named-lambda (polymorph ,name ,type-list) ,param-list
@@ -246,7 +246,8 @@ at your own risk."
           (remove-if (curry #'sb-c::type= ctype)
                      (sb-c::fun-info-transforms info)
                      :key #'sb-c::transform-type)))
-  (remove-polymorph name type-list))
+  (remove-polymorph name type-list)
+  (update-polymorphic-function-lambda (fdefinition name)))
 
 (defun undefine-polymorphic-function (name)
   "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH"

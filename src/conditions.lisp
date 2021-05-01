@@ -28,7 +28,7 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                (format stream "There already exists a FUNCTION ~S associated with NAME ~S.~%Do you want to delete the existing FUNCTION and associate a new~%POLYMORPHIC-FUNCTION with NAME ~S?"
                        (fdefinition name) name name)))))
 
-(define-condition no-applicable-polymorph (error)
+(define-condition no-applicable-polymorph ()
   ((arg-list :initarg :arg-list
              :initform (error "ARG-LIST not specified")
              :reader arg-list)
@@ -43,6 +43,10 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                (format s
                        "~%~%Available Effective-Type-Lists include:~{~^~%  ~S~}"
                        (effective-type-lists condition))))))
+
+(define-condition no-applicable-polymorph/error
+    (no-applicable-polymorph error)
+  ())
 
 (define-condition no-applicable-polymorph/compiler-note
     (no-applicable-polymorph compiler-macro-notes:note)

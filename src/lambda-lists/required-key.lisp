@@ -67,7 +67,7 @@
                                 (c number))
                               :typed t)))
 
-(defmethod %defun-lambda-list ((type (eql 'required-key)) (lambda-list list))
+(defmethod %effective-lambda-list ((type (eql 'required-key)) (lambda-list list))
   (let ((state               :required)
         (param-list          ())
         (type-list           ())
@@ -93,9 +93,10 @@
                           (push (second elt) type-list)
                           (push (second elt) effective-type-list))
                          (t
-                          (return-from %defun-lambda-list nil))))
+                          (return-from %effective-lambda-list nil))))
         (&key (cond ((not *lambda-list-typed-p*)
-                     (push elt param-list))
+                     (push (list elt nil (gensym (symbol-name elt)))
+                           param-list))
                     (*lambda-list-typed-p*
                      ;; TODO: Handle the case when keyword is non-default
                      ;; TODO: Handle supplied-p parameter
@@ -115,7 +116,7 @@
                                          ((not defaultp) type)))
                              effective-type-list)))
                     (t
-                     (return-from %defun-lambda-list nil))))))
+                     (return-from %effective-lambda-list nil))))))
     (if *lambda-list-typed-p*
         (values (nreverse param-list)
                 (let* ((type-list    (nreverse type-list))
@@ -131,20 +132,20 @@
                                         (1+ key-position)) #'string< :key #'first))))
         (nreverse param-list))))
 
-(def-test defun-lambda-list-key (:suite defun-lambda-list)
-  (is-error (defun-lambda-list '(a b &rest args &key)))
+(def-test effective-lambda-list-key (:suite effective-lambda-list)
+  (is-error (compute-effective-lambda-list '(a b &rest args &key)))
   (destructuring-bind (first second third fourth fifth sixth)
-      (defun-lambda-list '(a &key c d))
+      (compute-effective-lambda-list '(a &key c d))
     (declare (ignore third))
     (is (eq first 'a))
     (is (eq second '&rest))
     (is (eq fourth '&key))
-    (is (eq 'c fifth))
-    (is (eq 'd sixth)))
+    (is (eq 'c (first fifth)))
+    (is (eq 'd (first sixth))))
   (destructuring-bind ((first second third fourth) type-list effective-type-list)
-      (multiple-value-list (defun-lambda-list '((a string) (b number) &key
-                                                ((c number) 5))
-                             :typed t))
+      (multiple-value-list (compute-effective-lambda-list '((a string) (b number) &key
+                                                            ((c number) 5))
+                                                          :typed t))
     (is (eq first 'a))
     (is (eq second 'b))
     (is (eq third '&key))
@@ -154,18 +155,38 @@
     (is (equalp effective-type-list
                 '(string number &key (:c (or null number)))))))
 
-(defmethod %defun-body ((type (eql 'required-key)) (defun-lambda-list list))
-  (assert (not *lambda-list-typed-p*))
-  (let* ((rest-position       (position '&rest defun-lambda-list))
-         (required-parameters (subseq defun-lambda-list 0 rest-position))
-         (keyword-parameters  (subseq defun-lambda-list (+ 3 rest-position)))
-         (rest-args           (nth (1+ rest-position) defun-lambda-list)))
-    `((declare (ignore ,@keyword-parameters)
-               (dynamic-extent ,rest-args))
-      (apply (polymorph-lambda ,(retrieve-polymorph-form *name* type
-                                                         (append required-parameters
-                                                                 (list rest-args))))
-             ,@required-parameters ,rest-args))))
+(defmethod compute-polymorphic-function-lambda-body
+    ((type (eql 'required-key)) (untyped-lambda-list list))
+  (let* ((rest-position       (position '&rest untyped-lambda-list))
+         (required-parameters (subseq untyped-lambda-list 0 rest-position))
+         (keyword-parameters  (subseq untyped-lambda-list (+ 3 rest-position)))
+         (rest-args           (nth (1+ rest-position) untyped-lambda-list)))
+    `((declare (ignorable ,@(mapcar #'first keyword-parameters)
+                          ,@(mapcar #'third keyword-parameters))
+               (dynamic-extent ,rest-args)
+               (optimize speed))
+      ,(if (not (fboundp *name*))
+           `(error 'no-applicable-polymorph/error
+                   :effective-type-lists nil
+                   :arg-list (list* ,@required-parameters ,rest-args))
+           `(apply
+             (the function
+                  (polymorph-lambda
+                   (cond
+                     ,@(loop
+                         :for i :from 0
+                         :for polymorph :in (polymorphic-function-polymorphs
+                                             (fdefinition *name*))
+                         :for applicable-p-form
+                           := (polymorph-applicable-p-form polymorph)
+                         :collect
+                         `(,applicable-p-form ,polymorph))
+                     (t
+                      (error 'no-applicable-polymorph/error
+                             :arg-list (list* ,@required-parameters ,rest-args)
+                             :effective-type-lists
+                             (polymorphic-function-effective-type-lists (function ,*name*)))))))
+             ,@required-parameters ,rest-args)))))
 
 (defmethod %sbcl-transform-body-args ((type (eql 'required-key)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
@@ -197,17 +218,19 @@
 (defmethod %type-list-compatible-p ((type (eql 'required-key))
                                     (type-list list)
                                     (untyped-lambda-list list))
-  (let ((pos-key (position '&key type-list)))
+  (let ((pos-key  (position '&key type-list))
+        (pos-rest (position '&rest untyped-lambda-list)))
     (unless (and (numberp pos-key)
-                 (= pos-key (position '&key untyped-lambda-list)))
+                 (numberp pos-rest)
+                 (= pos-key pos-rest))
       (return-from %type-list-compatible-p nil))
     (let ((assoc-list (subseq type-list (1+ pos-key))))
-      (loop :for param :in (subseq untyped-lambda-list (1+ pos-key))
+      (loop :for (param default paramp) :in (subseq untyped-lambda-list (+ pos-key 3))
             :do (unless (assoc-value assoc-list (intern (symbol-name param) :keyword))
                   (return-from %type-list-compatible-p nil))))
     t))
 
-(defmethod applicable-p-function ((type (eql 'required-key)) (type-list list))
+(defmethod applicable-p-lambda-body ((type (eql 'required-key)) (type-list list))
   (let* ((key-position (position '&key type-list))
          (param-list (loop :for i :from 0
                            :for type :in type-list
@@ -231,6 +254,22 @@
                           :in (subseq param-list (1+ key-position))
                         :for type  :in (subseq type-list (1+ key-position))
                         :collect `(typep ,param ',(second type))))))))
+
+(defmethod applicable-p-form ((type (eql 'required-key))
+                              (untyped-lambda-list list)
+                              (type-list list))
+  (let* ((rest-position (position '&rest untyped-lambda-list))
+         (key-position  (position '&key untyped-lambda-list))
+         (param-list    untyped-lambda-list))
+    `(and ,@(loop :for param :in (subseq param-list 0 rest-position)
+                  :for type  :in (subseq type-list  0 rest-position)
+                  :collect `(typep ,param ',type))
+          ,@(let ((param-types (subseq type-list (1+ rest-position))))
+              (loop :for (param default supplied-p)
+                      :in (subseq param-list (1+ key-position))
+                    :for type := (second (assoc param param-types :test #'string=))
+                    :collect `(or (not ,supplied-p)
+                                  (typep ,param ',type)))))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required-key))
                                  (type-2 (eql 'required-key))
@@ -272,8 +311,8 @@
         (key-position-2 (position '&key list-2)))
     (and (= key-position-1 key-position-2)
          (every #'type=
-               (subseq list-1 0 key-position-1)
-               (subseq list-2 0 key-position-2))
+                (subseq list-1 0 key-position-1)
+                (subseq list-2 0 key-position-2))
          (let ((list-1 (subseq list-1 (1+ key-position-1)))
                (list-2 (subseq list-2 (1+ key-position-2))))
            (multiple-value-bind (shorter-alist longer-alist)
