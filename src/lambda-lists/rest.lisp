@@ -167,10 +167,16 @@
                                  :for type :in (butlast type-list)
                                  :collect `(typep (nth ,i ,rest-arg) ',type)))
                           ((member '&key type-list)
-                           (let ((param-type (subseq type-list (1+ (position '&key type-list)))))
-                             (loop :for i :from 1 :by 2
-                                   :for (param type) :in param-type
-                                   :collect `(typep (nth ,i ,rest-arg) ',type))))
+                           (let* ((pos-key (position '&key type-list))
+                                  (param-type (subseq type-list (1+ pos-key)))
+                                  (i -1))
+                             (nconc
+                              (loop :for type :in (subseq type-list 0 pos-key)
+                                    :do (incf i)
+                                    :collect `(typep (nth ,i ,rest-arg) ',type))
+                              (loop :for (param type) :in param-type
+                                    :do (incf i 2)
+                                    :collect `(typep (nth ,i ,rest-arg) ',type)))))
                           (t
                            (error "Not expected to reach here"))))))))
 
