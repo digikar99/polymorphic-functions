@@ -110,9 +110,9 @@ CL-USER> (my= 5 "hello")
 
 - SBCL 2.0.9+
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
-- [trivial-form-type](https://github.com/digikar99/trivial-form-type)
-  - [cl-environments 0.3](https://github.com/alex-gutev/cl-environments)
-- [compiler-macro-noes](https://github.com/digikar99/compiler-macro-notes)
+- [cl-form-types](https://github.com/alex-gutev/cl-form-types)
+  - [cl-environments 0.4](https://github.com/alex-gutev/cl-environments)
+- [compiler-macro-notes](https://github.com/digikar99/compiler-macro-notes)
 
 ### Getting it from ultralisp
 
@@ -221,40 +221,6 @@ Well...
 
 \*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries. But, there's also [static-dispatch](https://github.com/alex-gutev/static-dispatch).
 
-## Limitations
+## Static Dispatch Limitations
 
-At least one limitation stems from the limitations of the implementations (and CL?) themselves. On SBCL, this is mitigated by the use of `sb-c:deftransform`. For limited portability, an attempt is made to do this task of compile time type inference using [trivial-form-type](https://github.com/digikar99/trivial-form-type):
-
-```lisp
-CL-USER> (defun bar ()
-           (declare (optimize speed))
-           (my= "hello" (macrolet ((a () "hello"))
-                          (a))))
-; Optimization of
-;   (MY= "hello"
-;        (MACROLET ((A ()
-;                     "hello"))
-;          (A)))
-; is left to SBCL because ADHOC-POLYMORPHIC-FUNCTIONS is unable to optimize it
-; because
-;
-;  Type of
-;    (MACROLET ((A ()
-;                 "hello"))
-;      (A))
-;  could not be determined
-;
-BAR
-CL-USER> (disassemble 'bar)               ; on SBCL
-; disassembly for BAR
-; Size: 13 bytes. Origin: #x5300799B                          ; BAR
-; 9B:       BA4F011050       MOV EDX, #x5010014F              ; T
-; A0:       488BE5           MOV RSP, RBP
-; A3:       F8               CLC
-; A4:       5D               POP RBP
-; A5:       C3               RET
-; A6:       CC10             INT3 16                          ; Invalid argument count trap
-NIL
-```
-
-And while this is a simpler case that could possibly be optimizable, a nuanced discussion pertaining to the same is at [https://github.com/Bike/compiler-macro/pull/6#issuecomment-643613503](https://github.com/Bike/compiler-macro/pull/6#issuecomment-643613503).
+For form-type-inference, adhoc-polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [cl-form-types](https://github.com/alex-gutev/cl-form-types) does get pretty extensive. In cases wherein it does fail, we also rely on `sb-c:deftransform` on SBCL.

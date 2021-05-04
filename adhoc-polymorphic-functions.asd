@@ -7,7 +7,7 @@
                "closer-mop"
                "compiler-macro-notes"
                "fiveam" ;; just keep things together!
-               "trivial-form-type"
+               "cl-form-types"
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
                "introspect-environment")
   :pathname #P"src/"

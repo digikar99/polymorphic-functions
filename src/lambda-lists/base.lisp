@@ -280,14 +280,10 @@ Non-examples:
 (defun our-typep (arg type)
   (assert *compiler-macro-expanding-p*)
   (when (type= t type) (return-from our-typep t))
-  (when (and (symbolp arg)              ; type-declared-p
-             (not (member arg '(nil t)))
-             (not (cdr (assoc 'type
-                              (nth-value 2
-                                         (variable-information arg *environment*))))))
-    (signal 'form-type-failure :form arg))
-  (multiple-value-bind (typep known) (form-typep arg type *environment*)
-    (if known typep (signal 'form-type-failure :form arg))))
+  (let ((form-type (nth-form-type arg *environment* 0 t)))
+    (if (eq t form-type)
+        (signal 'form-type-failure :form arg)
+        (subtypep form-type type *environment*))))
 
 (def-test our-typep (:suite :adhoc-polymorphic-functions)
   (macrolet ((with-compile-time (&rest body)

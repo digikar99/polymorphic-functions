@@ -17,7 +17,17 @@
         (original-form :name (fdefinition name)
                        :unwind-on-signal nil
                        :optimization-note-condition optim-speed)
-      (let* ((arg-list  (rest form))
+      (let* ((arg-list  (mapcar (lambda (form)
+                                  (cond ((not (listp form)) form)
+                                        ((macro-function (first form) env)
+                                         (macroexpand form env))
+                                        ((compiler-macro-function (first form) env)
+                                         (compiler-macroexpand form env))
+                                        (t form)))
+                                (rest form)))
+             ;; Expanding things here results in O(n) calls to this function
+             ;; rather than O(n^2); although the actual effects of this are
+             ;; insignificant for day-to-day compilations
              (form-type-failure-signalled)
              (polymorph (handler-case (apply #'retrieve-polymorph name arg-list)
                           (form-type-failure (c)
@@ -47,7 +57,7 @@
                    ;; TODO: Use some other declaration for inlining as well
                    ;; Optimized for speed and type information available
                    (if inline-lambda-body
-                       `(the ,return-type (,inline-lambda-body ,@(cdr form)))
+                       `(the ,return-type (,inline-lambda-body ,@arg-list))
                        (progn
                          (signal 'polymorph-has-no-inline-lambda-body
                                  :name name :type-list type-list)
