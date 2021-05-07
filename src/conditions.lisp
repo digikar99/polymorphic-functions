@@ -38,11 +38,15 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
   (:report (lambda (condition s)
              (pprint-logical-block (s nil)
                (format s "No applicable POLYMORPH discovered for ARG-LIST:~%~%")
+               ;; It is possible that arg-lists could be circular (?)
+               ;; Or that they contain circular structures (?)
                (pprint-logical-block (s nil :per-line-prefix "  ")
                  (format s "~S" (arg-list condition)))
-               (format s
-                       "~%~%Available Effective-Type-Lists include:~{~^~%  ~S~}"
-                       (effective-type-lists condition))))))
+               ;; So, we only "improve" the printing for effective-type-lists
+               (let ((*print-circle* nil))
+                 (format s
+                         "~%~%Available Effective-Type-Lists include:~%~{~^~%  ~S~}"
+                         (effective-type-lists condition)))))))
 
 (define-condition no-applicable-polymorph/error
     (no-applicable-polymorph error)
