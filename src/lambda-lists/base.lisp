@@ -280,7 +280,7 @@ Non-examples:
 (defun our-typep (arg type)
   (assert *compiler-macro-expanding-p*)
   (when (type= t type) (return-from our-typep t))
-  (let ((form-type (nth-form-type arg *environment* 0 t)))
+  (let ((form-type (nth-form-type arg *environment* 0 t t)))
     (if (eq t form-type)
         (signal 'form-type-failure :form arg)
         (subtypep form-type type *environment*))))
