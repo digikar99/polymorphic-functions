@@ -98,8 +98,7 @@
                      (push (list elt nil (gensym (symbol-name elt)))
                            param-list))
                     (*lambda-list-typed-p*
-                     ;; TODO: Handle the case when keyword is non-default
-                     ;; TODO: Handle supplied-p parameter
+                     ;; FIXME: Handle the case when keyword is non-default
                      (destructuring-bind ((name type) &optional (default nil defaultp)
                                                         name-supplied-p-arg) elt
                        (push (if name-supplied-p-arg
@@ -268,8 +267,7 @@
               (loop :for (param default supplied-p)
                       :in (subseq param-list (1+ key-position))
                     :for type := (second (assoc param param-types :test #'string=))
-                    :collect `(or (not ,supplied-p)
-                                  (typep ,param ',type)))))))
+                    :collect `(typep ,param ',type))))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required-key))
                                  (type-2 (eql 'required-key))
