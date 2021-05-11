@@ -134,7 +134,7 @@
     (is (equalp effective-type-list '(string number &optional (or null number))))))
 
 (defmethod compute-polymorphic-function-lambda-body
-    ((type (eql 'required-optional)) (effective-lambda-list list))
+    ((type (eql 'required-optional)) (effective-lambda-list list) &optional invalidated-p)
   (let* ((optional-position   (position '&optional effective-lambda-list))
          (required-parameters  (subseq effective-lambda-list 0 optional-position))
          (optional-parameters  (subseq effective-lambda-list (1+ optional-position)))
@@ -145,10 +145,19 @@
       `((declare (optimize speed)
                  (ignorable ,@(mapcar #'first optional-parameters)
                             ,@(mapcar #'third optional-parameters)))
-        ,(if (not (fboundp *name*))
-             `(error 'no-applicable-polymorph/error
-                     :effective-type-lists nil
-                     :arg-list ,args)
+        ,(if invalidated-p
+             `(progn
+                (update-polymorphic-function-lambda (fdefinition ',*name*))
+                (cond ,@(loop :for (name default supplied-p) :in (reverse optional-parameters)
+                              :for optional-idx :downfrom (length optional-parameters) :above 0
+                              :for parameters := (append required-parameters
+                                                         (mapcar #'first
+                                                                 (subseq optional-parameters
+                                                                         0 optional-idx)))
+                              :collect `(,supplied-p
+                                         (funcall (fdefinition ',*name*) ,@parameters)))
+                      (t
+                       (funcall (fdefinition ',*name*) ,@required-parameters))))
              `(let ((,polymorph
                       (cond
                         ,@(loop
@@ -171,7 +180,6 @@
                                                          (mapcar #'first
                                                                  (subseq optional-parameters
                                                                          0 optional-idx)))
-                              ;; FIXME: Is this slower than the consing alternative?
                               :collect `(,supplied-p
                                          (funcall
                                           (the function (polymorph-lambda ,polymorph))

@@ -85,6 +85,9 @@ APPLICABLE-P-LAMBDA is used for both run-time as well as compile-time dispatch.
                 :accessor polymorphic-function-polymorphs)
    (documentation :initarg :documentation
                   :type (or string null))
+   (invalidated-p :accessor polymorphic-function-invalidated-p
+                  :initform nil)
+   ;; Using SOURCE doesn't simply seem to be a matter of calling (SB-C:SOURCE-LOCATION)
    #+sbcl (sb-pcl::source :initarg sb-pcl::source)
    #+sbcl (%lock
            :initform (sb-thread:make-mutex :name "GF lock")
@@ -146,25 +149,37 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               :documentation documentation
                               :lambda-list lambda-list
                               :lambda-list-type (lambda-list-type untyped-lambda-list))))
-      (update-polymorphic-function-lambda apf)
+      (invalidate-polymorphic-function-lambda apf)
       (setf (fdefinition name) apf)
       (setf (documentation name 'function) documentation)
+      #+ccl (setf (ccl:arglist name) lambda-list)
       apf)))
 
-(defun update-polymorphic-function-lambda (adhoc-polymorphic-function)
+(defun update-polymorphic-function-lambda (adhoc-polymorphic-function &optional invalidate)
+  (when (and invalidate (polymorphic-function-invalidated-p adhoc-polymorphic-function))
+    (return-from update-polymorphic-function-lambda adhoc-polymorphic-function))
   (let* ((apf adhoc-polymorphic-function)
          (*name*           (polymorphic-function-name apf))
          (lambda-list      (polymorphic-function-lambda-list apf))
          (lambda-list-type (polymorphic-function-lambda-list-type apf))
-         (lambda-body (compute-polymorphic-function-lambda-body lambda-list-type lambda-list)))
+         (lambda-body (if invalidate
+                          (compute-polymorphic-function-lambda-body lambda-list-type
+                                                                    lambda-list
+                                                                    t)
+                          (compute-polymorphic-function-lambda-body lambda-list-type
+                                                                    lambda-list))))
     (closer-mop:set-funcallable-instance-function
      apf #+sbcl (compile nil `(sb-int:named-lambda (adhoc-polymorphic-function ,*name*)
                                 ,lambda-list ,@lambda-body))
-     ;; FIXME: https://github.com/Clozure/ccl/issues/361
+         ;; FIXME: https://github.com/Clozure/ccl/issues/361
      #+ccl (eval `(ccl:nfunction (adhoc-polymorphic-function ,*name*)
                                  (lambda ,lambda-list ,@lambda-body)))
      #-(or ccl sbcl) (compile nil `(lambda ,lambda-list ,@lambda-body)))
+    (setf (polymorphic-function-invalidated-p apf) invalidate)
     apf))
+
+(defun invalidate-polymorphic-function-lambda (adhoc-polymorphic-function)
+  (update-polymorphic-function-lambda adhoc-polymorphic-function t))
 
 (defun add-or-update-polymorph (adhoc-polymorphic-function polymorph)
   (declare (type adhoc-polymorphic-function adhoc-polymorphic-function)
@@ -247,7 +262,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      :lambda             lambda
                                      :compiler-macro-lambda nil)))
       (add-or-update-polymorph apf polymorph)
-      (update-polymorphic-function-lambda apf)
+      (invalidate-polymorphic-function-lambda apf)
       polymorph)))
 
 ;; FIXME: Fix the below after the caching update

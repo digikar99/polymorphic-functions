@@ -155,7 +155,7 @@
                 '(string number &key (:c (or null number)))))))
 
 (defmethod compute-polymorphic-function-lambda-body
-    ((type (eql 'required-key)) (untyped-lambda-list list))
+    ((type (eql 'required-key)) (untyped-lambda-list list) &optional invalidated-p)
   (let* ((rest-position       (position '&rest untyped-lambda-list))
          (required-parameters (subseq untyped-lambda-list 0 rest-position))
          (keyword-parameters  (subseq untyped-lambda-list (+ 3 rest-position)))
@@ -164,10 +164,10 @@
                           ,@(mapcar #'third keyword-parameters))
                (dynamic-extent ,rest-args)
                (optimize speed))
-      ,(if (not (fboundp *name*))
-           `(error 'no-applicable-polymorph/error
-                   :effective-type-lists nil
-                   :arg-list (list* ,@required-parameters ,rest-args))
+      ,(if invalidated-p
+           `(progn
+              (update-polymorphic-function-lambda (fdefinition ',*name*))
+              (apply (fdefinition ',*name*) ,@required-parameters ,rest-args))
            `(apply
              (the function
                   (polymorph-lambda

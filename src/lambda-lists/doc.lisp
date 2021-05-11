@@ -35,7 +35,9 @@ and the third value is the effective-type-list."
 (define-constant +compute-polymorphic-function-lambda-body-doc+
   "Processes LAMBDA-LIST to return the body for the lambda constructed in
 UPDATE-POLYMORPHIC-FUNCTION-LAMBDA.
-Raises an error if %LAMBDA-LIST-TYPE fails on *POTENTIAL-TYPE*."
+Raises an error if %LAMBDA-LIST-TYPE fails on *POTENTIAL-TYPE*.
+If INVALIDATED-P is non-NIL, then emits a dummy body that will first call
+UPDATE-POLYMORPHIC-FUNCTION-LAMBDA with INVALIDATE as NIL, and then recall the function."
   :test 'string=)
 
 ;; LAMBDA-DECLARATIONS =========================================================

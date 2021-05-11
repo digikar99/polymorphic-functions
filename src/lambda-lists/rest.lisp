@@ -65,17 +65,17 @@
                 '(string number &rest)))))
 
 (defmethod compute-polymorphic-function-lambda-body
-    ((type (eql 'rest)) (untyped-lambda-list list))
+    ((type (eql 'rest)) (untyped-lambda-list list) &optional invalidated-p)
   (let* ((rest-position       (position '&rest untyped-lambda-list))
          (rest-args           (nth (1+ rest-position) untyped-lambda-list))
          (required-parameters (subseq untyped-lambda-list 0 rest-position)))
     `((declare (ignorable ,@required-parameters)
                (dynamic-extent ,rest-args)
                (optimize speed))
-      ,(if (not (fboundp *name*))
-           `(error 'no-applicable-polymorph/error
-                   :effective-type-lists nil
-                   :arg-list (list* ,@required-parameters ,rest-args))
+      ,(if invalidated-p
+           `(progn
+              (update-polymorphic-function-lambda (fdefinition ',*name*))
+              (apply (fdefinition ',*name*) ,@required-parameters ,rest-args))
            `(apply
              (the function
                   (polymorph-lambda

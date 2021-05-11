@@ -21,32 +21,33 @@
       (copy-list lambda-list)))
 
 (defmethod compute-polymorphic-function-lambda-body
-    ((type (eql 'required)) (untyped-lambda-list list))
+    ((type (eql 'required)) (untyped-lambda-list list) &optional invalidated-p)
   `((declare (optimize speed))
-    ,(if (not (fboundp *name*))
-         `(error 'no-applicable-polymorph/error
-                 :effective-type-lists nil
-                 :arg-list (list ,@untyped-lambda-list))
-         `(funcall
-           (the function
-                (polymorph-lambda
-                 (the polymorph
-                      (cond
-                        ,@(loop
-                            :for i :from 0
-                            :for polymorph
-                              :in (polymorphic-function-polymorphs (fdefinition *name*))
-                            :for applicable-p-form
-                              := (polymorph-applicable-p-form polymorph)
-                            :collect
-                            `(,applicable-p-form ,polymorph))
-                        (t
-                         (error 'no-applicable-polymorph/error
-                                :arg-list (list ,@untyped-lambda-list)
-                                :effective-type-lists
-                                (polymorphic-function-effective-type-lists
-                                 (function ,*name*))))))))
-           ,@untyped-lambda-list))))
+    ,(cond (invalidated-p
+            `(progn
+               (update-polymorphic-function-lambda (fdefinition ',*name*))
+               (funcall (fdefinition ',*name*) ,@untyped-lambda-list)))
+           (t
+            `(funcall
+              (the function
+                   (polymorph-lambda
+                    (the polymorph
+                         (cond
+                           ,@(loop
+                               :for i :from 0
+                               :for polymorph
+                                 :in (polymorphic-function-polymorphs (fdefinition *name*))
+                               :for applicable-p-form
+                                 := (polymorph-applicable-p-form polymorph)
+                               :collect
+                               `(,applicable-p-form ,polymorph))
+                           (t
+                            (error 'no-applicable-polymorph/error
+                                   :arg-list (list ,@untyped-lambda-list)
+                                   :effective-type-lists
+                                   (polymorphic-function-effective-type-lists
+                                    (function ,*name*))))))))
+              ,@untyped-lambda-list)))))
 
 
 (defmethod %sbcl-transform-body-args ((type (eql 'required)) (typed-lambda-list list))

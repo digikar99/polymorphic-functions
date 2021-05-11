@@ -135,7 +135,7 @@ Non-examples:
 ;; COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY ============================================
 
 (defgeneric compute-polymorphic-function-lambda-body
-    (lambda-list-type effective-untyped-lambda-list)
+    (lambda-list-type effective-untyped-lambda-list &optional invalidated-p)
   (:documentation #.+compute-polymorphic-function-lambda-body-doc+))
 
 ;; SBCL-TRANSFORM-BODY-ARGS ====================================================
