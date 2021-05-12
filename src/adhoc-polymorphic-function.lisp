@@ -226,7 +226,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defun register-polymorph (name type-list effective-type-list
                            return-type inline-lambda-body lambda
-                           lambda-list-type)
+                           lambda-list-type applicable-p-lambda)
   (declare (type function-name  name)
            (type function       lambda)
            (type type-list      type-list)
@@ -252,9 +252,10 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      :return-type      return-type
                                      :lambda-list-type lambda-list-type
                                      :effective-type-list effective-type-list
-                                     :applicable-p-lambda
-                                     (compile nil (applicable-p-lambda-body lambda-list-type
-                                                                            effective-type-list))
+                                     ;; FIXME: COMPILE should be resulting in a heavy load time
+                                     ;; Avoid its use, since it's no longer of optimal use
+                                     ;; Perhaps, as before, resort to TYPE-LIST-APPLICABLE-P
+                                     :applicable-p-lambda applicable-p-lambda
                                      :applicable-p-form (applicable-p-form apf-lambda-list-type
                                                                            untyped-lambda-list
                                                                            effective-type-list)

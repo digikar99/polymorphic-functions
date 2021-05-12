@@ -218,7 +218,9 @@ at your own risk."
                                        ',return-type
                                        ',inline-safe-lambda-body
                                        ,lambda-body
-                                       ',lambda-list-type)
+                                       ',lambda-list-type
+                                       ,(applicable-p-lambda-body lambda-list-type
+                                                                  effective-type-list))
                    ',name)))))))))
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list
