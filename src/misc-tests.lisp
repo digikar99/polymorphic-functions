@@ -41,7 +41,7 @@
 
 (def-test optional-args-correctness ()
   (ignoring-error-output
-    (eval `(progn ; This requires SBCL version 2.0.9+
+    (eval `(progn                  ; This requires SBCL version 2.0.9+
              (define-polymorphic-function bar (a &optional b c) :overwrite t)
              (defpolymorph bar ((str string) &optional ((b integer) 5) ((c integer) 7)) t
                (list str b c))
@@ -285,3 +285,31 @@
   (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller-direct 2 3))))
   (fmakunbound 'setf-foo-caller)
   (undefine-polymorphic-function '(setf foo)))
+
+(def-test parametric-polymorphism ()
+  (unwind-protect
+       (handler-bind ((warning #'muffle-warning))
+         (eval `(progn
+                  (define-polymorphic-function inner (a) :overwrite t)
+                  (defpolymorph inner ((a string)) t
+                    (declare (ignore a))
+                    'string)
+                  (defpolymorph inner ((a array)) t
+                    (declare (ignore a))
+                    'array)))
+         (eval `(progn
+                  (define-polymorphic-function outer (a) :overwrite t)
+                  (defpolymorph outer ((a array)) t
+                    (inner a))))
+         (eval `(defun outer-caller (a)
+                  (declare (optimize speed)
+                           (type string a))
+                  (outer a)))
+
+         (eval `(is (eq 'string (outer-caller "hello")))))
+    (undefine-polymorphic-function 'inner)
+    (unintern 'inner)
+    (undefine-polymorphic-function 'outer)
+    (unintern 'outer)
+    (fmakunbound 'outer-caller)
+    (unintern 'outer-caller)))

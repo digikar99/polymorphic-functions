@@ -199,19 +199,61 @@
 
 (defmethod %lambda-declarations ((type (eql 'required-key)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
-  (let ((state        :required)
-        (declarations ()))
+  (let ((declarations ()))
     (loop :for elt := (first typed-lambda-list)
           :until (eq elt '&key)
           :do (push `(type ,(second elt) ,(first elt)) declarations)
               (setf typed-lambda-list (rest typed-lambda-list)))
     (when (eq '&key (first typed-lambda-list))
-      (setf state             '&key
-            typed-lambda-list (rest typed-lambda-list))
+      (setf typed-lambda-list (rest typed-lambda-list))
       (loop :for elt := (first (first typed-lambda-list))
             :while elt
             :do (push `(type ,(second elt) ,(first elt)) declarations)
                 (setf typed-lambda-list (rest typed-lambda-list))))
+    `(declare ,@(nreverse declarations))))
+
+(defmethod enhanced-lambda-declarations ((type (eql 'required-key))
+                                         (type-list list)
+                                         (args list)
+                                         (arg-types list))
+  (let ((declarations ()))
+    (loop :for arg := (first args)
+          :for arg-type := (first arg-types)
+          :until (eq arg '&key)
+          :do (push `(type ,arg-type ,arg) declarations)
+              (setf args      (rest args))
+              (setf arg-types (rest arg-types)))
+    (when (eq '&key (first args))
+      (setf args  (rest args)
+            type-list (rest (member '&key type-list)))
+      (loop :while args
+            :for key := (let ((arg-type (first arg-types)))
+                          (when arg-type
+                            (assert (and (listp arg-type)
+                                         (eq 'eql (first arg-type))
+                                         (null (cddr arg-type))))
+                            (second arg-type)))
+            :for arg-type := (second arg-types)
+            :for original-type := (second (assoc key type-list))
+            :for arg := (let ((arg (if key
+                                       (find key args
+                                             :test (lambda (key arg)
+                                                     (string= key
+                                                              (etypecase arg
+                                                                (symbol arg)
+                                                                (list (first arg))))))
+                                       (first args))))
+                          (etypecase arg
+                            (symbol arg)
+                            (list (first arg))))
+            :do (push `(type ,arg-type ,arg) declarations)
+                (setf arg-types (cddr arg-types))
+                (setf args (remove arg args
+                                   :test (lambda (first second)
+                                           (string= first
+                                                    (etypecase second
+                                                      (symbol second)
+                                                      (list (first second)))))))))
     `(declare ,@(nreverse declarations))))
 
 (defmethod %type-list-compatible-p ((type (eql 'required-key))

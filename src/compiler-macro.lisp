@@ -50,23 +50,37 @@
                        :arg-list arg-list
                        :effective-type-lists
                        (polymorphic-function-effective-type-lists (fdefinition name)))))
-        (unless optim-speed
+        (when (or (null polymorph)
+                  (not optim-speed))
           (return-from apf-compiler-macro original-form))
-        (with-slots (inline-lambda-body return-type type-list
-                     compiler-macro-lambda)
+        (with-slots (return-type type-list
+                     compiler-macro-lambda lambda-list-type)
             polymorph
-          (return-from apf-compiler-macro
-            (cond (compiler-macro-lambda
-                   (funcall compiler-macro-lambda
-                            (cons inline-lambda-body (rest form))
-                            env))
-                  (optim-speed
-                   ;; TODO: Use some other declaration for inlining as well
-                   ;; Optimized for speed and type information available
-                   (if inline-lambda-body
-                       `(the ,return-type (,inline-lambda-body ,@arg-list))
-                       (progn
-                         (signal 'polymorph-has-no-inline-lambda-body
-                                 :name name :type-list type-list)
-                         form)))
-                  (t form))))))))
+          (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph)))
+            (when inline-lambda-body
+              (setq inline-lambda-body
+                    (destructuring-bind (lambda args declarations &body body)
+                        inline-lambda-body
+                      (declare (ignore declarations))
+                      `(,lambda ,args
+                         ;; The source of parametric-polymorphism
+                         ,(enhanced-lambda-declarations lambda-list-type
+                                                        type-list
+                                                        args
+                                                        arg-types)
+                         ,@body))))
+            (return-from apf-compiler-macro
+              (cond (compiler-macro-lambda
+                     (funcall compiler-macro-lambda
+                              (cons inline-lambda-body (rest form))
+                              env))
+                    (optim-speed
+                     ;; TODO: Use some other declaration for inlining as well
+                     ;; Optimized for speed and type information available
+                     (if inline-lambda-body
+                         `(the ,return-type (,inline-lambda-body ,@arg-list))
+                         (progn
+                           (signal 'polymorph-has-no-inline-lambda-body
+                                   :name name :type-list type-list)
+                           form)))
+                    (t form)))))))))

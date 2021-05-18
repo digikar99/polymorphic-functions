@@ -60,6 +60,15 @@
                         `(type ,(second elt) ,(first elt)))
                       typed-lambda-list)))
 
+(defmethod enhanced-lambda-declarations ((type (eql 'required))
+                                         (type-list list)
+                                         (args list)
+                                         (arg-types list))
+  `(declare ,@(mapcar (lambda (arg arg-type)
+                        `(type ,arg-type ,arg))
+                      args
+                      arg-types)))
+
 (defmethod %type-list-compatible-p ((type (eql 'required))
                                     (type-list list)
                                     (untyped-lambda-list list))

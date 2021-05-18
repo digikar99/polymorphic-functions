@@ -7,6 +7,7 @@
 ;; - COMPUTE-POLYMORPHIC-FUNCTION-BODY
 ;; - SBCL-TRANSFORM-BODY-ARGS
 ;; - LAMBDA-DECLARATIONS
+;; - ENHANCED-LAMBDA-DECLARATIONS
 ;; - TYPE-LIST-COMPATIBLE-P
 ;; - COMPILER-APPLICABLE-P-LAMBDA-BODY
 ;; - RUNTIME-APPLICABLE-P-FORM
@@ -164,6 +165,20 @@ Non-examples:
   (progn
     (assert (typed-lambda-list-p *lambda-list*))
     (%lambda-declarations *potential-type* *lambda-list*)))
+
+;; ENHANCED-LAMBDA-DECLARATIONS ================================================
+
+(defgeneric enhanced-lambda-declarations (lambda-list-type type-list args arg-types)
+  (:documentation "Like LAMBDA-DECLARATIONS, but along with the TYPE-LIST, also takes
+ARG-TYPES into account."))
+
+(defmethod enhanced-lambda-declarations (type type-list args arg-types)
+  (assert (typep type 'lambda-list-type) nil
+          "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
+          +lambda-list-types+ type)
+  (assert (typep type-list 'type-list) nil
+          "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
+  (error "This code shouldn't have reached here; perhaps file a bug report!"))
 
 ;; TYPE-LIST-COMPATIBLE-P ======================================================
 
