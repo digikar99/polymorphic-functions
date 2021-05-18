@@ -3,8 +3,7 @@
 (defmethod %lambda-list-type ((type (eql 'required)) (lambda-list list))
   (if *lambda-list-typed-p*
       (every (lambda (arg)
-               (and (valid-parameter-name-p (first arg))
-                    (type-specifier-p       (second arg))))
+               (valid-parameter-name-p (first arg)))
              lambda-list)
       (every 'valid-parameter-name-p lambda-list)))
 

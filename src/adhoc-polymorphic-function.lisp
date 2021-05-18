@@ -10,16 +10,18 @@
                     (and valid-p
                          (cond ((eq '&optional elt)
                                 t)
-                               ((type-specifier-p elt)
-                                t)
+                               ((member elt lambda-list-keywords)
+                                nil)
                                (t
-                                nil))))
+                                t))))
               (setq list (rest list)))
     (when valid-p
       (cond ((eq '&key (first list))
              (when list
-               (loop :for (param type) :in (rest list)
-                     :do (setq valid-p (type-specifier-p type)))))
+               (loop :for param-type :in (rest list)
+                     :do (setq valid-p (and (listp param-type)
+                                            (cdr param-type)
+                                            (null (cddr param-type)))))))
             ((eq '&rest (first list))
              (unless (null (rest list))
                (setq valid-p nil)))
