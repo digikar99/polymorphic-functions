@@ -114,7 +114,9 @@
                                          (arg-types list))
   `(declare ,@(mapcar (lambda (arg arg-type)
                         `(type ,arg-type ,arg))
-                      args arg-types)))
+                      (subseq args 0
+                              (position '&rest args))
+                      arg-types)))
 
 (defmethod %type-list-compatible-p ((type (eql 'rest))
                                     (type-list list)
