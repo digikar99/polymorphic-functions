@@ -71,7 +71,7 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
 (defun note-no-inline (form datum &rest arguments)
   (let ((*print-pretty* t))
     (pprint-logical-block (*error-output* nil :per-line-prefix "; " :suffix (string #\newline))
-      (format *error-output* "Will not inline~%~A~%because~A"
+      (format *error-output* "Will not inline~%~A~%because ~A"
               (with-output-to-string (*error-output*)
                 (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
                   (format *error-output* "~S" form)))

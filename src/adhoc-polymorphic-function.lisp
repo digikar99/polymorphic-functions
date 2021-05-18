@@ -43,9 +43,13 @@
 
 (defstruct polymorph
   "
-APPLICABLE-P-FORM is used for computing cached dispatch lambda form inside the
-  polymorphic-function's body. See COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY.
-APPLICABLE-P-LAMBDA is used for both run-time as well as compile-time dispatch.
+- If RUNTIME-APPLICABLE-P-FORM returns true when evaluated inside the lexical environment
+of the polymorphic-function, then the dispatch is done on LAMBDA. The prioritization
+is done by ADD-OR-UPDATE-POLYMORPH so that a more specialized polymorph is checked
+for compatibility before a less specialized polymorph.
+- The APF-COMPILER-MACRO calls the COMPILER-APPLICABLE-P-LAMBDA with the FORM-TYPEs
+of the arguments derived at compile time. The compiler macro dispatches on the polymorph
+at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   "
   (documentation nil :type (or null string))
   (name (error "NAME must be supplied!"))
@@ -53,8 +57,8 @@ APPLICABLE-P-LAMBDA is used for both run-time as well as compile-time dispatch.
   (type-list nil)
   (lambda-list-type nil)
   (effective-type-list nil)
-  (applicable-p-lambda)
-  (applicable-p-form)
+  (compiler-applicable-p-lambda)
+  (runtime-applicable-p-form)
   (inline-lambda-body)
   ;; We need the FUNCTION-BODY due to compiler macros,
   ;; and "objects of type FUNCTION can't be dumped into fasl files."
@@ -203,8 +207,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
              (merge-slot 'lambda)
              (merge-slot 'return-type)
              (merge-slot 'effective-type-list)
-             (merge-slot 'applicable-p-lambda)
-             (merge-slot 'applicable-p-form)
+             (merge-slot 'compiler-applicable-p-lambda)
+             (merge-slot 'runtime-applicable-p-form)
              (merge-slot 'inline-lambda-body)
              (merge-slot 'compiler-macro-lambda))
            (setf (nth p-pos polymorphs) p-new)
@@ -228,7 +232,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defun register-polymorph (name type-list effective-type-list
                            return-type inline-lambda-body lambda
-                           lambda-list-type applicable-p-lambda)
+                           lambda-list-type compiler-applicable-p-lambda)
   (declare (type function-name  name)
            (type function       lambda)
            (type type-list      type-list)
@@ -257,10 +261,12 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      ;; FIXME: COMPILE should be resulting in a heavy load time
                                      ;; Avoid its use, since it's no longer of optimal use
                                      ;; Perhaps, as before, resort to TYPE-LIST-APPLICABLE-P
-                                     :applicable-p-lambda applicable-p-lambda
-                                     :applicable-p-form (applicable-p-form apf-lambda-list-type
-                                                                           untyped-lambda-list
-                                                                           effective-type-list)
+                                     :compiler-applicable-p-lambda
+                                     compiler-applicable-p-lambda
+                                     :runtime-applicable-p-form
+                                     (runtime-applicable-p-form apf-lambda-list-type
+                                                                untyped-lambda-list
+                                                                effective-type-list)
                                      :inline-lambda-body inline-lambda-body
                                      :lambda             lambda
                                      :compiler-macro-lambda nil)))
@@ -268,39 +274,57 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       (invalidate-polymorphic-function-lambda apf)
       polymorph)))
 
-;; FIXME: Fix the below after the caching update
-
-(defun retrieve-polymorph (name &rest arg-list)
+(defun compiler-retrieve-polymorph (name &rest arg-types)
   (declare (type function-name name))
   (assert *compiler-macro-expanding-p*)
   ;; This function is used by the main compiler macro of the polymorphic-function
   ;; The RETRIEVE-POLYMORPH-FORM below is a complementary to this function.
-  (let* ((apf                   (fdefinition name))
-         (polymorphs            (polymorphic-function-polymorphs apf))
-         (lambda-list-type      (polymorphic-function-lambda-list-type apf))
-         (applicable-polymorph  nil)
-         (applicable-polymorphs nil))
+  (let* ((apf        (fdefinition name))
+         (polymorphs (polymorphic-function-polymorphs apf))
+         (num-args   (length arg-types)))
+    (declare (optimize debug))
     (loop :for polymorph :in polymorphs
-          :do (when (if (eq 'rest lambda-list-type)
-                        (ignore-errors
-                         (apply
-                          (the function
-                               (polymorph-applicable-p-lambda polymorph))
-                          arg-list))
-                        (apply
-                         (the function
-                              (polymorph-applicable-p-lambda polymorph))
-                         arg-list))
-                (cond (applicable-polymorphs (push polymorph applicable-polymorphs))
-                      (applicable-polymorph
-                       (push applicable-polymorph applicable-polymorphs)
-                       (push polymorph applicable-polymorphs)
-                       (setq applicable-polymorph nil))
-                      (t (setq applicable-polymorph polymorph)))))
-    ;; TODO: Optimize this; look at specialization-store?
-    (or applicable-polymorph
-        ;; TODO: Add a NOT-THE-MOST-SPECIALIZED-POLYMORPH condition
-        (most-specialized-polymorph applicable-polymorphs))))
+          :for lambda-list-type := (polymorph-lambda-list-type polymorph)
+          :for type-list := (polymorph-type-list polymorph)
+          :for app-p-lambda := (polymorph-compiler-applicable-p-lambda polymorph)
+          :do (when (block app-p-lambda
+                      (case lambda-list-type
+                        (required
+                         (if (= num-args (length type-list))
+                             (apply app-p-lambda arg-types)
+                             nil))
+                        (required-optional
+                         (if (<= (position '&optional type-list)
+                                 num-args
+                                 (1- (length type-list)))
+                             (apply app-p-lambda arg-types)
+                             nil))
+                        (required-key
+                         (let ((key-pos (position '&key type-list)))
+                           (if (<= key-pos
+                                   num-args
+                                   (+ key-pos (* 2 (- (length type-list) key-pos 1))))
+                               (apply app-p-lambda
+                                      (loop :for arg-type :in arg-types
+                                            :for idx :from 0
+                                            :with keyword-start := key-pos
+                                            :if (and (>= idx keyword-start)
+                                                     (evenp (- idx keyword-start)))
+                                              :collect (if (and (listp arg-type)
+                                                                ;; FIXME: Use CTYPE
+                                                                (eq 'eql (first arg-type))
+                                                                (null (cddr arg-type)))
+                                                           (second arg-type)
+                                                           (return-from app-p-lambda nil))
+                                            :else
+                                              :collect arg-type))
+                               nil)))
+                        (rest
+                         (if (<= (position '&rest type-list)
+                                 num-args)
+                             (apply app-p-lambda arg-types)
+                             nil))))
+                (return-from compiler-retrieve-polymorph polymorph)))))
 
 #+sbcl
 (defun most-specialized-applicable-transform-p (name node type-list)
@@ -345,6 +369,12 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (let* ((apf              (fdefinition name))
          (lambda-list      (polymorphic-function-lambda-list apf))
          (lambda-list-type (polymorphic-function-lambda-list-type apf))
+         (polymorph-lambda-list-type
+           (eswitch ((intersection type-list lambda-list-keywords) :test #'equal)
+             ('(&rest)     'rest)
+             ('(&key)      'required-key)
+             ('(&optional) 'required-optional)
+             ('()          'required)))
          (type-list   (let ((key-position (position '&key type-list)))
                         (if key-position
                             (append (subseq type-list 0 key-position)
@@ -375,14 +405,15 @@ use by functions like TYPE-LIST-APPLICABLE-P")
          apf
          (make-polymorph :name name
                          :type-list type-list
-                         :lambda-list-type lambda-list-type
-                         :applicable-p-form
-                         (applicable-p-form lambda-list-type
-                                            lambda-list
-                                            type-list)
-                         :applicable-p-lambda
-                         (compile nil (applicable-p-lambda-body lambda-list-type
-                                                                type-list))
+                         :lambda-list-type polymorph-lambda-list-type
+                         :runtime-applicable-p-form
+                         (runtime-applicable-p-form lambda-list-type
+                                                    lambda-list
+                                                    type-list)
+                         :compiler-applicable-p-lambda
+                         (compile nil
+                                  (compiler-applicable-p-lambda-body lambda-list-type
+                                                                     type-list))
                          :compiler-macro-lambda lambda))))))
 
 (defun retrieve-polymorph-compiler-macro (name &rest arg-list)
@@ -397,11 +428,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                          (ignore-errors
                           (apply
                            (the function
-                                (polymorph-applicable-p-lambda polymorph))
+                                (polymorph-compiler-applicable-p-lambda polymorph))
                            arg-list))
                          (apply
                           (the function
-                               (polymorph-applicable-p-lambda polymorph))
+                               (polymorph-compiler-applicable-p-lambda polymorph))
                           arg-list))
                    :collect polymorph)))
     (case (length applicable-polymorphs)

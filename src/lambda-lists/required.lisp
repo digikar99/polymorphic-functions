@@ -36,10 +36,10 @@
                                :for i :from 0
                                :for polymorph
                                  :in (polymorphic-function-polymorphs (fdefinition *name*))
-                               :for applicable-p-form
-                                 := (polymorph-applicable-p-form polymorph)
+                               :for runtime-applicable-p-form
+                                 := (polymorph-runtime-applicable-p-form polymorph)
                                :collect
-                               `(,applicable-p-form ,polymorph))
+                               `(,runtime-applicable-p-form ,polymorph))
                            (t
                             (error 'no-applicable-polymorph/error
                                    :arg-list (list ,@untyped-lambda-list)
@@ -65,22 +65,18 @@
                                     (untyped-lambda-list list))
   (length= type-list untyped-lambda-list))
 
-(defmethod applicable-p-lambda-body ((type (eql 'required))
-                                     (type-list list))
+(defmethod compiler-applicable-p-lambda-body ((type (eql 'required))
+                                              (type-list list))
   (let ((param-list (mapcar #'type->param type-list)))
     `(lambda ,param-list
        (declare (optimize speed))
-       (if *compiler-macro-expanding-p*
-           (and ,@(loop :for param :in param-list
-                        :for type  :in type-list
-                        :collect `(our-typep ,param ',type)))
-           (and ,@(loop :for param :in param-list
-                        :for type  :in type-list
-                        :collect `(typep ,param ',type)))))))
+       (and ,@(loop :for param :in param-list
+                    :for type  :in type-list
+                    :collect `(subtypep ,param ',type))))))
 
-(defmethod applicable-p-form ((type (eql 'required))
-                              (untyped-lambda-list list)
-                              (type-list list))
+(defmethod runtime-applicable-p-form ((type (eql 'required))
+                                      (untyped-lambda-list list)
+                                      (type-list list))
   `(and ,@(loop :for param :in untyped-lambda-list
                 :for type  :in type-list
                 :collect `(typep ,param ',type))))

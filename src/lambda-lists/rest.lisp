@@ -83,10 +83,10 @@
                          :for i :from 0
                          :for polymorph :in (polymorphic-function-polymorphs
                                              (fdefinition *name*))
-                         :for applicable-p-form
-                           := (polymorph-applicable-p-form polymorph)
+                         :for runtime-applicable-p-form
+                           := (polymorph-runtime-applicable-p-form polymorph)
                          :collect
-                         `(,applicable-p-form ,polymorph))
+                         `(,runtime-applicable-p-form ,polymorph))
                      (t
                       (error 'no-applicable-polymorph/error
                              :arg-list (list* ,@required-parameters ,rest-args)
@@ -119,24 +119,20 @@
           (t
            (<= rest-position (length type-list))))))
 
-(defmethod applicable-p-lambda-body ((type (eql 'rest)) (type-list list))
+(defmethod compiler-applicable-p-lambda-body ((type (eql 'rest)) (type-list list))
   (let* ((rest-position (position '&rest type-list))
          (param-list (append (mapcar #'type->param (subseq type-list 0 rest-position))
                              `(&rest ,(gensym)))))
     `(lambda ,param-list
        (declare (optimize speed)
                 (ignore ,@(last param-list)))
-       (if *compiler-macro-expanding-p*
-           (and ,@(loop :for param :in (subseq param-list 0 rest-position)
-                        :for type  :in (subseq type-list  0 rest-position)
-                        :collect `(our-typep ,param ',type)))
-           (and ,@(loop :for param :in (subseq param-list 0 rest-position)
-                        :for type  :in (subseq type-list  0 rest-position)
-                        :collect `(typep ,param ',type)))))))
+       (and ,@(loop :for param :in (subseq param-list 0 rest-position)
+                    :for type  :in (subseq type-list  0 rest-position)
+                    :collect `(subtypep ,param ',type))))))
 
-(defmethod applicable-p-form ((type (eql 'rest))
-                              (untyped-lambda-list list)
-                              (type-list list))
+(defmethod runtime-applicable-p-form ((type (eql 'rest))
+                                      (untyped-lambda-list list)
+                                      (type-list list))
   (let* ((rest-position (position '&rest untyped-lambda-list))
          (param-list    untyped-lambda-list)
          (rest-arg      (nth (1+ rest-position) untyped-lambda-list)))

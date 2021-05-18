@@ -36,7 +36,9 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
          (register-polymorphic-function ',name ',untyped-lambda-list ,documentation)
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
          (setf (compiler-macro-function ',name) #'apf-compiler-macro))
-      (fdefinition ',name))))
+       #+sbcl (setf (slot-value (fdefinition ',name) 'sb-pcl::source)
+                    (sb-c:source-location))
+       (fdefinition ',name))))
 
 (defun extract-declarations (body)
   "Returns two values: DECLARATIONS and remaining BODY"
@@ -203,7 +205,7 @@ at your own risk."
                          (values inline-lambda-body
                                  nil))))
               ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
-              ;; and "objects of type FUNCTION can't be dumped into fasl files
+              ;; and "objects of type FUNCTION can't be dumped into fasl files"
               `(progn
                  #+sbcl ,(when inline-safe-lambda-body
                            (if optim-debug
@@ -211,6 +213,10 @@ at your own risk."
                                `(locally (declare (sb-ext:muffle-conditions style-warning))
                                   (handler-bind ((style-warning #'muffle-warning))
                                     ,sbcl-transform))))
+                 ;; ,(when inline-note
+                 ;;    `(when (or (= 3 (introspect-environment:policy-quality 'debug))
+                 ;;               (= 3 (introspect-environment:policy-quality 'safety)))
+                 ;;       (write-string ,inline-note *error-output*)))
                  ,(when inline-note `(write-string ,inline-note *error-output*))
                  (eval-when (:compile-toplevel :load-toplevel :execute)
                    (register-polymorph ',name ',type-list
@@ -219,8 +225,9 @@ at your own risk."
                                        ',inline-safe-lambda-body
                                        ,lambda-body
                                        ',lambda-list-type
-                                       ,(applicable-p-lambda-body lambda-list-type
-                                                                  effective-type-list))
+                                       ,(compiler-applicable-p-lambda-body
+                                         lambda-list-type
+                                         effective-type-list))
                    ',name)))))))))
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list

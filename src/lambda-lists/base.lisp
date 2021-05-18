@@ -8,8 +8,8 @@
 ;; - SBCL-TRANSFORM-BODY-ARGS
 ;; - LAMBDA-DECLARATIONS
 ;; - TYPE-LIST-COMPATIBLE-P
-;; - APPLICABLE-P-LAMBDA-BODY
-;; - APPLICABLE-P-FORM
+;; - COMPILER-APPLICABLE-P-LAMBDA-BODY
+;; - RUNTIME-APPLICABLE-P-FORM
 ;; - TYPE-LIST-SUBTYPE-P
 ;; - TYPE-LIST-CAUSES-AMBIGUOUS-CALL-P
 ;; - MISCELLANEOUS
@@ -209,11 +209,11 @@ Non-examples:
   (5am:is-false (type-list-compatible-p 'rest
                                         '(&rest) '(c &rest e))))
 
-;; APPLICABLE-P-LAMBDA-BODY ====================================================
+;; COMPILER-APPLICABLE-P-LAMBDA-BODY ===========================================
 
-(defgeneric applicable-p-lambda-body (lambda-list-type type-list))
+(defgeneric compiler-applicable-p-lambda-body (lambda-list-type type-list))
 
-(defmethod applicable-p-lambda-body ((type t) (type-list t))
+(defmethod compiler-applicable-p-lambda-body ((type t) (type-list t))
   (assert (typep type 'lambda-list-type) nil
           "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
           +lambda-list-types+ type)
@@ -221,12 +221,12 @@ Non-examples:
           "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
 
-;; APPLICABLE-P-FORM ===========================================================
+;; RUNTIME-APPLICABLE-P-FORM ===================================================
 
-(defgeneric applicable-p-form
+(defgeneric runtime-applicable-p-form
     (lambda-list-type untyped-lambda-list type-list))
 
-(defmethod applicable-p-form ((type t) (untyped-lambda-list t) (type-list t))
+(defmethod runtime-applicable-p-form ((type t) (untyped-lambda-list t) (type-list t))
   (assert (typep type 'lambda-list-type) nil
           "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
           +lambda-list-types+ type)
@@ -276,26 +276,6 @@ Non-examples:
 
 (defvar *compiler-macro-expanding-p* nil
   "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")
-
-(defun our-typep (arg type)
-  (assert *compiler-macro-expanding-p*)
-  (when (type= t type) (return-from our-typep t))
-  (let ((form-type (nth-form-type arg *environment* 0 t t)))
-    (if (eq t form-type)
-        (signal 'form-type-failure :form arg)
-        (subtypep form-type type *environment*))))
-
-(def-test our-typep (:suite :adhoc-polymorphic-functions)
-  (macrolet ((with-compile-time (&rest body)
-               `(let ((*compiler-macro-expanding-p* t)
-                      (*environment* nil))
-                  ,@body)))
-    (5am:is-true (with-compile-time (our-typep 5 '(member 5))))
-    (5am:is-true (with-compile-time (our-typep 5 '(eql 5))))
-    (5am:is-true (with-compile-time (our-typep ''symbol '(eql symbol))))
-    (5am:is-true (with-compile-time (our-typep ''symbol '(member symbol))))
-    (5am:is-true (with-compile-time (our-typep ''symbol '(or fixnum (member symbol)))))
-    (5am:is-false (with-compile-time (our-typep (copy-array #(1 2 3)) '(eql #(1 2 3)))))))
 
 (defun type->param (type-specifier &optional type)
   (if (member type-specifier lambda-list-keywords)

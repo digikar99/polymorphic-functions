@@ -162,10 +162,10 @@
                             :for i :from 0
                             :for polymorph
                               :in (polymorphic-function-polymorphs (fdefinition *name*))
-                            :for applicable-p-form
-                              := (polymorph-applicable-p-form polymorph)
+                            :for runtime-applicable-p-form
+                              := (polymorph-runtime-applicable-p-form polymorph)
                             :collect
-                            `(,applicable-p-form ,polymorph))
+                            `(,runtime-applicable-p-form ,polymorph))
                         (t
                          (error 'no-applicable-polymorph/error
                                 :arg-list ,args
@@ -220,7 +220,7 @@
                 (pos-2 (position '&optional untyped-lambda-list)))
          (= pos-1 pos-2))))
 
-(defmethod applicable-p-lambda-body ((type (eql 'required-optional)) (type-list list))
+(defmethod compiler-applicable-p-lambda-body ((type (eql 'required-optional)) (type-list list))
   (let* ((optional-position (position '&optional type-list))
          (param-list (loop :for i :from 0
                            :for type :in type-list
@@ -229,27 +229,18 @@
                                         (type->param type)))))
     `(lambda ,param-list
        (declare (optimize speed))
-       (if *compiler-macro-expanding-p*
-           (and ,@(loop :for param :in (subseq param-list 0 optional-position)
-                        :for type  :in (subseq type-list  0 optional-position)
-                        :collect `(our-typep ,param ',type))
-                ,@(loop :for (param default supplied-p)
-                          :in (subseq param-list (1+ optional-position))
-                        :for type  :in (subseq type-list (1+ optional-position))
-                        :collect `(or (not ,supplied-p)
-                                      (our-typep ,param ',type))))
-           (and ,@(loop :for param :in (subseq param-list 0 optional-position)
-                        :for type  :in (subseq type-list  0 optional-position)
-                        :collect `(typep ,param ',type))
-                ,@(loop :for (param default supplied-p)
-                          :in (subseq param-list (1+ optional-position))
-                        :for type  :in (subseq type-list (1+ optional-position))
-                        :collect `(or (not ,supplied-p)
-                                      (typep ,param ',type))))))))
+       (and ,@(loop :for param :in (subseq param-list 0 optional-position)
+                    :for type  :in (subseq type-list  0 optional-position)
+                    :collect `(subtypep ,param ',type))
+            ,@(loop :for (param default supplied-p)
+                      :in (subseq param-list (1+ optional-position))
+                    :for type  :in (subseq type-list (1+ optional-position))
+                    :collect `(or (not ,supplied-p)
+                                  (subtypep ,param ',type)))))))
 
-(defmethod applicable-p-form ((type (eql 'required-optional))
-                              (untyped-lambda-list list)
-                              (type-list list))
+(defmethod runtime-applicable-p-form ((type (eql 'required-optional))
+                                      (untyped-lambda-list list)
+                                      (type-list list))
   (let* ((optional-position (position '&optional type-list))
          (param-list        untyped-lambda-list))
     `(and ,@(loop :for param :in (subseq param-list 0 optional-position)

@@ -176,10 +176,10 @@
                          :for i :from 0
                          :for polymorph :in (polymorphic-function-polymorphs
                                              (fdefinition *name*))
-                         :for applicable-p-form
-                           := (polymorph-applicable-p-form polymorph)
+                         :for runtime-applicable-p-form
+                           := (polymorph-runtime-applicable-p-form polymorph)
                          :collect
-                         `(,applicable-p-form ,polymorph))
+                         `(,runtime-applicable-p-form ,polymorph))
                      (t
                       (error 'no-applicable-polymorph/error
                              :arg-list (list* ,@required-parameters ,rest-args)
@@ -229,7 +229,7 @@
                   (return-from %type-list-compatible-p nil))))
     t))
 
-(defmethod applicable-p-lambda-body ((type (eql 'required-key)) (type-list list))
+(defmethod compiler-applicable-p-lambda-body ((type (eql 'required-key)) (type-list list))
   (let* ((key-position (position '&key type-list))
          (param-list (loop :for i :from 0
                            :for type :in type-list
@@ -238,25 +238,17 @@
                                         (type->param type)))))
     `(lambda ,param-list
        (declare (optimize speed))
-       (if *compiler-macro-expanding-p*
-           (and ,@(loop :for param :in (subseq param-list 0 key-position)
-                        :for type  :in (subseq type-list  0 key-position)
-                        :collect `(our-typep ,param ',type))
-                ,@(loop :for (param default supplied-p)
-                          :in (subseq param-list (1+ key-position))
-                        :for type  :in (subseq type-list (1+ key-position))
-                        :collect `(our-typep ,param ',(second type))))
-           (and ,@(loop :for param :in (subseq param-list 0 key-position)
-                        :for type  :in (subseq type-list  0 key-position)
-                        :collect `(typep ,param ',type))
-                ,@(loop :for (param default supplied-p)
-                          :in (subseq param-list (1+ key-position))
-                        :for type  :in (subseq type-list (1+ key-position))
-                        :collect `(typep ,param ',(second type))))))))
+       (and ,@(loop :for param :in (subseq param-list 0 key-position)
+                    :for type  :in (subseq type-list  0 key-position)
+                    :collect `(subtypep ,param ',type))
+            ,@(loop :for (param default supplied-p)
+                      :in (subseq param-list (1+ key-position))
+                    :for type  :in (subseq type-list (1+ key-position))
+                    :collect `(subtypep ,param ',(second type)))))))
 
-(defmethod applicable-p-form ((type (eql 'required-key))
-                              (untyped-lambda-list list)
-                              (type-list list))
+(defmethod runtime-applicable-p-form ((type (eql 'required-key))
+                                      (untyped-lambda-list list)
+                                      (type-list list))
   (let* ((rest-position (position '&rest untyped-lambda-list))
          (key-position  (position '&key untyped-lambda-list))
          (param-list    untyped-lambda-list))

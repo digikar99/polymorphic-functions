@@ -18,32 +18,39 @@
                        :unwind-on-signal nil
                        :optimization-note-condition optim-speed)
       (let* ((arg-list  (mapcar (lambda (form)
-                                  (cond ((not (listp form)) form)
-                                        ((macro-function (first form) env)
-                                         (macroexpand form env))
-                                        ((compiler-macro-function (first form) env)
-                                         (compiler-macroexpand form env))
-                                        (t form)))
+                                  (with-output-to-string (*error-output*)
+                                    (setq form
+                                          (cond ((not (listp form)) form)
+                                                ((macro-function (first form) env)
+                                                 (macroexpand form env))
+                                                ((compiler-macro-function (first form) env)
+                                                 (compiler-macroexpand form env))
+                                                (t form))))
+                                  form)
                                 (rest form)))
              ;; Expanding things here results in O(n) calls to this function
              ;; rather than O(n^2); although the actual effects of this are
              ;; insignificant for day-to-day compilations
-             (form-type-failure-signalled)
-             (polymorph (handler-case (apply #'retrieve-polymorph name arg-list)
-                          (form-type-failure (c)
-                            (signal c)
-                            (setq form-type-failure-signalled t)
-                            nil))))
+             (arg-types (mapcar (lambda (form)
+                                  (nth-form-type form env 0 t t))
+                                arg-list))
+             (polymorph (apply #'compiler-retrieve-polymorph name arg-types)))
         (when optim-debug
           (return-from apf-compiler-macro original-form))
-        (when (and (or optim-speed optim-safety)
-                   (null polymorph)
-                   (not form-type-failure-signalled))
-          (signal 'no-applicable-polymorph/compiler-note
-                  :arg-list arg-list
-                  :effective-type-lists
-                  (polymorphic-function-effective-type-lists (fdefinition name))))
-        (when (null polymorph)
+        (cond ((and optim-speed
+                    (null polymorph)
+                    (member t arg-types))
+               (signal 'form-type-failure
+                       :form (nth (position t arg-types)
+                                  (rest form))))
+              ((and optim-safety
+                    (null polymorph)
+                    (not (member t arg-types)))
+               (signal 'no-applicable-polymorph/compiler-note
+                       :arg-list arg-list
+                       :effective-type-lists
+                       (polymorphic-function-effective-type-lists (fdefinition name)))))
+        (unless optim-speed
           (return-from apf-compiler-macro original-form))
         (with-slots (inline-lambda-body return-type type-list
                      compiler-macro-lambda)
