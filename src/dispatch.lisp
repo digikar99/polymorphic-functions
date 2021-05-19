@@ -121,6 +121,7 @@ at your own risk."
                                  name))
            (*environment*    env)
            (typed-lambda-list (normalize-typed-lambda-list typed-lambda-list))
+           (untyped-lambda-list (untyped-lambda-list typed-lambda-list))
            (lambda-list-type  (lambda-list-type typed-lambda-list :typed t)))
       (declare (type typed-lambda-list typed-lambda-list))
       (multiple-value-bind (param-list type-list effective-type-list)
@@ -207,6 +208,11 @@ at your own risk."
               ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
               ;; and "objects of type FUNCTION can't be dumped into fasl files"
               `(progn
+                 (eval-when (:compile-toplevel :load-toplevel :execute)
+                   (unless (and (fboundp ',name)
+                                (typep (function ,name) 'adhoc-polymorphic-function))
+                     #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
+                     (register-polymorphic-function ',name ',untyped-lambda-list nil)))
                  #+sbcl ,(when inline-safe-lambda-body
                            (if optim-debug
                                sbcl-transform
