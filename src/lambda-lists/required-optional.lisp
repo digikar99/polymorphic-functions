@@ -168,6 +168,7 @@
                             `(,runtime-applicable-p-form ,polymorph))
                         (t
                          (error 'no-applicable-polymorph/error
+                                :name ',*name*
                                 :arg-list ,args
                                 :effective-type-lists
                                 (polymorphic-function-effective-type-lists

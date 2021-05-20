@@ -29,7 +29,10 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                        (fdefinition name) name name)))))
 
 (define-condition no-applicable-polymorph ()
-  ((arg-list :initarg :arg-list
+  ((name :initarg :name
+         :initform (error "NAME not specified")
+         :reader name)
+   (arg-list :initarg :arg-list
              :initform (error "ARG-LIST not specified")
              :reader arg-list)
    (effective-type-lists :initarg :effective-type-lists
@@ -37,7 +40,9 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                :reader effective-type-lists))
   (:report (lambda (condition s)
              (pprint-logical-block (s nil)
-               (format s "No applicable POLYMORPH discovered for ARG-LIST:~%~%")
+               (format s "No applicable POLYMORPH discovered for polymorphic-function~%  ~S~%"
+                       (name condition))
+               (format s "and ARG-LIST:~%~%")
                ;; It is possible that arg-lists could be circular (?)
                ;; Or that they contain circular structures (?)
                (pprint-logical-block (s nil :per-line-prefix "  ")

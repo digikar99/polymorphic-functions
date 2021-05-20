@@ -89,6 +89,7 @@
                          `(,runtime-applicable-p-form ,polymorph))
                      (t
                       (error 'no-applicable-polymorph/error
+                             :name ',*name*
                              :arg-list (list* ,@required-parameters ,rest-args)
                              :effective-type-lists
                              (polymorphic-function-effective-type-lists (function ,*name*)))))))

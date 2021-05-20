@@ -42,6 +42,7 @@
                                `(,runtime-applicable-p-form ,polymorph))
                            (t
                             (error 'no-applicable-polymorph/error
+                                   :name ',*name*
                                    :arg-list (list ,@untyped-lambda-list)
                                    :effective-type-lists
                                    (polymorphic-function-effective-type-lists
