@@ -78,21 +78,23 @@
            `(apply
              (the function
                   (polymorph-lambda
-                   (cond
-                     ,@(loop
-                         :for i :from 0
-                         :for polymorph :in (polymorphic-function-polymorphs
-                                             (fdefinition *name*))
-                         :for runtime-applicable-p-form
-                           := (polymorph-runtime-applicable-p-form polymorph)
-                         :collect
-                         `(,runtime-applicable-p-form ,polymorph))
-                     (t
-                      (error 'no-applicable-polymorph/error
-                             :name ',*name*
-                             :arg-list (list* ,@required-parameters ,rest-args)
-                             :effective-type-lists
-                             (polymorphic-function-effective-type-lists (function ,*name*)))))))
+                   (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                     (cond
+                       ,@(loop
+                           :for i :from 0
+                           :for polymorph :in (polymorphic-function-polymorphs
+                                               (fdefinition *name*))
+                           :for runtime-applicable-p-form
+                             := (polymorph-runtime-applicable-p-form polymorph)
+                           :collect
+                           `(,runtime-applicable-p-form ,polymorph))
+                       (t
+                        (error 'no-applicable-polymorph/error
+                               :name ',*name*
+                               :arg-list (list* ,@required-parameters ,rest-args)
+                               :effective-type-lists
+                               (polymorphic-function-effective-type-lists
+                                (function ,*name*))))))))
              ,@required-parameters ,rest-args)))))
 
 (defmethod %sbcl-transform-body-args ((type (eql 'rest)) (typed-lambda-list list))

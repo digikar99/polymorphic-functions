@@ -157,22 +157,23 @@
                       (t
                        (funcall (fdefinition ',*name*) ,@required-parameters))))
              `(let ((,polymorph
-                      (cond
-                        ,@(loop
-                            :for i :from 0
-                            :for polymorph
-                              :in (polymorphic-function-polymorphs (fdefinition *name*))
-                            :for runtime-applicable-p-form
-                              := (polymorph-runtime-applicable-p-form polymorph)
-                            :collect
-                            `(,runtime-applicable-p-form ,polymorph))
-                        (t
-                         (error 'no-applicable-polymorph/error
-                                :name ',*name*
-                                :arg-list ,args
-                                :effective-type-lists
-                                (polymorphic-function-effective-type-lists
-                                 (function ,*name*)))))))
+                      (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                        (cond
+                          ,@(loop
+                              :for i :from 0
+                              :for polymorph
+                                :in (polymorphic-function-polymorphs (fdefinition *name*))
+                              :for runtime-applicable-p-form
+                                := (polymorph-runtime-applicable-p-form polymorph)
+                              :collect
+                              `(,runtime-applicable-p-form ,polymorph))
+                          (t
+                           (error 'no-applicable-polymorph/error
+                                  :name ',*name*
+                                  :arg-list ,args
+                                  :effective-type-lists
+                                  (polymorphic-function-effective-type-lists
+                                   (function ,*name*))))))))
                 (cond ,@(loop :for (name default supplied-p) :in (reverse optional-parameters)
                               :for optional-idx :downfrom (length optional-parameters) :above 0
                               :for parameters := (append required-parameters
