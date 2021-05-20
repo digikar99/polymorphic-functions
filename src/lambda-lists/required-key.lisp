@@ -227,27 +227,38 @@
     (when (eq '&key (first args))
       (setf args  (rest args)
             type-list (rest (member '&key type-list)))
-      (loop :while args
+      (loop :while key
             :for key := (let ((arg-type (first arg-types)))
                           (when arg-type
                             (assert (and (listp arg-type)
                                          (eq 'eql (first arg-type))
                                          (null (cddr arg-type))))
                             (second arg-type)))
-            :for arg-type := (second arg-types)
-            :for original-type := (second (assoc key type-list))
-            :for arg := (let ((arg (if key
-                                       (find key args
-                                             :test (lambda (key arg)
-                                                     (string= key
-                                                              (etypecase arg
-                                                                (symbol arg)
-                                                                (list (first arg))))))
-                                       (first args))))
+            :for arg := (let ((arg (find key args
+                                         :test (lambda (key arg)
+                                                 (string= key
+                                                          (etypecase arg
+                                                            (symbol arg)
+                                                            (list (first arg))))))))
                           (etypecase arg
                             (symbol arg)
                             (list (first arg))))
+            :for arg-type := (second arg-types)
             :do (push `(type ,arg-type ,arg) declarations)
+                (setf arg-types (cddr arg-types))
+                (setf args (remove key args
+                                   :test (lambda (first second)
+                                           (string= first
+                                                    (etypecase second
+                                                      (symbol second)
+                                                      (list (first second))))))))
+      (loop :while args
+            :for arg := (let ((arg (first args)))
+                          (etypecase arg
+                            (symbol arg)
+                            (list (first arg))))
+            :for original-type := (second (assoc arg type-list :test #'string=))
+            :do (push `(type ,original-type ,arg) declarations)
                 (setf arg-types (cddr arg-types))
                 (setf args (remove arg args
                                    :test (lambda (first second)
