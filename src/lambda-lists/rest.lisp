@@ -176,15 +176,22 @@
                                  :collect `(typep (nth ,i ,rest-arg) ',type)))
                           ((member '&key type-list)
                            (let* ((pos-key (position '&key type-list))
-                                  (param-type (subseq type-list (1+ pos-key)))
-                                  (i -1))
+                                  (param-types (subseq type-list (1+ pos-key)))
+                                  (i 0))
                              (nconc
                               (loop :for type :in (subseq type-list 0 pos-key)
-                                    :do (incf i)
-                                    :collect `(typep (nth ,i ,rest-arg) ',type))
-                              (loop :for (param type) :in param-type
-                                    :do (incf i 2)
-                                    :collect `(typep (nth ,i ,rest-arg) ',type)))))
+                                    :collect `(typep (nth ,i ,rest-arg) ',type)
+                                    :do (incf i))
+                              `((evenp (length (nthcdr ,i ,rest-arg))))
+                              (let ((key-tmp-args
+                                      (loop :for (param type) :in param-types
+                                            :collect (make-symbol (symbol-name param)))))
+                                `((destructuring-bind (&key ,@key-tmp-args &allow-other-keys)
+                                      (nthcdr ,i ,rest-arg)
+                                    (and ,@(loop :for (param type) :in param-types
+                                                 :for key-tmp-arg :in key-tmp-args
+                                                 :collect `(typep ,key-tmp-arg
+                                                                  ',type)))))))))
                           (t
                            (error "Not expected to reach here"))))))))
 

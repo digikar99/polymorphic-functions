@@ -120,7 +120,7 @@
 ;;; FIXME: Add a test for recursive safety
 ;;; How to distinguish between runtime call vs compile time call?
 
-(def-test rest-correctness ()
+(def-test rest-correctness-1 ()
   (ignoring-error-output
     (eval `(define-polymorphic-function my+ (arg &rest args) :overwrite t))
     (eval `(progn
@@ -146,6 +146,22 @@
   (is (string= "hello5" (eval `(my+ "hello" 5 :coerce t))))
   (undefine-polymorphic-function 'my+)
   (fmakunbound 'my+-number-caller))
+
+(def-test rest-correctness-2 ()
+  (ignoring-error-output
+    (unwind-protect
+         (progn
+           (eval
+            `(progn
+               (define-polymorphic-function rest-tester (a &rest args) :overwrite t)
+               (defpolymorph rest-tester ((a number) &key ((b number) 0)) number
+                 (+ a b))
+               (defpolymorph rest-tester ((a number) (b number) &key ((c number) 0)) number
+                 (+ a b c)))))
+      (is (= 4 (eval `(rest-tester 4))))
+      (is (= 6 (eval `(rest-tester 4 :b 2))))
+      (is (= 6 (eval `(rest-tester 4 2))))
+      (is (= 8 (eval `(rest-tester 4 2 :c 2)))))))
 
 (def-test undefpolymorph ()
   (with-output-to-string (*error-output*)
