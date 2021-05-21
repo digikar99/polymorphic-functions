@@ -1,5 +1,5 @@
 
-(uiop:define-package :adhoc-polymorphic-functions
+(uiop:define-package :polymorphic-functions
   (:mix :cl-form-types :trivial-types :cl :alexandria :introspect-environment)
   (:import-from :5am :is :def-test)
   (:export :define-polymorphic-function
@@ -10,12 +10,12 @@
            :find-polymorph
 
            ;; Unstable API
-           :adhoc-polymorphic-function
+           :polymorphic-function
            :polymorph))
 
-(in-package :adhoc-polymorphic-functions)
+(in-package :polymorphic-functions)
 
-(5am:def-suite :adhoc-polymorphic-functions)
+(5am:def-suite :polymorphic-functions)
 
 (defmacro catch-condition (form)
   `(handler-case ,form

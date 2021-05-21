@@ -1,4 +1,4 @@
-(in-package :adhoc-polymorphic-functions)
+(in-package :polymorphic-functions)
 
 (defun apf-compiler-macro (form &optional env)
   (when (eq 'apply (first form))
@@ -47,6 +47,7 @@
                     (null polymorph)
                     (not (member t arg-types)))
                (signal 'no-applicable-polymorph/compiler-note
+                       :name name
                        :arg-list arg-list
                        :effective-type-lists
                        (polymorphic-function-effective-type-lists (fdefinition name)))))

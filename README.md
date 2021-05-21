@@ -1,41 +1,24 @@
-# adhoc-polymorphic-functions
-
-Provides `polymorphic-functions` to allow for dispatching on types instead of classes. See [examples](#examples).
+# polymorphic-functions
 
 >This library is still experimental. Interface can change in backward-incompatible ways.
+>Please wait until a proper release to use in production code. (Or track commits and use git submodules and/or qlot!)
 
-The name does capture what it is: [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism). This is not [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) since individual implementations do differ. I also do not see how the latter is implementable without the former. See [specialized-function](https://github.com/numcl/specialized-function) for parametric polymorphism.
+The library provides both [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism) and (IIUC) AOT [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) to dispatch and/or optimize on the basis of types rather than classes.
 
-## Rationale
+## Usage
 
-`polymorphic-function` are implemented using the metaclass `closer-mop:funcallable-standard-class` and `closer-mop:set-funcallable-instance-function`.
+- Users are expected to define a `polymorphic-function` (analogous to `cl:generic-function`) with one or more `polymorph` (similar to `cl:method`). These may be dispatched at runtime or at compile time if optimization policy is `(and (= speed 3) (/= debug 3))` abbreviated as `optim-speed`.
+- Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
+- Parametric Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a polymorph that was defined for `vector` when compiled with arguments declared to be `simple-string`, then the body is made aware at *compiler/macroexpansion time* that the arguments are actually `simple-string` rather than just `vector`. Code further in the succeeding compiler/macroexpansion phases can then make use of this information.
+- Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for *correctness*.
 
-As per [CLHS](http://www.lispworks.com/documentation/HyperSpec/Body/t_generi.htm#generic-function),
 
->A generic function is a function whose behavior depends on the classes or identities of the arguments supplied to it.
-
-By contrast, adhoc-polymorphic-functions dispatch on the types of the arguments supplied to it. This helps dispatching on specialized arrays as well as user-defined types.
-
-apf comprises of the `polymorphic-functions` (analogous to `generic-functions`) and its associated `polymorphs` (analogous to `methods`). Wherever possible, apf provides compiler notes for [inline optimizations](#inline-optimizations) as well as a certain amount of type checking.
-
-In contrast to [sealable-metaobjects](https://github.com/marcoheisig/sealable-metaobjects) and [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions), adhoc-polymorphic-functions does not make any assumptions about the sealedness of a domain for purposes of inlining. Thus, users are expected to abide by the same precautions for inline optimizations here as they do while inlining normal functions. In particular, users are expected to recompile their code after additional polymorphs are defined, and also accordingly manage the compilation order of their files and systems.
-
-A related project [specialization-store](https://github.com/markcox80/specialization-store) also provides support for type-based dispatch:
-
->A premise of specialization store is that all specializations should perform the same task. Specializations should only differ in how the task is performed. This premise resolves ambiguities that arise when using types, rather than classes, to select the most specific specialization to apply.
-
-However, the implications of this assumption are that individual specializations in each store-object of specialization-store [do not have initializer forms for optional or keyword arguments](https://github.com/markcox80/specialization-store/wiki/Tutorial-2:-Optional,-Keyword-and-Rest-Arguments).
-
-By contrast, like usual generic-functions, apf does allow initializer forms for optional and keywords arguments for individual polymorphs.
-
-In addition to being dispatched on types, apf also provides the ability to install compiler-macros for individual `polymorphs`.
-
-## Examples
+### Examples
 
 See [src/misc-tests.lisp](src/misc-tests.lisp) for some more examples.
 
 ```lisp
-(use-package :adhoc-polymorphic-functions)
+(use-package :polymorphic-functions)
 (define-polymorphic-function my= (a b))
 (defpolymorph my= ((a string) (b string)) boolean
   (string= a b))
@@ -94,25 +77,67 @@ CL-USER> (defun baz (a b)
                     (type integer b)
                     (optimize safety))
            (my= a b))
-; While compiling (MY= A B):
-;
-;   No applicable POLYMORPH discovered for TYPE-LIST (STRING INTEGER).
-;   Available TYPE-LISTs include:
-;      ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
-;      (CHARACTER CHARACTER)
-;      (STRING STRING)
+; While compiling
+;     (MY= A B)
+;   Following notes were encountered:
+;     
+;     No applicable POLYMORPH discovered for polymorphic-function
+;       MY=
+;     and ARG-LIST:
+;     
+;       (A B)
+;     
+;     Available Effective-Type-Lists include:
+;     
+;       (STRING STRING)
+;       (CHARACTER CHARACTER)
+;       ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
 BAZ
 CL-USER> (my= 5 "hello")
-; Evaluation aborted on #<ADHOC-POLYMORPHIC-FUNCTIONS::NO-APPLICABLE-POLYMORPH/ERROR {103A713D13}>.
+; Evaluation aborted on #<POLYMORPHIC-FUNCTIONS::NO-APPLICABLE-POLYMORPH/ERROR {103A713D13}>.
 ```
+
+### Libraries / Projects currently using polymorphic-functions
+
+- [abstract-arrays](https://github.com/digikar99/abstract-arrays) and [dense-arrays](https://github.com/digikar99/dense-numericals/)
+- [dense-numericals](https://github.com/digikar99/dense-numericals/): this makes extensive use of parametric polymorphism to avoid code repetition in the *packaged* provided code, cutting down on initial compile times. 
+- lisp-polymorph with currently working 
+  - [polymorph.maths](https://github.com/lisp-polymorph/polymorph.maths)
+  - [polymorph.access](https://github.com/lisp-polymorph/polymorph.access)
+  - [polymorph.copy-cast](https://github.com/lisp-polymorph/polymorph.copy-cast)
+  - and more...
+
+
+## Rationale
+
+`polymorphic-function` are implemented using the metaclass `closer-mop:funcallable-standard-class` and `closer-mop:set-funcallable-instance-function`.
+
+As per [CLHS](http://www.lispworks.com/documentation/HyperSpec/Body/t_generi.htm#generic-function),
+
+>A generic function is a function whose behavior depends on the classes or identities of the arguments supplied to it.
+
+By contrast, polymorphic-functions dispatch on the types of the arguments supplied to it. This helps dispatching on specialized arrays as well as user-defined types.
+
+In contrast to [sealable-metaobjects](https://github.com/marcoheisig/sealable-metaobjects) and [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions), polymorphic-functions does not make any assumptions about the sealedness of a domain for purposes of inlining. Thus, users are expected to abide by the same precautions for inline optimizations here as they do while inlining normal functions. In particular, users are expected to recompile their code after additional polymorphs are defined, and also accordingly manage the compilation order of their files and systems.
+
+A related project [specialization-store](https://github.com/markcox80/specialization-store) also provides support for type-based dispatch:
+
+>A premise of specialization store is that all specializations should perform the same task. Specializations should only differ in how the task is performed. This premise resolves ambiguities that arise when using types, rather than classes, to select the most specific specialization to apply.
+
+However, the implications of this assumption are that individual specializations in each store-object of specialization-store [do not have initializer forms for optional or keyword arguments](https://github.com/markcox80/specialization-store/wiki/Tutorial-2:-Optional,-Keyword-and-Rest-Arguments).
+
+By contrast, like usual generic-functions, PF does allow initializer forms for optional and keywords arguments for individual polymorphs.
+
+In addition to being dispatched on types, PF also provides the ability to install compiler-macros for individual `polymorphs`.
 
 ## Dependencies outside quicklisp
 
 - SBCL 2.0.9+
 - [trivial-types:function-name](https://github.com/digikar99/trivial-types)
 - [cl-form-types](https://github.com/alex-gutev/cl-form-types)
-  - [cl-environments 0.4](https://github.com/alex-gutev/cl-environments)
+  - [cl-environments](https://github.com/alex-gutev/cl-environments)
 - [compiler-macro-notes](https://github.com/digikar99/compiler-macro-notes)
+- and more... better use ultralisp until then!
 
 ### Getting it from ultralisp
 
@@ -145,21 +170,20 @@ Once the function is pushed, install the dist:
 ;;; If the install-dist step gives a "can't create directory" error, manually
 ;;; create the directory $QUICKLISP_HOME/dists/digikar99
 (ql:update-dist "digikar99/specialized-array-dispatch")
-(ql:quickload "adhoc-polymorphic-functions")
-(asdf:test-system "adhoc-polymorphic-functions")
+(ql:quickload "polymorphic-functions")
+(asdf:test-system "polymorphic-functions")
 ```
 
 ## Tests
 
-Tests are distributed throughout the system. Run `(asdf:test-system "adhoc-polymorphic-functions")`.
+Tests are distributed throughout the system. Run `(asdf:test-system "polymorphic-functions")`.
 
 ## Inline Optimizations
 
 A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
 
 - A speed=3 optimization coupled with debug<3 optimization results in (attempts to) inline-optimizations.
-- A debug=3 optimization leaves things as they are and avoids any sort of optimizations.
-- Inline optimizations may be avoided by `(declare (notinline my-polymorph))` - however, inlining is the only way to optimize polymorphs.
+- Inline optimizations may be avoided by `(declare (notinline my-polymorph))` - however, inlining is the only way to optimize polymorphic-functions.
 
 It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under some definition of same-ness.
 
@@ -194,7 +218,7 @@ Then, the behavior of `my-type-caller` depends on optimization policies:
 
 The mistake here is polymorph with type list `(vector)` produces a different behavior as compared to polymorph with type list `(string)`. (The behavior is "same" in the sense that `"hello"` is indeed a `vector`; perspective matters?)
 
-This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way adhoc-polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
+This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
 
 Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. `generic-cl` (since `static-dispatch` version 0.5) overcomes this on SBCL by using `sb-c:deftransform`; for portable projects, one could use `inlined-generic-functions` [superseded by `fast-generic-functions`] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.
 
@@ -204,23 +228,32 @@ Inlining especially becomes necessary for mathematical operations, wherein a cal
 - [specialization-store](https://github.com/markcox80/specialization-store)
 - [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions)
 - [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function)
+- [specialized-function](https://github.com/numcl/specialized-function)
+
 
 
 ## Feature Parity
 
-| Feature                         | cl:generic-function | specialization-store | adhoc-polymorphic-functions |
-|:--------------------------------|:--------------------|:---------------------|:----------------------------|
-| Method combination              | Yes                 | No                   | No                          |
-| Precedence                      | Yes                 | Partial*             | Yes                         |
-| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                        |
-| Run-time Speed                  | Fast                | Fast                 | Fast                        |
-| Compile-time support            | Partial**           | Yes                  | Yes                         |
+| Feature                         | cl:generic-function | specialization-store | polymorphic-functions |
+|:--------------------------------|:--------------------|:---------------------|:----------------------|
+| Method combination              | Yes                 | No                   | No                    |
+| Precedence                      | Yes                 | Partial*             | Yes                   |
+| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                  |
+| Run-time Speed                  | Fast                | Fast                 | Fast                  |
+| Compile-time support            | Partial**           | Yes                  | Yes                   |
+| Parametric Polymorphism         | Partial**           | No                   | Yes                   |
 
 ^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
 
 \*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries. But, there's also [static-dispatch](https://github.com/alex-gutev/static-dispatch).
 
-## Static Dispatch Limitations
+## Limitations
 
-For form-type-inference, adhoc-polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [cl-form-types](https://github.com/alex-gutev/cl-form-types) does get pretty extensive. In cases wherein it does fail, we also rely on `sb-c:deftransform` on SBCL.
+- For form-type-inference, polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [cl-form-types](https://github.com/alex-gutev/cl-form-types) does get pretty extensive. In cases wherein it does fail, we also rely on `sb-c:deftransform` on SBCL.
+- Integration with SLIME is yet to be thought about; etags could work, but this needs more thinking given the apparant non-extensibility of internals of `slime-edit-definition`. imenu is also another option.
+
+## Acknowledgements
+
+- [Alex Gutev](https://github.com/alex-gutev/) for an extensive [cl-form-types](https://github.com/alex-gutev/cl-form-types)!
+- [Andrew](https://github.com/commander-trashdin/) for extensively putting polymorphic-functions to test at a brewing project on [lisp-polymorph](https://github.com/lisp-polymorph/polymorph)!

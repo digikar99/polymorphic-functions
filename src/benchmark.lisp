@@ -1,6 +1,6 @@
-(in-package :adhoc-polymorphic-functions)
+(in-package :polymorphic-functions)
 
-(5am:in-suite :adhoc-polymorphic-functions)
+(5am:in-suite :polymorphic-functions)
 
 (defmacro time-it (&body body)
   (with-gensyms (start end body-result)

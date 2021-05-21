@@ -1,4 +1,4 @@
-(in-package adhoc-polymorphic-functions)
+(in-package polymorphic-functions)
 
 ;; In this file, our main functions/macros are
 ;; - DEFINE-LAMBDA-LIST-HELPER
@@ -30,7 +30,7 @@
 
 (deftype lambda-list-type () `(satisfies lambda-list-type-p))
 
-(5am:def-suite lambda-list :in :adhoc-polymorphic-functions)
+(5am:def-suite lambda-list :in :polymorphic-functions)
 
 (defun valid-parameter-name-p (name)
   (and (symbolp name)
@@ -297,7 +297,7 @@ ARG-TYPES into account."))
       type-specifier
       (case type
         (&key (list (intern (symbol-name (first type-specifier))
-                            :adhoc-polymorphic-functions)
+                            :polymorphic-functions)
                     nil))
         (&optional (list (gensym (write-to-string type-specifier))
                          nil

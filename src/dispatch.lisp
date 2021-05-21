@@ -1,4 +1,4 @@
-(in-package adhoc-polymorphic-functions)
+(in-package polymorphic-functions)
 
 (defun recursive-function-p (name body)
   (when body
@@ -210,7 +210,7 @@ at your own risk."
               `(progn
                  (eval-when (:compile-toplevel :load-toplevel :execute)
                    (unless (and (fboundp ',name)
-                                (typep (function ,name) 'adhoc-polymorphic-function))
+                                (typep (function ,name) 'polymorphic-function))
                      #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
                      (register-polymorphic-function ',name ',untyped-lambda-list nil)
                      (setf (compiler-macro-function ',name) #'apf-compiler-macro)))

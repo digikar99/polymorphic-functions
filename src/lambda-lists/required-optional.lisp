@@ -1,4 +1,4 @@
-(in-package :adhoc-polymorphic-functions)
+(in-package :polymorphic-functions)
 
 (defmethod %lambda-list-type ((type (eql 'required-optional)) (lambda-list list))
   (let ((state :required))
