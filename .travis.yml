@@ -10,7 +10,7 @@ install:
   - bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
   - mkdir -p ~/quicklisp/dists/digikar99
   - ls -l ~/quicklisp/dists
-
+  
 script:
   - cl --eval '(progn
                  (defun ql-dist::dist-name-pathname (name)
@@ -30,7 +30,7 @@ script:
                   "http://dist.ultralisp.org/digikar99/specialized-array-dispatch.txt"
                   :prompt nil)
                  (push :travis *features*)
-                 (ql:quickload "adhoc-polymorphic-functions")
+                 (ql:quickload "polymorphic-functions")
                  (uiop:quit 0))'
   - cl --eval '(progn
                  (defun ql-dist::dist-name-pathname (name)
@@ -47,8 +47,8 @@ script:
                  (push (quote digikar99-dist-enumeration-function)
                        ql::*dist-enumeration-functions*)
                  (push :travis *features*)
-                 (ql:quickload "adhoc-polymorphic-functions")
-                 (asdf:test-system :adhoc-polymorphic-functions)
+                 (ql:quickload "polymorphic-functions")
+                 (asdf:test-system :polymorphic-functions)
                  (uiop:quit 0))'
 
 notifications:
