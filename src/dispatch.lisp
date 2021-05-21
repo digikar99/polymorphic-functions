@@ -212,7 +212,8 @@ at your own risk."
                    (unless (and (fboundp ',name)
                                 (typep (function ,name) 'adhoc-polymorphic-function))
                      #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-                     (register-polymorphic-function ',name ',untyped-lambda-list nil)))
+                     (register-polymorphic-function ',name ',untyped-lambda-list nil)
+                     (setf (compiler-macro-function ',name) #'apf-compiler-macro)))
                  #+sbcl ,(when inline-safe-lambda-body
                            (if optim-debug
                                sbcl-transform
