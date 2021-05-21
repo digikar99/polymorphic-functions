@@ -120,6 +120,8 @@ By contrast, polymorphic-functions dispatch on the types of the arguments suppli
 
 In contrast to [sealable-metaobjects](https://github.com/marcoheisig/sealable-metaobjects) and [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions), polymorphic-functions does not make any assumptions about the sealedness of a domain for purposes of inlining. Thus, users are expected to abide by the same precautions for inline optimizations here as they do while inlining normal functions. In particular, users are expected to recompile their code after additional polymorphs are defined, and also accordingly manage the compilation order of their files and systems.
 
+IIUC, [specialized-function](https://github.com/numcl/specialized-function) provides a JIT variant of parametric polymorphism. By contrast, PF provides an AOT variant.
+
 A related project [specialization-store](https://github.com/markcox80/specialization-store) also provides support for type-based dispatch:
 
 >A premise of specialization store is that all specializations should perform the same task. Specializations should only differ in how the task is performed. This premise resolves ambiguities that arise when using types, rather than classes, to select the most specific specialization to apply.
@@ -256,4 +258,4 @@ Well...
 ## Acknowledgements
 
 - [Alex Gutev](https://github.com/alex-gutev/) for an extensive [cl-form-types](https://github.com/alex-gutev/cl-form-types)!
-- [Andrew](https://github.com/commander-trashdin/) for extensively putting polymorphic-functions to test at a brewing project on [lisp-polymorph](https://github.com/lisp-polymorph/polymorph)!
+- [Andrew](https://github.com/commander-trashdin/) for extensively putting polymorphic-functions to test at a brewing project on [lisp-polymorph](https://github.com/lisp-polymorph/)!
