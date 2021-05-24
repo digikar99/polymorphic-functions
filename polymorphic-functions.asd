@@ -25,13 +25,15 @@
                (:file "compiler-macro"             :depends-on ("polymorphic-function"
                                                                 "lambda-lists"
                                                                 "conditions"))
+               #+sbcl
                (:file "sbcl-transform"             :depends-on ("polymorphic-function"
                                                                 "lambda-lists"
                                                                 "conditions"))
                (:file "dispatch"                   :depends-on ("polymorphic-function"
                                                                 "lambda-lists"
                                                                 "conditions"
-                                                                "compiler-macro"))
+                                                                "compiler-macro"
+                                                                #+sbcl "sbcl-transform"))
                (:file "misc-tests"                 :depends-on ("dispatch"))
                (:file "benchmark"                  :depends-on ("misc-tests")))
   :perform (test-op (o c)

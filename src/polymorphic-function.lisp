@@ -326,36 +326,6 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                              nil))))
                 (return-from compiler-retrieve-polymorph polymorph)))))
 
-#+sbcl
-(defun most-specialized-applicable-transform-p (name node type-list)
-  (let ((applicable-polymorphs
-          (remove-if-not (lambda (polymorph)
-                           (sb-c::valid-fun-use
-                            node
-                            (sb-kernel:specifier-type
-                             (list 'function
-                                   (let ((type-list (polymorph-type-list polymorph)))
-                                     ;; FIXME: Better integration of &rest types
-                                     (if (eq '&rest (lastcar type-list))
-                                         (butlast type-list)
-                                         type-list))
-                                   '*))))
-                         (polymorphic-function-polymorphs
-                          (fdefinition name)))))
-    (equalp type-list
-            (polymorph-type-list (most-specialized-polymorph applicable-polymorphs)))))
-
-(defun most-specialized-polymorph (polymorphs)
-  (declare (optimize debug))
-  (cond ((null polymorphs) nil)
-        ((null (rest polymorphs)) (first polymorphs))
-        (t
-         (let ((ms-polymorph (most-specialized-polymorph (rest polymorphs))))
-           (if (type-list-subtype-p (polymorph-type-list ms-polymorph)
-                                    (polymorph-type-list (first polymorphs)))
-               ms-polymorph
-               (first polymorphs))))))
-
 (defun remove-polymorph (name type-list)
   (let ((apf (fdefinition name)))
     (when apf
