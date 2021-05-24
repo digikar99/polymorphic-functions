@@ -205,20 +205,40 @@
     (eval `(progn
              (undefine-polymorphic-function 'sbcl-transform)
              (define-polymorphic-function sbcl-transform (a) :overwrite t)
+             (defpolymorph sbcl-transform ((a array)) t
+               (list 'array a))
              (defpolymorph sbcl-transform ((a string)) t
-               (declare (ignore a))))))
+               (list 'string a))
+             (defpolymorph-compiler-macro sbcl-transform (string) (&whole form a)
+               `(list ',(sb-c::type-specifier (sb-c::%lvar-derived-type a)) ,form)))))
+  (is (= 2 (length
+            (sb-c::fun-info-transforms
+             (sb-c::fun-info-or-lose 'sbcl-transform)))))
+  (eval `(setf (compiler-macro-function 'sbcl-transform) nil))
+  (ignoring-error-output
+    (eval `(defun sbcl-transform-caller (b)
+             (declare (optimize speed)
+                      (type array b))
+             (sbcl-transform b))))
+  (is (equalp '(array "string") (eval `(sbcl-transform-caller "string"))))
+  (ignoring-error-output
+    (eval `(defun sbcl-transform-compiler-macro-caller (b)
+             (declare (optimize speed)
+                      (type string b))
+             (sbcl-transform b))))
+  (is (equalp '((values string &optional) (string "string"))
+              (eval `(sbcl-transform-compiler-macro-caller "string"))))
+  (eval `(undefpolymorph 'sbcl-transform '(string)))
   (is (= 1 (length
             (sb-c::fun-info-transforms
              (sb-c::fun-info-or-lose 'sbcl-transform)))))
-  (eval `(undefpolymorph 'sbcl-transform '(string)))
-  (is (= 0 (length
-            (sb-c::fun-info-transforms
-             (sb-c::fun-info-or-lose 'sbcl-transform)))))
-  (eval `(undefine-polymorphic-function 'sbcl-transform)))
-
-;;; TODO: Add specialization tests pertaining to sbcl-transforms
-;;; It feels non-trivial to check if it was the correct transform that was applied
-;;; or if it was the correct polymorph being called at runtime.
+  (eval `(progn
+           (undefine-polymorphic-function 'sbcl-transform)
+           (unintern 'sbcl-transform)
+           (fmakunbound 'sbcl-transform-caller)
+           (unintern 'sbcl-transform-caller)
+           (fmakunbound 'sbcl-transform-compiler-macro-caller)
+           (unintern 'sbcl-transform-compiler-macro-caller))))
 
 (def-test ambiguous-type-lists ()
   (ignoring-error-output
