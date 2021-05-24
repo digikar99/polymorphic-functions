@@ -171,43 +171,9 @@ at your own risk."
                                        #+ccl (nth 2 lambda-body)
                                        #+sbcl `(lambda ,@(nthcdr 2 lambda-body))))
                  #+sbcl
-                 (sbcl-transform
-                   (with-gensyms (node env compiler-macro-lambda)
-                     `(sb-c:deftransform ,name
-                          (,param-list ,(if (eq '&rest (lastcar type-list))
-                                            (butlast type-list)
-                                            type-list) *
-                           :policy (< debug speed)
-                           :node ,node)
-                        ;; FIXME: This leads to an O(n^2) complexity
-                        ;; Could sorting help?
-                        (unless (most-specialized-applicable-transform-p
-                                 ',name ,node ',type-list)
-                          (sb-c::give-up-ir1-transform))
-                        ,(let ((args (sbcl-transform-body-args typed-lambda-list
-                                                               :typed t)))
-                           `(if-let ((,compiler-macro-lambda
-                                         (polymorph-compiler-macro-lambda
-                                          (find-polymorph ',name ',type-list)))
-                                     (,env (sb-c::node-lexenv ,node)))
-                              ,(let ((compiler-macro-arg-syms
-                                       (loop :for arg :in args
-                                             :unless (null arg)
-                                               :collect (gensym (symbol-name arg)))))
-                                 `(let (,@(loop :for compiler-macro-arg-sym
-                                                  :in compiler-macro-arg-syms
-                                                :for arg :in args
-                                                :collect `(,compiler-macro-arg-sym ,arg)))
-                                    (translate-body
-                                     (trivial-macroexpand-all:macroexpand-all
-                                      (funcall ,compiler-macro-lambda
-                                               (cons ',inline-lambda-body
-                                                     (list ,@compiler-macro-arg-syms))
-                                               ,env))
-                                     (list ,@(mapcar (lambda (x y) `(cons ,x ',y))
-                                                     compiler-macro-arg-syms
-                                                     args)))))
-                              `(apply ,',lambda-body ,@',args)))))))
+                 (sbcl-transform-body (make-sbcl-transform-body name
+                                                                typed-lambda-list
+                                                                inline-lambda-body)))
             (multiple-value-bind (inline-safe-lambda-body inline-note)
                 (cond ((and ip inline)
                        (values inline-lambda-body
@@ -246,10 +212,10 @@ at your own risk."
                      (setf (compiler-macro-function ',name) #'apf-compiler-macro)))
                  #+sbcl ,(when inline-safe-lambda-body
                            (if optim-debug
-                               sbcl-transform
+                               sbcl-transform-body
                                `(locally (declare (sb-ext:muffle-conditions style-warning))
                                   (handler-bind ((style-warning #'muffle-warning))
-                                    ,sbcl-transform))))
+                                    ,sbcl-transform-body))))
                  ;; ,(when inline-note
                  ;;    `(when (or (= 3 (introspect-environment:policy-quality 'debug))
                  ;;               (= 3 (introspect-environment:policy-quality 'safety)))

@@ -113,12 +113,12 @@
 
 (defmethod enhanced-lambda-declarations ((type (eql 'rest))
                                          (type-list list)
-                                         (args list)
+                                         (param-list list)
                                          (arg-types list))
   `(declare ,@(mapcar (lambda (arg arg-type)
                         `(type ,arg-type ,arg))
-                      (subseq args 0
-                              (position '&rest args))
+                      (subseq param-list 0
+                              (position '&rest param-list))
                       arg-types)))
 
 (defmethod %type-list-compatible-p ((type (eql 'rest))

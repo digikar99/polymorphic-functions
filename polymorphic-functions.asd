@@ -25,6 +25,9 @@
                (:file "compiler-macro"             :depends-on ("polymorphic-function"
                                                                 "lambda-lists"
                                                                 "conditions"))
+               (:file "sbcl-transform"             :depends-on ("polymorphic-function"
+                                                                "lambda-lists"
+                                                                "conditions"))
                (:file "dispatch"                   :depends-on ("polymorphic-function"
                                                                 "lambda-lists"
                                                                 "conditions"

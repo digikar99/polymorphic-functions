@@ -217,18 +217,18 @@
 
 (defmethod enhanced-lambda-declarations ((type (eql 'required-key))
                                          (type-list list)
-                                         (args list)
+                                         (param-list list)
                                          (arg-types list))
   (let ((declarations ()))
-    (loop :for arg := (first args)
+    (loop :for arg := (first param-list)
           :for arg-type := (first arg-types)
           :until (eq arg '&key)
           :do (push `(type ,arg-type ,arg) declarations)
-              (setf args      (rest args))
-              (setf arg-types (rest arg-types)))
-    (when (eq '&key (first args))
-      (setf args  (rest args)
-            type-list (rest (member '&key type-list)))
+              (setf param-list (rest param-list))
+              (setf arg-types  (rest arg-types)))
+    (when (eq '&key (first param-list))
+      (setf param-list (rest param-list)
+            type-list  (rest (member '&key type-list)))
       (loop :for key := (let ((arg-type (first arg-types)))
                           (when arg-type
                             (assert (and (listp arg-type)
@@ -236,7 +236,7 @@
                                          (null (cddr arg-type))))
                             (second arg-type)))
             :while key
-            :for arg := (let ((arg (find key args
+            :for arg := (let ((arg (find key param-list
                                          :test (lambda (key arg)
                                                  (string= key
                                                           (etypecase arg
@@ -247,27 +247,27 @@
                             (list (first arg))))
             :for arg-type := (second arg-types)
             :do (push `(type ,arg-type ,arg) declarations)
-                (setf arg-types (cddr arg-types))
-                (setf args (remove key args
-                                   :test (lambda (first second)
-                                           (string= first
-                                                    (etypecase second
-                                                      (symbol second)
-                                                      (list (first second))))))))
-      (loop :while args
-            :for arg := (let ((arg (first args)))
+                (setf arg-types  (cddr arg-types))
+                (setf param-list (remove key param-list
+                                         :test (lambda (first second)
+                                                 (string= first
+                                                          (etypecase second
+                                                            (symbol second)
+                                                            (list (first second))))))))
+      (loop :while param-list
+            :for arg := (let ((arg (first param-list)))
                           (etypecase arg
                             (symbol arg)
                             (list (first arg))))
             :for original-type := (second (assoc arg type-list :test #'string=))
             :do (push `(type ,original-type ,arg) declarations)
-                (setf arg-types (cddr arg-types))
-                (setf args (remove arg args
-                                   :test (lambda (first second)
-                                           (string= first
-                                                    (etypecase second
-                                                      (symbol second)
-                                                      (list (first second)))))))))
+                (setf arg-types  (cddr arg-types))
+                (setf param-list (remove arg param-list
+                                         :test (lambda (first second)
+                                                 (string= first
+                                                          (etypecase second
+                                                            (symbol second)
+                                                            (list (first second)))))))))
     `(declare ,@(nreverse declarations))))
 
 (defmethod %type-list-compatible-p ((type (eql 'required-key))

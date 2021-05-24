@@ -65,11 +65,11 @@
 
 (defmethod enhanced-lambda-declarations ((type (eql 'required))
                                          (type-list list)
-                                         (args list)
+                                         (param-list list)
                                          (arg-types list))
   `(declare ,@(mapcar (lambda (arg arg-type)
                         `(type ,arg-type ,arg))
-                      args
+                      param-list
                       arg-types)))
 
 (defmethod %type-list-compatible-p ((type (eql 'required))

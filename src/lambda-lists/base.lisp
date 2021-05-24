@@ -168,11 +168,11 @@ Non-examples:
 
 ;; ENHANCED-LAMBDA-DECLARATIONS ================================================
 
-(defgeneric enhanced-lambda-declarations (lambda-list-type type-list args arg-types)
+(defgeneric enhanced-lambda-declarations (lambda-list-type type-list param-list arg-types)
   (:documentation "Like LAMBDA-DECLARATIONS, but along with the TYPE-LIST, also takes
 ARG-TYPES into account."))
 
-(defmethod enhanced-lambda-declarations (type type-list args arg-types)
+(defmethod enhanced-lambda-declarations (type type-list param-list arg-types)
   (assert (typep type 'lambda-list-type) nil
           "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
           +lambda-list-types+ type)
