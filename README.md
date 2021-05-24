@@ -3,7 +3,7 @@
 >This library is still experimental. Interface can change in backward-incompatible ways.
 >Please wait until a proper release to use in production code. (Or track commits and use git submodules and/or qlot!)
 
-The library provides both [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism) and (IIUC) AOT [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) to dispatch and/or optimize on the basis of types rather than classes.
+The library provides both [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism) and (IIUC) limited AOT [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) to dispatch and/or optimize on the basis of types rather than classes. Currently Parametric Polymorphism is limited to the outermost scope of the polymorphs. See [this](https://www.reddit.com/r/lisp/comments/nho7gr/polymorphicfunctions_possibly_aot_dispatch_on/gyyovkh?utm_source=share&utm_medium=web2x&context=3) and nearby comments for an attempt at explaining this.
 
 ## Usage
 

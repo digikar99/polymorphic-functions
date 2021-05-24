@@ -1,12 +1,29 @@
 (in-package polymorphic-functions)
 
+(defun traverse-tree (tree &optional (function #'identity))
+  "Traverses TREE and calls function on each subtree and node of TREE."
+  (if (listp tree)
+      (loop :for node :in (funcall function tree)
+            :collect (traverse-tree node function))
+      (funcall function tree)))
+
 (defun recursive-function-p (name body)
-  (when body
-    (cond ((listp body)
-           (if (eq name (car body))
-               t
-               (some (curry 'recursive-function-p name) (cdr body))))
-          (t nil))))
+  (flet ((%recursive-p (node)
+           (if (listp node)
+               (if (eq name (first node))
+                   (return-from recursive-function-p t)
+                   node)
+               nil)))
+    (traverse-tree body #'%recursive-p)
+    nil))
+
+(defun translate-body (body translation-alist)
+  (flet ((translate (node)
+           (if (listp node)
+               node
+               (or (cdr (assoc node translation-alist))
+                   node))))
+    (traverse-tree body #'translate)))
 
 ;;; - run-time correctness requires
 ;;;   - DEFINE-POLYMORPH-FUNCTION -> DEFUN
@@ -155,7 +172,7 @@ at your own risk."
                                        #+sbcl `(lambda ,@(nthcdr 2 lambda-body))))
                  #+sbcl
                  (sbcl-transform
-                   (with-gensyms (node args env compiler-macro-lambda)
+                   (with-gensyms (node env compiler-macro-lambda)
                      `(sb-c:deftransform ,name
                           (,param-list ,(if (eq '&rest (lastcar type-list))
                                             (butlast type-list)
@@ -167,17 +184,30 @@ at your own risk."
                         (unless (most-specialized-applicable-transform-p
                                  ',name ,node ',type-list)
                           (sb-c::give-up-ir1-transform))
-                        (let ((,args (sbcl-transform-body-args ',typed-lambda-list
+                        ,(let ((args (sbcl-transform-body-args typed-lambda-list
                                                                :typed t)))
-                          (if-let ((,compiler-macro-lambda
-                                     (polymorph-compiler-macro-lambda
-                                      (find-polymorph ',name ',type-list)))
-                                   (,env (sb-c::node-lexenv ,node)))
-                            (funcall ,compiler-macro-lambda
-                                     (cons ',inline-lambda-body
-                                           (apply #'list* ,args))
-                                     ,env)
-                            `(apply ,',lambda-body ,@,args)))))))
+                           `(if-let ((,compiler-macro-lambda
+                                         (polymorph-compiler-macro-lambda
+                                          (find-polymorph ',name ',type-list)))
+                                     (,env (sb-c::node-lexenv ,node)))
+                              ,(let ((compiler-macro-arg-syms
+                                       (loop :for arg :in args
+                                             :unless (null arg)
+                                               :collect (gensym (symbol-name arg)))))
+                                 `(let (,@(loop :for compiler-macro-arg-sym
+                                                  :in compiler-macro-arg-syms
+                                                :for arg :in args
+                                                :collect `(,compiler-macro-arg-sym ,arg)))
+                                    (translate-body
+                                     (trivial-macroexpand-all:macroexpand-all
+                                      (funcall ,compiler-macro-lambda
+                                               (cons ',inline-lambda-body
+                                                     (list ,@compiler-macro-arg-syms))
+                                               ,env))
+                                     (list ,@(mapcar (lambda (x y) `(cons ,x ',y))
+                                                     compiler-macro-arg-syms
+                                                     args)))))
+                              `(apply ,',lambda-body ,@',args)))))))
             (multiple-value-bind (inline-safe-lambda-body inline-note)
                 (cond ((and ip inline)
                        (values inline-lambda-body

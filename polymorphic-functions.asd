@@ -9,6 +9,7 @@
                "fiveam" ;; just keep things together!
                "cl-form-types"
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
+               "trivial-macroexpand-all"
                "introspect-environment")
   :pathname #P"src/"
   :components ((:file "package")
