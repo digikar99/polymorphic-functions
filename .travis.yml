@@ -8,6 +8,9 @@ env:
 
 install:
   - bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
+  - cd ~/
+  - ls -a ~/
+  - git clone --depth=3 https://github.com/digikar99/polymorphic-functions ~/polymorphic-functions
   - mkdir -p ~/quicklisp/dists/digikar99
   - ls -l ~/quicklisp/dists
   
@@ -30,6 +33,9 @@ script:
                   "http://dist.ultralisp.org/digikar99/specialized-array-dispatch.txt"
                   :prompt nil)
                  (push :travis *features*)
+                 (push "~/" ql:*local-project-directories*)
+                 (print ql:*local-project-directories*)
+                 (print (ql:where-is-system "polymorphic-functions"))
                  (ql:quickload "polymorphic-functions")
                  (uiop:quit 0))'
   - cl --eval '(progn
@@ -46,6 +52,7 @@ script:
                      collect (ql-dist::make-dist-from-file file)))
                  (push (quote digikar99-dist-enumeration-function)
                        ql::*dist-enumeration-functions*)
+                 (push "~/" ql:*local-project-directories*)
                  (push :travis *features*)
                  (ql:quickload "polymorphic-functions")
                  (asdf:test-system :polymorphic-functions)
