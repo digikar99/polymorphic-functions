@@ -1,9 +1,9 @@
 (in-package :polymorphic-functions)
 
-(defun most-specialized-applicable-transform-p (name arg-types type-list)
+(defun most-specialized-applicable-transform-p (name arg-types-alist type-list)
   (let ((*compiler-macro-expanding-p* t))
     (equalp type-list
-            (polymorph-type-list (apply #'compiler-retrieve-polymorph name arg-types)))))
+            (polymorph-type-list (apply #'compiler-retrieve-polymorph name arg-types-alist)))))
 
 (defun make-sbcl-transform-body (name typed-lambda-list inline-lambda-body)
   (multiple-value-bind (param-list type-list effective-type-list)
@@ -12,7 +12,7 @@
     (let ((lambda-list-type (lambda-list-type typed-lambda-list :typed t)))
       (with-gensyms (node env compiler-macro-lambda
                           inline-lambda-body-sym param-list-sym lambda declarations body
-                          arg-types type)
+                          arg-types-alist arg-types type)
         `(sb-c:deftransform ,name
              (,param-list
               ,(if (eq '&rest (lastcar type-list))
@@ -23,18 +23,21 @@
               :node ,node)
            (declare (optimize debug))
            ,(let ((transformed-args (sbcl-transform-body-args typed-lambda-list :typed t)))
-              `(let ((,arg-types
-                       (list ,@(mapcar (lambda (arg)
-                                         (if (keywordp arg)
-                                             `'(eql ,arg)
-                                             `(let ((,type (sb-c::type-specifier
-                                                            (sb-c::%lvar-derived-type ,arg))))
-                                                (if (eq 'cl:* ,type)
-                                                    t
-                                                    (nth 1 ,type)))))
-                                       (remove-if #'null transformed-args)))))
+              `(let* ((,arg-types-alist
+                        (list ,@(mapcar (lambda (arg)
+                                          (if (keywordp arg)
+                                              `(cons ,arg '(eql ,arg))
+                                              `(cons ,arg
+                                                     (let ((,type
+                                                             (sb-c::type-specifier
+                                                              (sb-c::%lvar-derived-type ,arg))))
+                                                       (if (eq 'cl:* ,type)
+                                                           t
+                                                           (nth 1 ,type))))))
+                                        (remove-if #'null transformed-args))))
+                      (,arg-types (mapcar #'cdr ,arg-types-alist)))
                  (unless (most-specialized-applicable-transform-p
-                          ',name ,arg-types ',type-list)
+                          ',name ,arg-types-alist ',type-list)
                    (sb-c::give-up-ir1-transform))
                  (let ((,inline-lambda-body-sym
                          (destructuring-bind (,lambda ,param-list-sym ,declarations &body ,body)

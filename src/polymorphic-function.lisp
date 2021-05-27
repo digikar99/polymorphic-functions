@@ -274,14 +274,14 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       (invalidate-polymorphic-function-lambda apf)
       polymorph)))
 
-(defun compiler-retrieve-polymorph (name &rest arg-types)
+(defun compiler-retrieve-polymorph (name &rest arg-types-alist)
   (declare (type function-name name))
   (assert *compiler-macro-expanding-p*)
   ;; This function is used by the main compiler macro of the polymorphic-function
   ;; The RETRIEVE-POLYMORPH-FORM below is a complementary to this function.
   (let* ((apf        (fdefinition name))
          (polymorphs (polymorphic-function-polymorphs apf))
-         (num-args   (length arg-types)))
+         (num-args   (length arg-types-alist)))
     (declare (optimize debug))
     (loop :for polymorph :in polymorphs
           :for lambda-list-type := (polymorph-lambda-list-type polymorph)
@@ -291,13 +291,13 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                       (case lambda-list-type
                         (required
                          (if (= num-args (length type-list))
-                             (apply app-p-lambda arg-types)
+                             (apply app-p-lambda arg-types-alist)
                              nil))
                         (required-optional
                          (if (<= (position '&optional type-list)
                                  num-args
                                  (1- (length type-list)))
-                             (apply app-p-lambda arg-types)
+                             (apply app-p-lambda arg-types-alist)
                              nil))
                         (required-key
                          (let ((key-pos (position '&key type-list)))
@@ -305,24 +305,25 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                    num-args
                                    (+ key-pos (* 2 (- (length type-list) key-pos 1))))
                                (apply app-p-lambda
-                                      (loop :for arg-type :in arg-types
+                                      (loop :for (arg . arg-type) :in arg-types-alist
                                             :for idx :from 0
                                             :with keyword-start := key-pos
                                             :if (and (>= idx keyword-start)
                                                      (evenp (- idx keyword-start)))
                                               :collect (if (and (listp arg-type)
                                                                 ;; FIXME: Use CTYPE
-                                                                (eq 'eql (first arg-type))
+                                                                (member (first arg-type)
+                                                                        '(eql member))
                                                                 (null (cddr arg-type)))
                                                            (second arg-type)
                                                            (return-from app-p-lambda nil))
                                             :else
-                                              :collect arg-type))
+                                              :collect (cons arg arg-type)))
                                nil)))
                         (rest
                          (if (<= (position '&rest type-list)
                                  num-args)
-                             (apply app-p-lambda arg-types)
+                             (apply app-p-lambda arg-types-alist)
                              nil))))
                 (return-from compiler-retrieve-polymorph polymorph)))))
 

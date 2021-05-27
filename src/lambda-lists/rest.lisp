@@ -136,12 +136,21 @@
   (let* ((rest-position (position '&rest type-list))
          (param-list (append (mapcar #'type->param (subseq type-list 0 rest-position))
                              `(&rest ,(gensym)))))
-    `(lambda ,param-list
-       (declare (optimize speed)
-                (ignore ,@(last param-list)))
-       (and ,@(loop :for param :in (subseq param-list 0 rest-position)
-                    :for type  :in (subseq type-list  0 rest-position)
-                    :collect `(subtypep ,param ',type))))))
+    (with-gensyms (form form-type)
+      `(lambda ,param-list
+         (declare (optimize speed)
+                  (ignore ,@(last param-list)))
+         (and ,@(loop :for param :in (subseq param-list 0 rest-position)
+                      :for type  :in (subseq type-list  0 rest-position)
+                      :collect `(let ((,form      (car ,param))
+                                      (,form-type (cdr ,param)))
+                                  (cond ((eq t ',type)
+                                         t)
+                                        ((eq t ,form-type)
+                                         (signal 'form-type-failure
+                                                 :form ,form))
+                                        (t
+                                         (subtypep ,form-type ',type))))))))))
 
 (defmethod runtime-applicable-p-form ((type (eql 'rest))
                                       (untyped-lambda-list list)

@@ -80,11 +80,21 @@
 (defmethod compiler-applicable-p-lambda-body ((type (eql 'required))
                                               (type-list list))
   (let ((param-list (mapcar #'type->param type-list)))
-    `(lambda ,param-list
-       (declare (optimize speed))
-       (and ,@(loop :for param :in param-list
-                    :for type  :in type-list
-                    :collect `(subtypep ,param ',type))))))
+    (with-gensyms (form form-type)
+      `(lambda ,param-list
+         (declare (optimize speed))
+         (block nil
+           (and ,@(loop :for param :in param-list
+                        :for type  :in type-list
+                        :collect `(let ((,form      (car ,param))
+                                        (,form-type (cdr ,param)))
+                                    (cond ((eq t ',type)
+                                           t)
+                                          ((eq t ,form-type)
+                                           (signal 'form-type-failure
+                                                   :form ,form))
+                                          (t
+                                           (subtypep ,form-type ',type)))))))))))
 
 (defmethod runtime-applicable-p-form ((type (eql 'required))
                                       (untyped-lambda-list list)

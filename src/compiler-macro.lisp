@@ -34,23 +34,44 @@
              (arg-types (mapcar (lambda (form)
                                   (nth-form-type form env 0 t t))
                                 arg-list))
-             (polymorph (apply #'compiler-retrieve-polymorph name arg-types)))
+             ;; FORM-TYPE-FAILURE: We not only want to inform the user that there
+             ;; was a failure, but also inform them what the failure-ing form was.
+             ;; However, even if there was what appeared to be a failure on an
+             ;; earlier polymorph (because its type list was more specific than T),
+             ;; the possibility that there exists a later polymorph remains.
+             ;; Therefore, we first muffle the duplicated FORM-TYPE-FAILUREs;
+             ;; then, if a polymorph was found (see COND below), we further muffle
+             ;; the non-duplicated failures as well.
+             (form-type-failures nil)
+             (polymorph (handler-bind ((form-type-failure
+                                         (lambda (c)
+                                           (if (find c form-type-failures
+                                                     :test (lambda (c1 c2)
+                                                             (equalp (form c1)
+                                                                     (form c2))))
+                                               (compiler-macro-notes:muffle c)
+                                               (push c form-type-failures)))))
+                          (apply #'compiler-retrieve-polymorph
+                                 name (mapcar #'cons (rest form) arg-types)))))
         (when optim-debug
           (return-from apf-compiler-macro original-form))
-        (cond ((and optim-speed
-                    (null polymorph)
-                    (member t arg-types))
-               (signal 'form-type-failure
-                       :form (nth (position t arg-types)
-                                  (rest form))))
-              ((and optim-safety
-                    (null polymorph)
-                    (not (member t arg-types)))
-               (signal 'no-applicable-polymorph/compiler-note
-                       :name name
-                       :arg-list arg-list
-                       :effective-type-lists
-                       (polymorphic-function-effective-type-lists (fdefinition name)))))
+        (cond ((and (null polymorph)
+                    optim-speed
+                    ;; We can be sure that *something* will be printed
+                    ;; However, if there were no failures, and no polymorphs
+                    ;; *nothing* will be shown! And then we rely on the
+                    ;; NO-APPLICABLE-POLYMORPH/COMPILER-NOTE below.
+                    form-type-failures)
+               (return-from apf-compiler-macro original-form))
+              ((not (null polymorph))
+               (mapc #'compiler-macro-notes:muffle form-type-failures)))
+        (when (and (null polymorph)
+                   (or optim-speed optim-safety))
+          (signal 'no-applicable-polymorph/compiler-note
+                  :name name
+                  :arg-list arg-list
+                  :effective-type-lists
+                  (polymorphic-function-effective-type-lists (fdefinition name))))
         (when (or (null polymorph)
                   (not optim-speed))
           (return-from apf-compiler-macro original-form))

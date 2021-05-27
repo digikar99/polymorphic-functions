@@ -252,16 +252,33 @@
                            :collect (if (> i optional-position)
                                         (type->param type '&optional)
                                         (type->param type)))))
-    `(lambda ,param-list
-       (declare (optimize speed))
-       (and ,@(loop :for param :in (subseq param-list 0 optional-position)
-                    :for type  :in (subseq type-list  0 optional-position)
-                    :collect `(subtypep ,param ',type))
-            ,@(loop :for (param default supplied-p)
-                      :in (subseq param-list (1+ optional-position))
-                    :for type  :in (subseq type-list (1+ optional-position))
-                    :collect `(or (not ,supplied-p)
-                                  (subtypep ,param ',type)))))))
+    (with-gensyms (form form-type)
+      `(lambda ,param-list
+         (declare (optimize speed))
+         (and ,@(loop :for param :in (subseq param-list 0 optional-position)
+                      :for type  :in (subseq type-list  0 optional-position)
+                      :collect `(let ((,form      (car ,param))
+                                      (,form-type (cdr ,param)))
+                                  (cond ((eq t ',type)
+                                         t)
+                                        ((eq t ,form-type)
+                                         (signal 'form-type-failure
+                                                 :form ,form))
+                                        (t
+                                         (subtypep ,form-type ',type)))))
+              ,@(loop :for (param default supplied-p)
+                        :in (subseq param-list (1+ optional-position))
+                      :for type  :in (subseq type-list (1+ optional-position))
+                      :collect `(or (not ,supplied-p)
+                                    (let ((,form      (car ,param))
+                                          (,form-type (cdr ,param)))
+                                      (cond ((eq t ',type)
+                                             t)
+                                            ((eq t ,form-type)
+                                             (signal 'form-type-failure
+                                                     :form ,form))
+                                            (t
+                                             (subtypep ,form-type ',type)))))))))))
 
 (defmethod runtime-applicable-p-form ((type (eql 'required-optional))
                                       (untyped-lambda-list list)
