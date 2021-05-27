@@ -333,16 +333,40 @@
                   (defpolymorph inner ((a array)) t
                     (declare (ignore a))
                     'array)))
+
          (eval `(progn
                   (define-polymorphic-function outer (a) :overwrite t)
                   (defpolymorph outer ((a array)) t
                     (inner a))))
-         (eval `(defun outer-caller (a)
-                  (declare (optimize speed)
-                           (type string a))
-                  (outer a)))
+         (is (eq 'string (funcall (compile nil
+                                           `(lambda (a)
+                                              (declare (optimize speed)
+                                                       (type string a))
+                                              (outer a)))
+                                  "hello")))
 
-         (eval `(is (eq 'string (outer-caller "hello")))))
+         (eval `(defpolymorph outer ((a array)) t
+                  (let ((b a))
+                    (declare (type array b))
+                    (inner b))))
+         (is (eq 'array (funcall (compile nil
+                                           `(lambda (a)
+                                              (declare (optimize speed)
+                                                       (type string a))
+                                              (outer a)))
+                                 "hello")))
+
+         (eval `(defpolymorph outer ((a array)) t
+                  (let ((b a))
+                    (declare (type-like a b))
+                    (inner b))))
+         (is (eq 'string (funcall (compile nil
+                                           `(lambda (a)
+                                              (declare (optimize speed)
+                                                       (type string a))
+                                              (outer a)))
+                                  "hello"))))
+
     (undefine-polymorphic-function 'inner)
     (unintern 'inner)
     (undefine-polymorphic-function 'outer)

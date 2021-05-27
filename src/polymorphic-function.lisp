@@ -433,3 +433,13 @@ If it exists, the second value is T and the first value is a possibly empty
                        (return-from find-polymorph
                          (values polymorph t))))
            (values nil t)))))
+
+(cltl2:define-declaration type-like (vars env)
+  ;; TODO: Allow type-like like types in type-lists and return-type
+  (destructuring-bind (original &rest similar) vars
+    (values :variable
+            (loop :with type
+                    := (rest (assoc 'type
+                                    (nth-value 2 (cltl2:variable-information original env))))
+                  :for var :in similar
+                  :collect `(,var type ,type)))))

@@ -1,17 +1,18 @@
 
 (uiop:define-package :polymorphic-functions
   (:mix :cl-form-types :trivial-types :cl :alexandria :introspect-environment)
-  (:import-from :5am :is :def-test)
-  (:export :define-polymorphic-function
-           :undefine-polymorphic-function
-           :defpolymorph
-           :defpolymorph-compiler-macro
-           :undefpolymorph
-           :find-polymorph
+  (:import-from :5am #:is #:def-test)
+  (:export #:define-polymorphic-function
+           #:undefine-polymorphic-function
+           #:defpolymorph
+           #:defpolymorph-compiler-macro
+           #:undefpolymorph
+           #:find-polymorph
 
            ;; Unstable API
-           :polymorphic-function
-           :polymorph))
+           #:polymorphic-function
+           #:polymorph
+           #:type-like))
 
 (in-package :polymorphic-functions)
 
@@ -35,3 +36,5 @@
                                              (/= 3 (policy-quality 'speed env))
                                              (<= (policy-quality 'debug env)
                                                  (policy-quality 'speed env))))
+
+(trivial-package-local-nicknames:add-package-local-nickname :cltl2 :cl-environments.cltl2)
