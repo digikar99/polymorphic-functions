@@ -52,7 +52,7 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
             `(undefine-polymorphic-function ',name))
          (register-polymorphic-function ',name ',untyped-lambda-list ,documentation)
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-         (setf (compiler-macro-function ',name) #'apf-compiler-macro))
+         (setf (compiler-macro-function ',name) #'pf-compiler-macro))
        #+sbcl (setf (slot-value (fdefinition ',name) 'sb-pcl::source)
                     (sb-c:source-location))
        (fdefinition ',name))))
@@ -209,7 +209,7 @@ at your own risk."
                                 (typep (function ,name) 'polymorphic-function))
                      #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
                      (register-polymorphic-function ',name ',untyped-lambda-list nil)
-                     (setf (compiler-macro-function ',name) #'apf-compiler-macro)))
+                     (setf (compiler-macro-function ',name) #'pf-compiler-macro)))
                  #+sbcl ,(when inline-safe-lambda-body
                            (if optim-debug
                                sbcl-transform-body

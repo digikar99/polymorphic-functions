@@ -1,10 +1,10 @@
 (in-package :polymorphic-functions)
 
-(defun apf-compiler-macro (form &optional env)
+(defun pf-compiler-macro (form &optional env)
   (when (eq 'apply (first form))
     (format *error-output* "~A can optimize cases other than FUNCALL and raw call!~%Assk maintainer of ADHOC-POLYMORPHIC-FUNCTIONS to provide support for this case!"
             (lisp-implementation-type))
-    (return-from apf-compiler-macro form))
+    (return-from pf-compiler-macro form))
   (let* ((*environment*                 env)
          (*compiler-macro-expanding-p*    t)
          (original-form                form)
@@ -54,7 +54,7 @@
                           (apply #'compiler-retrieve-polymorph
                                  name (mapcar #'cons (rest form) arg-types)))))
         (when optim-debug
-          (return-from apf-compiler-macro original-form))
+          (return-from pf-compiler-macro original-form))
         (cond ((and (null polymorph)
                     optim-speed
                     ;; We can be sure that *something* will be printed
@@ -62,7 +62,7 @@
                     ;; *nothing* will be shown! And then we rely on the
                     ;; NO-APPLICABLE-POLYMORPH/COMPILER-NOTE below.
                     form-type-failures)
-               (return-from apf-compiler-macro original-form))
+               (return-from pf-compiler-macro original-form))
               ((not (null polymorph))
                (mapc #'compiler-macro-notes:muffle form-type-failures)))
         (when (and (null polymorph)
@@ -74,7 +74,7 @@
                   (polymorphic-function-effective-type-lists (fdefinition name))))
         (when (or (null polymorph)
                   (not optim-speed))
-          (return-from apf-compiler-macro original-form))
+          (return-from pf-compiler-macro original-form))
         (with-slots (return-type type-list
                      compiler-macro-lambda lambda-list-type)
             polymorph
@@ -91,7 +91,7 @@
                                                         args
                                                         arg-types)
                          ,@body))))
-            (return-from apf-compiler-macro
+            (return-from pf-compiler-macro
               (cond (compiler-macro-lambda
                      (funcall compiler-macro-lambda
                               (cons inline-lambda-body (rest form))
