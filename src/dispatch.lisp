@@ -259,7 +259,7 @@ at your own risk."
                      (sb-c::fun-info-transforms info)
                      :key #'sb-c::transform-type)))
   (remove-polymorph name type-list)
-  (update-polymorphic-function-lambda (fdefinition name)))
+  (update-polymorphic-function-lambda (fdefinition name) t))
 
 (defun undefine-polymorphic-function (name)
   "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH"
