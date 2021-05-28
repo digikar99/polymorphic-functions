@@ -334,7 +334,7 @@
 
          (eval `(progn
                   (define-polymorphic-function outer (a) :overwrite t)
-                  (defpolymorph outer ((a array)) t
+                  (defpolymorph (outer :inline t) ((a array)) t
                     (inner a))))
          (is (eq 'string (funcall (compile nil
                                            `(lambda (a)
@@ -343,7 +343,7 @@
                                               (outer a)))
                                   "hello")))
 
-         (eval `(defpolymorph outer ((a array)) t
+         (eval `(defpolymorph (outer :inline t) ((a array)) t
                   (let ((b a))
                     (declare (type array b))
                     (inner b))))
@@ -354,7 +354,7 @@
                                               (outer a)))
                                  "hello")))
 
-         (eval `(defpolymorph outer ((a array)) t
+         (eval `(defpolymorph (outer :inline t) ((a array)) t
                   (let ((b a))
                     (declare (type-like a b))
                     (inner b))))
