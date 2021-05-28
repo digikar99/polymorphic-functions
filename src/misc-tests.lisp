@@ -3,8 +3,7 @@
 (5am:in-suite :polymorphic-functions)
 
 (defmacro ignoring-error-output (&body body)
-  `(locally (declare #+sbcl(sb-ext:muffle-conditions style-warning))
-     (with-output-to-string (*error-output*) ,@body)))
+  `(with-output-to-string (*error-output*) ,@body))
 
 ;; unwind-protect (apparantly) does not have an effect in the def-test forms below :/
 
@@ -162,7 +161,7 @@
       (is (= 8 (eval `(rest-tester 4 2 :c 2)))))))
 
 (def-test undefpolymorph ()
-  (with-output-to-string (*error-output*)
+  (ignoring-error-output
     (eval '(define-polymorphic-function undefpolymorph-tester (a) :overwrite t))
     (eval '(progn
             (defpolymorph undefpolymorph-tester ((a list)) symbol
@@ -171,12 +170,12 @@
             (defpolymorph undefpolymorph-tester ((a string)) symbol
               (declare (ignore a))
               'string)))
-    (locally (declare (notinline undefpolymorph-tester))
-      (is (equalp 'list   (undefpolymorph-tester '(a))))
-      (is (equalp 'string (undefpolymorph-tester "hello")))
-      (undefpolymorph 'undefpolymorph-tester '(list))
-      (is-error (undefpolymorph-tester '(a)))
-      (is (equalp 'string (undefpolymorph-tester "hello"))))
+    (eval `(locally (declare (notinline undefpolymorph-tester))
+             (is (equalp 'list   (undefpolymorph-tester '(a))))
+             (is (equalp 'string (undefpolymorph-tester "hello")))
+             (undefpolymorph 'undefpolymorph-tester '(list))
+             (is-error (undefpolymorph-tester '(a)))
+             (is (equalp 'string (undefpolymorph-tester "hello")))))
     (undefine-polymorphic-function 'fmakunbound-tester)))
 
 (def-test undefine-polymorphic-function ()
@@ -189,12 +188,12 @@
             (defpolymorph undefine-polymorphic-function-tester ((a string)) symbol
               (declare (ignore a))
               'string)))
-    (locally (declare (notinline undefine-polymorphic-function-tester))
-      (is (equalp 'list   (undefine-polymorphic-function-tester '(a))))
-      (is (equalp 'string (undefine-polymorphic-function-tester "hello")))
-      (undefine-polymorphic-function 'undefine-polymorphic-function-tester)
-      (is-error (undefine-polymorphic-function-tester '(a)))
-      (is-error (undefine-polymorphic-function-tester "hello")))
+    (eval `(locally (declare (notinline undefine-polymorphic-function-tester))
+             (is (equalp 'list   (undefine-polymorphic-function-tester '(a))))
+             (is (equalp 'string (undefine-polymorphic-function-tester "hello")))
+             (undefine-polymorphic-function 'undefine-polymorphic-function-tester)
+             (is-error (undefine-polymorphic-function-tester '(a)))
+             (is-error (undefine-polymorphic-function-tester "hello"))))
     (undefine-polymorphic-function 'undefine-polymorphic-function-tester)))
 
 #+sbcl
@@ -277,12 +276,12 @@
              (defun most-specialized-polymorph-tester-caller ()
                (declare (optimize speed))
                (most-specialized-polymorph-tester "hello"))))
-    (let ((a "string")
-          (b #(a r r a y)))
-      (5am:is-true (eq 'string (most-specialized-polymorph-tester a)))
-      (5am:is-true (eq 'array  (most-specialized-polymorph-tester b)))
-      (5am:is-true (equalp '(compiled string)
-                           (most-specialized-polymorph-tester-caller))))
+    (eval `(let ((a "string")
+                 (b #(a r r a y)))
+             (5am:is-true (eq 'string (most-specialized-polymorph-tester a)))
+             (5am:is-true (eq 'array  (most-specialized-polymorph-tester b)))
+             (5am:is-true (equalp '(compiled string)
+                                  (most-specialized-polymorph-tester-caller)))))
     (eval `(undefine-polymorphic-function 'most-specialized-polymorph-tester))
     (eval `(fmakunbound 'most-specialized-polymorph-tester-caller))))
 

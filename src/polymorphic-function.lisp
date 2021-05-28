@@ -274,6 +274,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       (invalidate-polymorphic-function-lambda apf)
       polymorph)))
 
+(defvar *compiler-macro-expanding-p* nil
+  "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")
+
 (defun compiler-retrieve-polymorph (name &rest arg-types-alist)
   (declare (type function-name name))
   (assert *compiler-macro-expanding-p*)

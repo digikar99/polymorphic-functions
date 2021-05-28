@@ -289,9 +289,6 @@ ARG-TYPES into account."))
 
 ;; MISCELLANEOUS ===============================================================
 
-(defvar *compiler-macro-expanding-p* nil
-  "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")
-
 (defun type->param (type-specifier &optional type)
   (if (member type-specifier lambda-list-keywords)
       type-specifier
