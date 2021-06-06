@@ -24,17 +24,22 @@
            (declare (optimize debug))
            ,(let ((transformed-args (sbcl-transform-body-args typed-lambda-list :typed t)))
               `(let* ((,arg-types-alist
-                        (list ,@(mapcar (lambda (arg)
-                                          (if (keywordp arg)
-                                              `(cons ,arg '(eql ,arg))
-                                              `(cons ,arg
-                                                     (let ((,type
-                                                             (sb-c::type-specifier
-                                                              (sb-c::%lvar-derived-type ,arg))))
-                                                       (if (eq 'cl:* ,type)
-                                                           t
-                                                           (nth 1 ,type))))))
-                                        (remove-if #'null transformed-args))))
+                        (list ,@(mapcar
+                                 (lambda (arg)
+                                   (if (keywordp arg)
+                                       `(cons ,arg '(eql ,arg))
+                                       `(cons ,arg
+                                              (when ,arg
+                                                ;; &rest lambda lists can result in NIL
+                                                ;; Test system polymorph.callable to check
+                                                ;; this issue
+                                                (let ((,type
+                                                        (sb-c::type-specifier
+                                                         (sb-c::%lvar-derived-type ,arg))))
+                                                  (if (eq 'cl:* ,type)
+                                                      t
+                                                      (nth 1 ,type)))))))
+                                 (remove-if #'null transformed-args))))
                       (,arg-types (mapcar #'cdr ,arg-types-alist)))
                  (unless (most-specialized-applicable-transform-p
                           ',name ,arg-types-alist ',type-list)
