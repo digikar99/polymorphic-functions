@@ -30,7 +30,7 @@
         `(sb-c:deftransform ,name
              (,param-list
               ,(if (eq '&rest (lastcar type-list))
-                   (butlast type-list)
+                   (append type-list '(*))
                    type-list)
               *
               :policy (< debug speed)
