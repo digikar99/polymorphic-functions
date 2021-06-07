@@ -12,7 +12,7 @@
     (let ((lambda-list-type (lambda-list-type typed-lambda-list :typed t)))
       (with-gensyms (node env compiler-macro-lambda
                           inline-lambda-body-sym param-list-sym lambda declarations body
-                          arg-types-alist arg-types type)
+                          arg-types-alist arg-types type lvar)
         `(sb-c:deftransform ,name
              (,param-list
               ,(if (eq '&rest (lastcar type-list))
@@ -24,22 +24,30 @@
            (declare (optimize debug))
            ,(let ((transformed-args (sbcl-transform-body-args typed-lambda-list :typed t)))
               `(let* ((,arg-types-alist
-                        (list ,@(mapcar
-                                 (lambda (arg)
-                                   (if (keywordp arg)
-                                       `(cons ,arg '(eql ,arg))
-                                       `(cons ,arg
-                                              (when ,arg
-                                                ;; &rest lambda lists can result in NIL
-                                                ;; Test system polymorph.callable to check
-                                                ;; this issue
-                                                (let ((,type
-                                                        (sb-c::type-specifier
-                                                         (sb-c::%lvar-derived-type ,arg))))
-                                                  (if (eq 'cl:* ,type)
-                                                      t
-                                                      (nth 1 ,type)))))))
-                                 (remove-if #'null transformed-args))))
+                       (list ,@(mapcar
+                                (lambda (arg)
+                                  (if (keywordp arg)
+                                      `(cons ,arg '(eql ,arg))
+                                      `(cons ,arg
+                                             (when ,arg
+                                               ;; &rest arguments contain a list of LVARs
+                                               (if (listp ,arg)
+                                                   (mapcar
+                                                    (lambda (,lvar)
+                                                      (let ((,type
+                                                             (sb-c::type-specifier
+                                                              (sb-c::%lvar-derived-type ,lvar))))
+                                                        (if (eq 'cl:* ,type)
+                                                            t
+                                                            (nth 1 ,type))))
+                                                    ,arg)
+                                                   (let ((,type
+                                                          (sb-c::type-specifier
+                                                           (sb-c::%lvar-derived-type ,arg))))
+                                                     (if (eq 'cl:* ,type)
+                                                         t
+                                                         (nth 1 ,type))))))))
+                                (remove-if #'null transformed-args))))
                       (,arg-types (mapcar #'cdr ,arg-types-alist)))
                  (unless (most-specialized-applicable-transform-p
                           ',name ,arg-types-alist ',type-list)
@@ -70,7 +78,10 @@
                             (trivial-macroexpand-all:macroexpand-all
                              (funcall ,compiler-macro-lambda
                                       (cons ,inline-lambda-body-sym
-                                            (list ,@compiler-macro-arg-syms))
+                                            (,(if (member '&rest param-list)
+                                                  'list*
+                                                  'list)
+                                              ,@compiler-macro-arg-syms))
                                       ,env))
                             (list ,@(mapcar (lambda (x y) `(cons ,x ',y))
                                             compiler-macro-arg-syms
