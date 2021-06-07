@@ -5,6 +5,20 @@
     (equalp type-list
             (polymorph-type-list (apply #'compiler-retrieve-polymorph name arg-types-alist)))))
 
+(defun make-lvar-translation-alist (lvar-args arg-syms)
+  (mappend
+   (lambda (lvar sym)
+     (if (listp lvar)
+         (loop
+            for lv in lvar
+            for i from 0
+            collect (cons lv `(nth ,i ,sym)))
+
+         (list (cons lvar sym))))
+
+   lvar-args
+   arg-syms))
+
 (defun make-sbcl-transform-body (name typed-lambda-list inline-lambda-body)
   (multiple-value-bind (param-list type-list effective-type-list)
       (compute-effective-lambda-list typed-lambda-list :typed t)
@@ -88,8 +102,9 @@
                                                   'list)
                                               ,@compiler-macro-arg-syms))
                                       ,env))
-                            (list ,@(mapcar (lambda (x y) `(cons ,x ',y))
-                                            compiler-macro-arg-syms
-                                            transformed-args)))))
+
+                            (make-lvar-translation-alist
+                             (list ,@compiler-macro-arg-syms)
+                             ',transformed-args))))
                      (progn
                        `(apply ,,inline-lambda-body-sym ,@',transformed-args)))))))))))
