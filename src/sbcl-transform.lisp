@@ -24,30 +24,35 @@
            (declare (optimize debug))
            ,(let ((transformed-args (sbcl-transform-body-args typed-lambda-list :typed t)))
               `(let* ((,arg-types-alist
-                       (list ,@(mapcar
-                                (lambda (arg)
-                                  (if (keywordp arg)
-                                      `(cons ,arg '(eql ,arg))
-                                      `(cons ,arg
-                                             (when ,arg
-                                               ;; &rest arguments contain a list of LVARs
-                                               (if (listp ,arg)
-                                                   (mapcar
-                                                    (lambda (,lvar)
-                                                      (let ((,type
-                                                             (sb-c::type-specifier
-                                                              (sb-c::%lvar-derived-type ,lvar))))
-                                                        (if (eq 'cl:* ,type)
-                                                            t
-                                                            (nth 1 ,type))))
-                                                    ,arg)
-                                                   (let ((,type
-                                                          (sb-c::type-specifier
-                                                           (sb-c::%lvar-derived-type ,arg))))
-                                                     (if (eq 'cl:* ,type)
-                                                         t
-                                                         (nth 1 ,type))))))))
-                                (remove-if #'null transformed-args))))
+                       (,(if (member '&rest param-list)
+                             'list*
+                             'list)
+                         ,@(mapcar
+                            (lambda (arg)
+                              (if (keywordp arg)
+                                  `(cons ,arg '(eql ,arg))
+                                  ;; &rest arguments contain a list of LVARs
+                                  `(if (listp ,arg)
+                                       (mapcar
+                                        (lambda (,lvar)
+                                          (let ((,type
+                                                 (sb-c::type-specifier
+                                                  (sb-c::%lvar-derived-type ,lvar))))
+
+                                            (cons ,lvar
+                                                  (if (eq 'cl:* ,type)
+                                                      t
+                                                      (nth 1 ,type)))))
+                                        ,arg)
+                                       (let ((,type
+                                              (sb-c::type-specifier
+                                               (sb-c::%lvar-derived-type ,arg))))
+
+                                         (cons ,arg
+                                               (if (eq 'cl:* ,type)
+                                                   t
+                                                   (nth 1 ,type)))))))
+                            (remove-if #'null transformed-args))))
                       (,arg-types (mapcar #'cdr ,arg-types-alist)))
                  (unless (most-specialized-applicable-transform-p
                           ',name ,arg-types-alist ',type-list)
