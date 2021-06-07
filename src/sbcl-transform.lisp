@@ -5,28 +5,14 @@
     (equalp type-list
             (polymorph-type-list (apply #'compiler-retrieve-polymorph name arg-types-alist)))))
 
-(defun make-lvar-translation-alist (lvar-args arg-syms)
-  (mappend
-   (lambda (lvar sym)
-     (if (listp lvar)
-         (loop
-            for lv in lvar
-            for i from 0
-            collect (cons lv `(nth ,i ,sym)))
-
-         (list (cons lvar sym))))
-
-   lvar-args
-   arg-syms))
-
 (defun make-sbcl-transform-body (name typed-lambda-list inline-lambda-body)
   (multiple-value-bind (param-list type-list effective-type-list)
       (compute-effective-lambda-list typed-lambda-list :typed t)
     (declare (ignore effective-type-list))
     (let ((lambda-list-type (lambda-list-type typed-lambda-list :typed t)))
-      (with-gensyms (node env compiler-macro-lambda
+      (with-gensyms (node env arg compiler-macro-lambda
                           inline-lambda-body-sym param-list-sym lambda declarations body
-                          arg-types-alist arg-types type lvar)
+                          arg-types-alist arg-types type arg-syms lvars lvar arg-sym)
         `(sb-c:deftransform ,name
              (,param-list
               ,(if (eq '&rest (lastcar type-list))
@@ -36,39 +22,25 @@
               :policy (< debug speed)
               :node ,node)
            (declare (optimize debug))
-           ,(let ((transformed-args (sbcl-transform-body-args typed-lambda-list :typed t)))
-              `(let* ((,arg-types-alist
-                       (,(if (member '&rest param-list)
-                             'list*
-                             'list)
-                         ,@(mapcar
-                            (lambda (arg)
-                              (if (keywordp arg)
-                                  `(cons ,arg '(eql ,arg))
-                                  ;; &rest arguments contain a list of LVARs
-                                  `(if (listp ,arg)
-                                       (mapcar
-                                        (lambda (,lvar)
-                                          (let ((,type
-                                                 (sb-c::type-specifier
-                                                  (sb-c::%lvar-derived-type ,lvar))))
-
-                                            (cons ,lvar
-                                                  (if (eq 'cl:* ,type)
-                                                      t
-                                                      (nth 1 ,type)))))
-                                        ,arg)
-                                       (let ((,type
+           ,(let* ((transformed-args (sbcl-transform-body-args typed-lambda-list :typed t)))
+              `(let* (;; This is especially useful because for &REST ARGS,
+                      ;;  ARGS is a list of SB-C::LVARs
+                      (,lvars (flatten (list ,@transformed-args)))
+                      (,arg-types-alist
+                        (mapcar (lambda (,arg)
+                                  (if (keywordp ,arg)
+                                      (cons ,arg '(eql ,arg))
+                                      (let ((,type
                                               (sb-c::type-specifier
                                                (sb-c::%lvar-derived-type ,arg))))
-
-                                         (cons ,arg
-                                               (if (eq 'cl:* ,type)
-                                                   t
-                                                   (nth 1 ,type)))))))
-                            (remove-if #'null transformed-args))))
+                                        (cons ,arg
+                                              (if (eq 'cl:* ,type)
+                                                  t
+                                                  (nth 1 ,type))))))
+                                ,lvars))
                       (,arg-types (mapcar #'cdr ,arg-types-alist)))
                  (unless (most-specialized-applicable-transform-p
+                          ;; FIXME: Length of ARG-TYPES-ALIST for &rest lambda-lists
                           ',name ,arg-types-alist ',type-list)
                    (sb-c::give-up-ir1-transform))
                  (let ((,inline-lambda-body-sym
@@ -79,32 +51,26 @@
                               ,(enhanced-lambda-declarations ',lambda-list-type
                                                              ',type-list
                                                              ',param-list
+                                                             ;; FIXME: length of ARG-TYPES
                                                              ,arg-types)
-                              ,@,body))))
-                   (if-let ((,compiler-macro-lambda
-                             (polymorph-compiler-macro-lambda
-                              (find-polymorph ',name ',type-list)))
-                            (,env (sb-c::node-lexenv ,node)))
-                     ,(let ((compiler-macro-arg-syms
-                              (loop :for arg :in transformed-args
-                                    :unless (null arg)
-                                      :collect (gensym (symbol-name arg)))))
-                        `(let (,@(loop :for compiler-macro-arg-sym
-                                         :in compiler-macro-arg-syms
-                                       :for arg :in transformed-args
-                                       :collect `(,compiler-macro-arg-sym ,arg)))
-                           (translate-body
-                            (trivial-macroexpand-all:macroexpand-all
-                             (funcall ,compiler-macro-lambda
-                                      (cons ,inline-lambda-body-sym
-                                            (,(if (member '&rest param-list)
-                                                  'list*
-                                                  'list)
-                                              ,@compiler-macro-arg-syms))
-                                      ,env))
-
-                            (make-lvar-translation-alist
-                             (list ,@compiler-macro-arg-syms)
-                             ',transformed-args))))
-                     (progn
-                       `(apply ,,inline-lambda-body-sym ,@',transformed-args)))))))))))
+                              ,@,body)))
+                       (,arg-syms (make-gensym-list (length ,lvars))))
+                   ;; Yes, we are returning a LAMBDA-FORM
+                   `(lambda ,,arg-syms
+                      ,(if-let ((,compiler-macro-lambda
+                                 (polymorph-compiler-macro-lambda
+                                  (find-polymorph ',name ',type-list)))
+                                (,env (sb-c::node-lexenv ,node)))
+                         ;; Firstly, call the COMPILER-MACRO-LAMBDA with SB-C::LVARs
+                         ;;   We expect it to be able to deal with them
+                         ;; Secondly, replace any SB-C::LVAR in the result form
+                         ;;   with the appropriate variable name
+                         ;; FIXME: SB-CLTL2:MACROEXPAND-ALL does not expand commas
+                         ;;   as of SBCL 2.1.5
+                         (translate-body (trivial-macroexpand-all:macroexpand-all
+                                          (funcall ,compiler-macro-lambda
+                                                   (cons ,inline-lambda-body-sym ,lvars)
+                                                   ,env))
+                                         (mapcar (lambda (,lvar ,arg-sym) (cons ,lvar ,arg-sym))
+                                                 ,lvars ,arg-syms))
+                         `(funcall ,,inline-lambda-body-sym ,@,arg-syms)))))))))))
