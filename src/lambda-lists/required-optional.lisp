@@ -188,14 +188,17 @@
                        (funcall (the function (polymorph-lambda ,polymorph))
                                 ,@required-parameters)))))))))
 
-(defmethod %sbcl-transform-body-args ((type (eql 'required-optional)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  (let ((optional-position (position '&optional typed-lambda-list)))
-    (append (mapcar 'first (subseq typed-lambda-list 0 optional-position))
-            (loop :for ((param-name type) default) :in (subseq typed-lambda-list
-                                                               (1+ optional-position))
-                  :collect param-name)
-            '(nil))))
+(defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required-optional))
+                                                            (untyped-lambda-list list))
+  (assert (not *lambda-list-typed-p*))
+  (let ((optional-position (position '&optional untyped-lambda-list)))
+    `(append ,@(loop :for arg :in (subseq untyped-lambda-list 0 optional-position)
+                     :collect `(list (cons ',arg ,arg)))
+             ,@(loop :for param-name :in (subseq untyped-lambda-list
+                                                 (1+ optional-position))
+                     :collect `(if ,param-name
+                                   (list (cons ',param-name ,param-name))
+                                   nil)))))
 
 (defmethod %lambda-declarations ((type (eql 'required-optional)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)

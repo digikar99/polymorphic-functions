@@ -5,7 +5,7 @@
 ;; - LAMBDA-LIST-TYPE
 ;; - EFFECTIVE-LAMBDA-LIST
 ;; - COMPUTE-POLYMORPHIC-FUNCTION-BODY
-;; - SBCL-TRANSFORM-BODY-ARGS
+;; - SBCL-TRANSFORM-ARGS-FROM-LAMBDA-LIST-FORM
 ;; - LAMBDA-DECLARATIONS
 ;; - ENHANCED-LAMBDA-DECLARATIONS
 ;; - TYPE-LIST-COMPATIBLE-P
@@ -133,29 +133,22 @@ Non-examples:
 
 (5am:def-suite effective-lambda-list :in lambda-list)
 
-;; COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY ============================================
+;; COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY ====================================
 
 (defgeneric compute-polymorphic-function-lambda-body
     (lambda-list-type effective-untyped-lambda-list &optional invalidated-p)
   (:documentation #.+compute-polymorphic-function-lambda-body-doc+))
 
-;; SBCL-TRANSFORM-BODY-ARGS ====================================================
+;; SBCL-TRANSFORM-ARG-LVARS-FROM-LAMBDA-LIST-FORM ==============================
 
 (define-lambda-list-helper
-    (sbcl-transform-body-args #.+sbcl-transform-body-args-doc+)
-    (%sbcl-transform-body-args #.+sbcl-transform-body-args-doc+)
+    (sbcl-transform-arg-lvars-from-lambda-list-form
+     #.+sbcl-transform-arg-lvars-from-lambda-list-form+)
+    (%sbcl-transform-arg-lvars-from-lambda-list-form
+     #.+sbcl-transform-arg-lvars-from-lambda-list-form+)
   (progn
-    (assert (typed-lambda-list-p *lambda-list*))
-    (%sbcl-transform-body-args *potential-type* *lambda-list*)))
-
-(def-test sbcl-transform-body-args (:suite lambda-list)
-  (is (equalp '(a b nil) (sbcl-transform-body-args '((a number) (b string)) :typed t)))
-  (is (equalp '(a b nil) (sbcl-transform-body-args '((a number) &optional ((b string) "hello"))
-                                                   :typed t)))
-  (is (equalp '(a :b b nil) (sbcl-transform-body-args '((a number) &key ((b string) "hello"))
-                                                      :typed t)))
-  (is (equalp '(a args) (sbcl-transform-body-args '((a number) &rest args)
-                                                  :typed t))))
+    (assert (untyped-lambda-list-p *lambda-list*))
+    (%sbcl-transform-arg-lvars-from-lambda-list-form *potential-type* *lambda-list*)))
 
 ;; LAMBDA-DECLARATIONS =========================================================
 

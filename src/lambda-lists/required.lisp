@@ -51,11 +51,11 @@
                                       (function ,*name*)))))))))
               ,@untyped-lambda-list)))))
 
-
-(defmethod %sbcl-transform-body-args ((type (eql 'required)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  (append (mapcar #'first typed-lambda-list)
-          '(nil)))
+(defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required))
+                                                            (untyped-lambda-list list))
+  (assert (not *lambda-list-typed-p*))
+  `(list ,@(loop :for arg :in untyped-lambda-list
+                 :collect `(cons ',arg ,arg))))
 
 (defmethod %lambda-declarations ((type (eql 'required)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)

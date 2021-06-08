@@ -24,10 +24,11 @@ the second value is the type-list corresponding to the LAMBDA-LIST,
 and the third value is the effective-type-list."
   :test 'string=)
 
-;; SBCL-TRANSFORM-BODY-ARGS ====================================================
+;; SBCL-TRANSFORM-ARG-LVARS-FROM-LAMBDA-LIST-FORM ==============================
 
-(define-constant +sbcl-transform-body-args-doc+
-  "Processes LAMBDA-LIST to return the argument list (not parameters) of SB-C:DEFTRANSFORM in DEFUN-TYPED"
+(define-constant +sbcl-transform-arg-lvars-from-lambda-list-form+
+  "Returns a FORM that can process the parameters of SB-C:DEFTRANSFORM to form an
+argument lvar alist list suitable for further processing."
   :test 'string=)
 
 ;; POLYMORPHIC-FUNCTION-BODY ===================================================

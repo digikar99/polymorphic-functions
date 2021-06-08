@@ -3,7 +3,8 @@
 (5am:in-suite :polymorphic-functions)
 
 (defmacro ignoring-error-output (&body body)
-  `(with-output-to-string (*error-output*) ,@body))
+  `(let ((*error-output* (make-string-output-stream)))
+     ,@body))
 
 ;; unwind-protect (apparantly) does not have an effect in the def-test forms below :/
 
@@ -198,7 +199,7 @@
 
 #+sbcl
 (def-test polymorph-sbcl-transforms ()
-  (with-output-to-string (*error-output*)
+  (ignoring-error-output
     (eval `(progn
              (undefine-polymorphic-function 'sbcl-transform)
              (define-polymorphic-function sbcl-transform (a) :overwrite t)
@@ -233,6 +234,88 @@
            (undefine-polymorphic-function 'sbcl-transform)
            (fmakunbound 'sbcl-transform-caller)
            (fmakunbound 'sbcl-transform-compiler-macro-caller))))
+
+#+sbcl
+(def-test optional-sbcl-transforms ()
+  (ignoring-error-output
+    (eval `(progn
+             (undefine-polymorphic-function 'optional-transforms)
+             (define-polymorphic-function optional-transforms (a &optional b) :overwrite t)
+             (defpolymorph optional-transforms ((a string) &optional ((b string) "")) t
+               (list 'string a b))))
+    (is (equalp (eval `(let ((a "hello"))
+                         (declare (optimize speed)
+                                  (type string a))
+                         (optional-transforms a)))
+                (eval `(let ((a "hello"))
+                         (declare (optimize speed))
+                         (optional-transforms a)))))
+    (is (equalp (eval `(let ((a "hello"))
+                         (declare (optimize speed)
+                                  (type string a))
+                         (optional-transforms a a)))
+                (eval `(let ((a "hello"))
+                         (declare (optimize speed))
+                         (optional-transforms a a)))))
+    (eval `(defpolymorph-compiler-macro optional-transforms (string &optional string)
+               (&whole form &rest args)
+             `(list (list ,@args) ,form)))
+    (is (equalp (eval `(let ((a "hello"))
+                         (declare (optimize speed)
+                                  (type string a))
+                         (optional-transforms a)))
+                (eval `(let ((a "hello"))
+                         (declare (optimize speed))
+                         (optional-transforms a)))))
+    (is (equalp (eval `(let ((a "hello"))
+                         (declare (optimize speed)
+                                  (type string a))
+                         (optional-transforms a a)))
+                (eval `(let ((a "hello"))
+                         (declare (optimize speed))
+                         (optional-transforms a a)))))
+    (undefine-polymorphic-function 'optional-transforms)))
+
+#+sbcl
+(def-test key-sbcl-transforms ()
+  (ignoring-error-output
+    (eval `(progn
+             (undefine-polymorphic-function 'key-transforms)
+             (define-polymorphic-function key-transforms (a &key b) :overwrite t)
+             (defpolymorph key-transforms ((a string) &key ((b string) "")) t
+               (list 'string a b))))
+    (is (equalp (eval `(let ((a "hello"))
+                         (declare (optimize speed)
+                                  (type string a))
+                         (key-transforms a)))
+                (eval `(let ((a "hello"))
+                         (declare (optimize speed))
+                         (key-transforms a)))))
+    (is (equalp (eval `(let ((a "hello"))
+                         (declare (optimize speed)
+                                  (type string a))
+                         (key-transforms a :b a)))
+                (eval `(let ((a "hello"))
+                         (declare (optimize speed))
+                         (key-transforms a :b a)))))
+    (eval `(defpolymorph-compiler-macro key-transforms (string &key (:b string))
+               (&whole form &rest args)
+             `(list (list ,@args) ,form)))
+    (is (equalp (eval `(let ((a "hello"))
+                         (declare (optimize speed)
+                                  (type string a))
+                         (key-transforms a)))
+                (eval `(let ((a "hello"))
+                         (declare (optimize speed))
+                         (key-transforms a)))))
+    (is (equalp (eval `(let ((a "hello"))
+                         (declare (optimize speed)
+                                  (type string a))
+                         (key-transforms a :b a)))
+                (eval `(let ((a "hello"))
+                         (declare (optimize speed))
+                         (key-transforms a :b a)))))
+    (undefine-polymorphic-function 'key-transforms)))
 
 #+sbcl
 (def-test rest-sbcl-transforms ()

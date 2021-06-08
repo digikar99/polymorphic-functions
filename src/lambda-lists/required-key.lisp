@@ -190,15 +190,19 @@
                                 (function ,*name*))))))))
              ,@required-parameters ,rest-args)))))
 
-(defmethod %sbcl-transform-body-args ((type (eql 'required-key)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  (let ((key-position (position '&key typed-lambda-list)))
-    (append (mapcar 'first (subseq typed-lambda-list 0 key-position))
-            (loop :for ((param-name type) default) :in (subseq typed-lambda-list
-                                                               (1+ key-position))
-                  :appending `(,(intern (symbol-name param-name) :keyword)
-                               ,param-name))
-            '(nil))))
+(defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required-key))
+                                                            (untyped-lambda-list list))
+  (assert (not *lambda-list-typed-p*))
+  (let ((key-position (position '&key untyped-lambda-list)))
+    `(append ,@(loop :for arg :in (subseq untyped-lambda-list 0 key-position)
+                     :collect `(list (cons ',arg ,arg)))
+             ,@(loop :for param-name :in (subseq untyped-lambda-list
+                                                 (1+ key-position))
+                     :collect `(if ,param-name
+                                   ,(let ((keyword (intern (symbol-name param-name) :keyword)))
+                                      `(list (cons ,keyword ,keyword)
+                                             (cons ',param-name ,param-name)))
+                                   nil)))))
 
 (defmethod %lambda-declarations ((type (eql 'required-key)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
