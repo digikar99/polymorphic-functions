@@ -14,9 +14,9 @@
                                            form))
          (name                         (first form)))
     (compiler-macro-notes:with-notes
-        (original-form :name (fdefinition name)
-                       :unwind-on-signal nil
-                       :optimization-note-condition optim-speed)
+        (original-form env :name (fdefinition name)
+                           :unwind-on-signal nil
+                           :optimization-note-condition optim-speed)
       (let* ((arg-list  (mapcar (lambda (form)
                                   (with-output-to-string (*error-output*)
                                     (setq form
