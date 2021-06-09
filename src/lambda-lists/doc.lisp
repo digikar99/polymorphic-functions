@@ -36,9 +36,10 @@ argument lvar alist list suitable for further processing."
 (define-constant +compute-polymorphic-function-lambda-body-doc+
   "Processes LAMBDA-LIST to return the body for the lambda constructed in
 UPDATE-POLYMORPHIC-FUNCTION-LAMBDA.
-Raises an error if %LAMBDA-LIST-TYPE fails on *POTENTIAL-TYPE*.
-If INVALIDATED-P is non-NIL, then emits a dummy body that will first call
-UPDATE-POLYMORPHIC-FUNCTION-LAMBDA with INVALIDATE as NIL, and then recall the function."
+  Raises an error if %LAMBDA-LIST-TYPE fails on *POTENTIAL-TYPE*.
+  If INVALIDATED-P is non-NIL, then emits a dummy body that will first call
+UPDATE-POLYMORPHIC-FUNCTION-LAMBDA with INVALIDATE as NIL, and then recall the function.
+  Can contain CTYPE::CTYPE objects that are not expected dumped."
   :test 'string=)
 
 ;; LAMBDA-DECLARATIONS =========================================================

@@ -6,6 +6,7 @@
   :depends-on ("alexandria"
                "closer-mop"
                "compiler-macro-notes"
+               "ctype"
                "fiveam" ;; just keep things together!
                "cl-form-types"
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
@@ -39,5 +40,6 @@
                (:file "benchmark"                  :depends-on ("misc-tests")))
   :perform (test-op (o c)
                     (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
-                                                   (5AM:*ON-ERROR* :DEBUG))
+                                                   (5AM:*ON-ERROR* :DEBUG)
+                                                   (CL:*COMPILE-VERBOSE* NIL))
                                                (FIVEAM:RUN :POLYMORPHIC-FUNCTIONS))"))))
