@@ -39,6 +39,21 @@
   (5am:is-true (type-list-p '(number &optional string)))
   (5am:is-true (type-list-p '(number &key (:a string)))))
 
+(defun extended-type-list-p (list)
+  ;; TODO: what parameter-names are valid?
+  (and (type-list-p list)
+       (let ((state :required)
+             (extended-p nil))
+         (loop :for elt :in list
+               :until extended-p
+               :do (setq extended-p
+                         (ecase state
+                           ((:required &optional) (extended-type-specifier-p elt))
+                           (&key (extended-type-specifier-p (second elt)))))
+                   (when (member elt lambda-list-keywords)
+                     (setq state elt))
+               :finally (return extended-p)))))
+
 (deftype type-list () `(satisfies type-list-p))
 
 (defstruct polymorph

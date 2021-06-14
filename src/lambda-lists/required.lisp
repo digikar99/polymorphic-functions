@@ -60,7 +60,9 @@
 (defmethod %lambda-declarations ((type (eql 'required)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
   `(declare ,@(mapcar (lambda (elt)
-                        `(type ,(second elt) ,(first elt)))
+                        (if (type-specifier-p (second elt))
+                            `(type ,(second elt) ,(first elt))
+                            `(type ,(upgrade-extended-type (second elt)) ,(first elt))))
                       typed-lambda-list)))
 
 (defmethod enhanced-lambda-declarations ((type (eql 'required))

@@ -236,6 +236,8 @@ Inlining especially becomes necessary for mathematical operations, wherein a cal
 
 ## Feature Parity
 
+The runtime dispatch performance of all the three of polymorphic-functions, cl:generic-function and specialization-store is comparable at least for a small number of polymorphs/methods/specializations.
+
 | Feature                         | cl:generic-function | specialization-store | polymorphic-functions |
 |:--------------------------------|:--------------------|:---------------------|:----------------------|
 | Method combination              | Yes                 | No                   | No                    |
@@ -256,6 +258,7 @@ Well...
 - Integration with SLIME is yet to be thought about; etags could work, but this needs more thinking given the apparant non-extensibility of internals of `slime-edit-definition`. imenu is also another option.
 - ANSI is insufficient for our purposes: we need `introspect-environment:policy-quality` and CLTL2 and more for cl-form-types; if someone needs a reduced feature version within the bounds of ANSI standard, please raise an issue!
 - A [bug on CCL](https://github.com/Clozure/ccl/pull/369) may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
+- A `polymorphic-functions.extended-types` package (not system!) is also provided based on [ctype](https://github.com/s-expressionists/ctype). This allows one to extend the CL type system to define types beyond what `cl:deftype` can do to some extent. While these cannot be used inside an arbitrary CL form with `cl:declare`, these can be used in the type lists of polymorphs. See [src/extended-types/supertypep.lisp](src/extended-types/supertypep.lisp) for an example put to use in [trivial-coerce](https://github.com/digikar99/trivial-coerce).
 
 ## Acknowledgements
 

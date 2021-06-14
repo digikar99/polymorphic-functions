@@ -110,7 +110,9 @@
 (defmethod %lambda-declarations ((type (eql 'rest)) (typed-lambda-list list))
   (assert *lambda-list-typed-p*)
   `(declare ,@(mapcar (lambda (elt)
-                        `(type ,(second elt) ,(first elt)))
+                        (if (type-specifier-p (second elt))
+                            `(type ,(second elt) ,(first elt))
+                            `(type ,(upgrade-extended-type (second elt)) ,(first elt))))
                       (subseq typed-lambda-list
                               0
                               (position '&rest typed-lambda-list)))))

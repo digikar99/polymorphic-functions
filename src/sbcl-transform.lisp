@@ -10,6 +10,8 @@
   (multiple-value-bind (param-list type-list effective-type-list)
       (compute-effective-lambda-list typed-lambda-list :typed t)
     (declare (ignore effective-type-list))
+    (when (extended-type-list-p type-list)
+      (return-from make-sbcl-transform-body nil))
     (let ((lambda-list-type (lambda-list-type typed-lambda-list :typed t))
           (transform-lambda-list (untyped-lambda-list typed-lambda-list)))
       (with-gensyms (node env arg arg-lvar-alist compiler-macro-lambda
