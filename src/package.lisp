@@ -22,7 +22,7 @@
            #:type=))
 
 (defpackage :polymorphic-functions
-  (:use :polymorphic-functions.extended-types :cl-form-types :trivial-types
+  (:use :polymorphic-functions.extended-types :cl-form-types
         :alexandria :introspect-environment :cl)
   (:import-from :5am #:is #:def-test)
   (:import-from :ctype
@@ -31,6 +31,9 @@
   (:import-from :polymorphic-functions.extended-types
                 #:*extended-type-specifiers*
                 #:upgraded-extended-type)
+  (:import-from :trivial-types
+                #:function-name
+                #:type-specifier)
   ;; UIOP:DEFINE-PACKAGE doesn't work as correctly on CCL
   ;; So, keep the below in manual sync with above extended things
   (:shadowing-import-from :polymorphic-functions.extended-types
