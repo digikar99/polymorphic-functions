@@ -14,7 +14,8 @@
                "trivial-package-local-nicknames"
                "introspect-environment")
   :pathname #P"src/"
-  :components ((:file "package")
+  :components ((:file "pre-package")
+               (:file "package"                    :depends-on ("pre-package"))
                (:module "extended-types"           :depends-on ("package")
                 :components ((:file "core")
                              (:file "supertypep"   :depends-on ("core"))
