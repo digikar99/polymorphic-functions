@@ -24,8 +24,8 @@ Expects such package to be already defined."
                                                 (do-external-symbols (s package)
                                                   (push s list))
                                                 list)))
-                                       `((:shadow ,@exported-symbols)
-                                         (:export ,@exported-symbols))))
+                                       `((:shadowing-import-from ,package
+                                                                 ,@exported-symbols))))
                                    (cdr option))
              :else
                :collect option)))
