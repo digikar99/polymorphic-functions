@@ -75,10 +75,13 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   (compiler-applicable-p-lambda)
   (runtime-applicable-p-form)
   (inline-lambda-body)
-  ;; We need the FUNCTION-BODY due to compiler macros,
-  ;; and "objects of type FUNCTION can't be dumped into fasl files."
-  (lambda)
+  (static-dispatch-name)
   (compiler-macro-lambda))
+
+(declaim (inline polymorph-lambda))
+(defun polymorph-lambda (polymorph)
+  (declare (type polymorph polymorph))
+  (fdefinition (polymorph-static-dispatch-name polymorph)))
 
 (defmethod print-object ((o polymorph) stream)
   (print-unreadable-object (o stream :type t)
@@ -219,7 +222,6 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                     (setf (slot-value p-new slot-name)
                           (or (slot-value p-new slot-name)
                               (slot-value p-old slot-name)))))
-             (merge-slot 'lambda)
              (merge-slot 'return-type)
              (merge-slot 'effective-type-list)
              (merge-slot 'compiler-applicable-p-lambda)
@@ -246,10 +248,10 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            nil))))
 
 (defun register-polymorph (name type-list effective-type-list
-                           return-type inline-lambda-body lambda
+                           return-type inline-lambda-body static-dispatch-name
                            lambda-list-type compiler-applicable-p-lambda)
   (declare (type function-name  name)
-           (type function       lambda)
+           (type function-name  static-dispatch-name)
            (type type-list      type-list)
            (type type-list      effective-type-list)
            (type type-specifier return-type)
@@ -283,7 +285,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                                                 untyped-lambda-list
                                                                 effective-type-list)
                                      :inline-lambda-body inline-lambda-body
-                                     :lambda             lambda
+                                     :static-dispatch-name static-dispatch-name
                                      :compiler-macro-lambda nil)))
       (add-or-update-polymorph apf polymorph)
       (invalidate-polymorphic-function-lambda apf)
@@ -457,7 +459,17 @@ If it exists, the second value is T and the first value is a possibly empty
   (destructuring-bind (original &rest similar) vars
     (values :variable
             (loop :with type
-                    := (rest (assoc 'type
+                    := (rest (assoc 'cl:type
                                     (nth-value 2 (cltl2:variable-information original env))))
                   :for var :in similar
-                  :collect `(,var type ,type)))))
+                  :collect `(,var cl:type ,type)))))
+
+(cltl2:define-declaration inline-pf (vars env)
+  (values :function
+          (loop :for var :in vars
+                :collect `(,var inline-pf inline-pf))))
+
+(cltl2:define-declaration notinline-pf (vars env)
+  (values :function
+          (loop :for var :in vars
+                :collect `(,var inline-pf notinline-pf))))

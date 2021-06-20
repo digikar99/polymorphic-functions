@@ -76,7 +76,8 @@
                   (not optim-speed))
           (return-from pf-compiler-macro original-form))
         (with-slots (return-type type-list
-                     compiler-macro-lambda lambda-list-type)
+                     compiler-macro-lambda lambda-list-type
+                     static-dispatch-name)
             polymorph
           (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph)))
             (when inline-lambda-body
@@ -97,12 +98,18 @@
                               (cons inline-lambda-body (rest form))
                               env))
                     (optim-speed
-                     ;; TODO: Use some other declaration for inlining as well
-                     ;; Optimized for speed and type information available
-                     (if inline-lambda-body
-                         `(the ,return-type (,inline-lambda-body ,@arg-list))
-                         (progn
-                           (signal 'polymorph-has-no-inline-lambda-body
-                                   :name name :type-list type-list)
-                           form)))
+                     (let ((inline-pf
+                             (assoc 'inline-pf
+                                    (nth-value 2 (cltl2:function-information name env)))))
+                       (cond ((and inline-lambda-body
+                                   (or (null inline-pf)
+                                       (eq 'inline-pf (cdr inline-pf))))
+                              `(the ,return-type (,inline-lambda-body ,@arg-list)))
+                             ((and (not inline-lambda-body)
+                                   (eq 'inline-pf (cdr inline-pf)))
+                              (signal 'polymorph-has-no-inline-lambda-body
+                                      :name name :type-list type-list)
+                              `(the ,return-type (,static-dispatch-name ,@arg-list)))
+                             (t
+                              `(the ,return-type (,static-dispatch-name ,@arg-list))))))
                     (t form)))))))))

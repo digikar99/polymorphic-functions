@@ -47,7 +47,14 @@
            #:polymorph
            #:type-like
            #:no-applicable-polymorph
-           #:polymorphic-function-type-lists))
+           #:polymorphic-function-type-lists
+           #:inline-pf
+           #:notinline-pf))
+
+(defpackage #:polymorphic-functions.nonuser
+  (:use)
+  (:documentation
+   "Package for internal use by POLYMORPHIC-FUNCTIONS not intended for direct use by users."))
 
 (in-package :polymorphic-functions)
 

@@ -1,12 +1,5 @@
 (in-package polymorphic-functions)
 
-(defun traverse-tree (tree &optional (function #'identity))
-  "Traverses TREE and calls function on each subtree and node of TREE."
-  (if (listp tree)
-      (loop :for node :in (funcall function tree)
-            :collect (traverse-tree node function))
-      (funcall function tree)))
-
 (defun recursive-function-p (name body)
   (flet ((%recursive-p (node)
            (if (listp node)
@@ -144,7 +137,18 @@ at your own risk."
       (multiple-value-bind (param-list type-list effective-type-list)
           (compute-effective-lambda-list typed-lambda-list :typed t)
         (multiple-value-bind (declarations body) (extract-declarations body)
-          (let* ((lambda-body #+sbcl
+          (let* ((static-dispatch-name (let* ((p-old (and (typep (fdefinition name)
+                                                                 'polymorphic-function)
+                                                          (find-polymorph name type-list)))
+                                              (old-name
+                                                (when p-old
+                                                  (polymorph-static-dispatch-name p-old))))
+                                         (if old-name
+                                             old-name
+                                             (gentemp (write-to-string
+                                                       `(polymorph ,name ,type-list))
+                                                      '#:polymorphic-functions.nonuser))))
+                 (lambda-body #+sbcl
                               `(sb-int:named-lambda (polymorph ,name ,type-list) ,param-list
                                  ,(lambda-declarations typed-lambda-list :typed t)
                                  ,declarations
@@ -166,6 +170,9 @@ at your own risk."
                                  (block ,block-name
                                    ,@(butlast body)
                                    (the ,return-type ,@(or (last body) '(nil))))))
+                 ;; Currently we only need INLINE-LAMBDA-BODY and the checks in M-V-B
+                 ;; below for DEFTRANSFORM
+                 ;; FIXME: Do away with this use even
                  (inline-lambda-body (when inline
                                        #-(or ccl sbcl) lambda-body
                                        #+ccl (nth 2 lambda-body)
@@ -216,17 +223,22 @@ at your own risk."
                                `(locally (declare (sb-ext:muffle-conditions style-warning))
                                   (handler-bind ((style-warning #'muffle-warning))
                                     ,sbcl-transform-body))))
+                 ;; FIXME: Use COMPILER-MACRO-NOTES to emit these notes to allow muffling
                  ;; ,(when inline-note
                  ;;    `(when (or (= 3 (introspect-environment:policy-quality 'debug))
                  ;;               (= 3 (introspect-environment:policy-quality 'safety)))
                  ;;       (write-string ,inline-note *error-output*)))
                  ,(when inline-note `(write-string ,inline-note *error-output*))
                  (eval-when (:compile-toplevel :load-toplevel :execute)
+                   ;; We are not "fixing inlining" using DEFUN made functions
+                   ;; because we need to take parametric polymorphism into account
+                   ;; while inlining.
+                   (setf (fdefinition ',static-dispatch-name) ,lambda-body)
                    (register-polymorph ',name ',type-list
                                        ',effective-type-list
                                        ',return-type
                                        ',inline-safe-lambda-body
-                                       ,lambda-body
+                                       ',static-dispatch-name
                                        ',lambda-list-type
                                        ,(compiler-applicable-p-lambda-body
                                          lambda-list-type
