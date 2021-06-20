@@ -78,11 +78,6 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   (static-dispatch-name)
   (compiler-macro-lambda))
 
-(declaim (inline polymorph-lambda))
-(defun polymorph-lambda (polymorph)
-  (declare (type polymorph polymorph))
-  (fdefinition (polymorph-static-dispatch-name polymorph)))
-
 (defmethod print-object ((o polymorph) stream)
   (print-unreadable-object (o stream :type t)
     (with-slots (name type-list) o

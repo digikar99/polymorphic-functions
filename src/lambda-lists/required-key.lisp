@@ -168,24 +168,25 @@
               (apply (fdefinition ',*name*) ,@required-parameters ,rest-args))
            `(apply
              (the function
-                  (polymorph-lambda
-                   (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
-                     (cond
-                       ,@(loop
-                           :for i :from 0
-                           :for polymorph :in (polymorphic-function-polymorphs
-                                               (fdefinition *name*))
-                           :for runtime-applicable-p-form
-                             := (polymorph-runtime-applicable-p-form polymorph)
-                           :collect
-                           `(,runtime-applicable-p-form ,polymorph))
-                       (t
-                        (error 'no-applicable-polymorph/error
-                               :name ',*name*
-                               :arg-list (list* ,@required-parameters ,rest-args)
-                               :effective-type-lists
-                               (polymorphic-function-effective-type-lists
-                                (function ,*name*))))))))
+                  (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                    (cond
+                      ,@(loop
+                          :for i :from 0
+                          :for polymorph :in (polymorphic-function-polymorphs
+                                              (fdefinition *name*))
+                          :for static-dispatch-name
+                            := (polymorph-static-dispatch-name polymorph)
+                          :for runtime-applicable-p-form
+                            := (polymorph-runtime-applicable-p-form polymorph)
+                          :collect
+                          `(,runtime-applicable-p-form #',static-dispatch-name))
+                      (t
+                       (error 'no-applicable-polymorph/error
+                              :name ',*name*
+                              :arg-list (list* ,@required-parameters ,rest-args)
+                              :effective-type-lists
+                              (polymorphic-function-effective-type-lists
+                               (function ,*name*)))))))
              ,@required-parameters ,rest-args)))))
 
 (defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required-key))
