@@ -74,6 +74,7 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   (effective-type-list nil)
   (compiler-applicable-p-lambda)
   (runtime-applicable-p-form)
+  (inline-p)
   (inline-lambda-body)
   (static-dispatch-name)
   (compiler-macro-lambda))
@@ -217,6 +218,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                     (setf (slot-value p-new slot-name)
                           (or (slot-value p-new slot-name)
                               (slot-value p-old slot-name)))))
+             (merge-slot 'inline-p)
              (merge-slot 'return-type)
              (merge-slot 'effective-type-list)
              (merge-slot 'compiler-applicable-p-lambda)
@@ -242,10 +244,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                    (add-polymorph p-new polymorphs)))
            nil))))
 
-(defun register-polymorph (name type-list effective-type-list
+(defun register-polymorph (name inline-p type-list effective-type-list
                            return-type inline-lambda-body static-dispatch-name
                            lambda-list-type compiler-applicable-p-lambda)
   (declare (type function-name  name)
+           (type (member t nil :maybe) inline-p)
            (type function-name  static-dispatch-name)
            (type type-list      type-list)
            (type type-list      effective-type-list)
@@ -266,6 +269,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
             type-list untyped-lambda-list name)
     (ensure-unambiguous-call name type-list effective-type-list)
     (let ((polymorph (make-polymorph :name name
+                                     :inline-p         inline-p
                                      :type-list        type-list
                                      :return-type      return-type
                                      :lambda-list-type lambda-list-type

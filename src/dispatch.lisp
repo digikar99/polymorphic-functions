@@ -115,11 +115,13 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
 
 (defmacro defpolymorph (&whole form name typed-lambda-list return-type
                         &body body &environment env)
-  "  Expects OPTIONAL or KEY args to be in the form ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP).
-  NAME could also be (NAME &KEY INLINE)
+  "  Expects OPTIONAL or KEY args to be in the form
+    ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP).
+  NAME could also be (NAME &KEY (INLINE T)).
+  Possible values for INLINE are T, NIL and :MAYBE
 
-  **Note**: `:inline t` can result in infinite expansions for recursive polymorphs. Proceed
-at your own risk."
+  **Note**: INLINE T or :MAYBE can result in infinite expansions for recursive polymorphs.
+Proceed at your own risk."
   (destructuring-bind (name &key (inline t ip))
       (if (typep name 'function-name)
           (list name)
@@ -208,6 +210,9 @@ at your own risk."
                                    (format *error-output* "~&; PROCEED AT YOUR OWN RISK!~%~%")))
                          (values inline-lambda-body
                                  nil))))
+              (setq inline (case inline
+                             ((t) (if inline-note nil t))
+                             (otherwise inline)))
               ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
               ;; and "objects of type FUNCTION can't be dumped into fasl files"
               `(progn
@@ -234,7 +239,7 @@ at your own risk."
                    ;; because we need to take parametric polymorphism into account
                    ;; while inlining.
                    (setf (fdefinition ',static-dispatch-name) ,lambda-body)
-                   (register-polymorph ',name ',type-list
+                   (register-polymorph ',name ',inline ',type-list
                                        ',effective-type-list
                                        ',return-type
                                        ',inline-safe-lambda-body

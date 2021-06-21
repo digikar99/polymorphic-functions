@@ -75,7 +75,7 @@
         (when (or (null polymorph)
                   (not optim-speed))
           (return-from pf-compiler-macro original-form))
-        (with-slots (return-type type-list
+        (with-slots (inline-p return-type type-list
                      compiler-macro-lambda lambda-list-type
                      static-dispatch-name)
             polymorph
@@ -101,15 +101,25 @@
                      (let ((inline-pf
                              (assoc 'inline-pf
                                     (nth-value 2 (cltl2:function-information name env)))))
-                       (cond ((and inline-lambda-body
-                                   (or (null inline-pf)
-                                       (eq 'inline-pf (cdr inline-pf))))
-                              `(the ,return-type (,inline-lambda-body ,@arg-list)))
-                             ((and (not inline-lambda-body)
-                                   (eq 'inline-pf (cdr inline-pf)))
-                              (signal 'polymorph-has-no-inline-lambda-body
-                                      :name name :type-list type-list)
-                              `(the ,return-type (,static-dispatch-name ,@arg-list)))
-                             (t
-                              `(the ,return-type (,static-dispatch-name ,@arg-list))))))
+                       (ecase inline-p
+                         ((t)
+                          (assert inline-lambda-body)
+                          (if (eq 'notinline-pf (cdr inline-pf))
+                              `(the ,return-type (,static-dispatch-name ,@arg-list))
+                              `(the ,return-type (,inline-lambda-body ,@arg-list))))
+                         ((nil)
+                          (when (eq 'inline-pf (cdr inline-pf))
+                            (signal 'polymorph-has-no-inline-lambda-body
+                                    :name name :type-list type-list))
+                          `(the ,return-type (,static-dispatch-name ,@arg-list)))
+                         ((:maybe)
+                          (cond ((null inline-pf)
+                                 `(the ,return-type (,static-dispatch-name ,@arg-list)))
+                                ((eq 'inline-pf (cdr inline-pf))
+                                 (assert inline-lambda-body)
+                                 `(the ,return-type (,inline-lambda-body ,@arg-list)))
+                                ((eq 'notinline-pf (cdr inline-pf))
+                                 `(the ,return-type (,static-dispatch-name ,@arg-list)))
+                                (t
+                                 (error "Unexpected case in pf-compiler-macro!")))))))
                     (t form)))))))))
