@@ -2,16 +2,23 @@
 
 >This library is still experimental. Interface can change in backward-incompatible ways.
 >Please wait until a proper release to use in production code. (Or track commits and use git submodules and/or qlot!)
+>
+>If you would like at least a few grams (or ounce :p) of stability, stick to the following symbols:
+> - define-polymorphic-function
+> - undefine-polymorphic-function
+> - defpolymorph
+> - defpolymorph-compiler-macro
+> - undefpolymorph
+> - find-polymorph
 
-The library provides both [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism) and AOT (IIUC) [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism) to dispatch and/or optimize on the basis of types rather than classes. See [this](https://www.reddit.com/r/lisp/comments/nho7gr/polymorphicfunctions_possibly_aot_dispatch_on/gyyovkh?utm_source=share&utm_medium=web2x&context=3) and nearby comments for an attempt at explaining this.
+The library provides both [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism) and ~~AOT (IIUC) [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism)~~ [Subtype Polymorphism](https://en.wikipedia.org/wiki/Subtyping) to dispatch and/or optimize on the basis of types rather than classes. See [this](https://www.reddit.com/r/lisp/comments/nho7gr/polymorphicfunctions_possibly_aot_dispatch_on/gyyovkh?utm_source=share&utm_medium=web2x&context=3) and nearby comments for an attempt at explaining this.
 
 ## Usage
 
 - Users are expected to define a `polymorphic-function` (analogous to `cl:generic-function`) with one or more `polymorph` (similar to `cl:method`). These may be dispatched at runtime or at compile time if optimization policy is `(and (= speed 3) (/= debug 3))` abbreviated as `optim-speed`.
 - Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
-- Parametric Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a polymorph that was defined for `vector` when compiled with arguments declared to be `simple-string`, then the body is made aware at *compiler/macroexpansion time* that the arguments are actually `simple-string` rather than just `vector`. Code further in the succeeding compiler/macroexpansion phases can then make use of this information. For code in the inner scopes of the polymorph, a `type-like` declaration is provided with example usage in [src/misc-tests.lisp](src/misc-tests.lisp).
+- Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a polymorph that was defined for `vector` when compiled with arguments declared to be `simple-string`, then the body is made aware at *compiler/macroexpansion time* that the arguments are actually `simple-string` rather than just `vector`. Code further in the succeeding compiler/macroexpansion phases can then make use of this information. For code in the inner scopes of the polymorph, a `type-like` declaration is provided with example usage in [src/misc-tests.lisp](src/misc-tests.lisp).
 - Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for *correctness*.
-
 
 ### Examples
 
@@ -80,15 +87,15 @@ CL-USER> (defun baz (a b)
 ; While compiling
 ;     (MY= A B)
 ;   Following notes were encountered:
-;     
+;
 ;     No applicable POLYMORPH discovered for polymorphic-function
 ;       MY=
 ;     and ARG-LIST:
-;     
+;
 ;       (A B)
-;     
+;
 ;     Available Effective-Type-Lists include:
-;     
+;
 ;       (STRING STRING)
 ;       (CHARACTER CHARACTER)
 ;       ((SIMPLE-ARRAY SINGLE-FLOAT) (SIMPLE-ARRAY SINGLE-FLOAT))
@@ -100,13 +107,65 @@ CL-USER> (my= 5 "hello")
 ### Libraries / Projects currently using polymorphic-functions
 
 - [abstract-arrays](https://github.com/digikar99/abstract-arrays) and [dense-arrays](https://github.com/digikar99/dense-numericals/)
-- [dense-numericals](https://github.com/digikar99/dense-numericals/): this makes extensive use of parametric polymorphism to avoid code repetition in the *packaged* provided code, cutting down on initial compile times. 
-- lisp-polymorph with currently working 
+- [dense-numericals](https://github.com/digikar99/dense-numericals/): this makes extensive use of subtype polymorphism to avoid code repetition in the *packaged* provided code, cutting down on initial compile times.
+- lisp-polymorph with currently working
   - [polymorph.maths](https://github.com/lisp-polymorph/polymorph.maths)
   - [polymorph.access](https://github.com/lisp-polymorph/polymorph.access)
   - [polymorph.copy-cast](https://github.com/lisp-polymorph/polymorph.copy-cast)
   - and more...
 
+
+### Inline Optimizations
+
+A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
+
+- A speed=3 optimization coupled with debug<3 optimization results in (attempts to) static-dispatch. This is done using by f-binding gentemps to appropriate function objects.
+- Inline optimization may also be provided by `(declare (inline-pf my-polymorph))` or supplying `:inline t` or `:inline :maybe` option in the `name` field of `defpolymorph` form.
+
+It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under some definition of same-ness.
+
+For instance, consider
+
+```lisp
+(define-polymorphic-function my-type (obj))
+(defpolymorph my-type ((obj vector)) symbol
+  (declare (ignore obj))
+  'vector)
+(defpolymorph my-type ((obj string)) symbol
+  (declare (ignore obj))
+  'string)
+```
+
+Then, the behavior of `my-type-caller` depends on optimization policies:
+
+```lisp
+(defun my-type-caller (a)
+  (declare (optimize debug))
+  (my-type a))
+(my-type-caller "hello") ;=> STRING
+
+;;; VS
+
+(defun my-type-caller (a)
+  (declare (optimize speed)
+           (type vector a))
+  (my-type a))
+(my-type-caller "hello") ;=> VECTOR
+```
+
+The mistake here is polymorph with type list `(vector)` produces a different behavior as compared to polymorph with type list `(string)`. (The behavior is "same" in the sense that `"hello"` is indeed a `vector`; perspective matters?)
+
+This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
+
+Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. `generic-cl` (since `static-dispatch` version 0.5) overcomes this on SBCL by using `sb-c:deftransform`; for portable projects, one could use `inlined-generic-functions` [superseded by `fast-generic-functions`] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.
+
+### Limitations
+
+- For form-type-inference, polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [cl-form-types](https://github.com/alex-gutev/cl-form-types) does get pretty extensive. In cases wherein it does fail, we also rely on `sb-c:deftransform` on SBCL.
+- Integration with SLIME is yet to be thought about; etags could work, but this needs more thinking given the apparant non-extensibility of internals of `slime-edit-definition`. imenu is also another option.
+- ANSI is insufficient for our purposes: we need `introspect-environment:policy-quality` and CLTL2 and more for cl-form-types; if someone needs a reduced feature version within the bounds of ANSI standard, please raise an issue!
+- A [bug on CCL](https://github.com/Clozure/ccl/pull/369) may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
+- A `polymorphic-functions.extended-types` package (not system!) is also provided based on [ctype](https://github.com/s-expressionists/ctype). This allows one to extend the CL type system to define types beyond what `cl:deftype` can do to some extent. While these cannot be used inside an arbitrary CL form with `cl:declare`, these can be used in the type lists of polymorphs. See [src/extended-types/supertypep.lisp](src/extended-types/supertypep.lisp) for an example put to use in [trivial-coerce](https://github.com/digikar99/trivial-coerce).
 
 ## Rationale
 
@@ -180,50 +239,6 @@ Once the function is pushed, install the dist:
 
 Tests are distributed throughout the system. Run `(asdf:test-system "polymorphic-functions")`.
 
-## Inline Optimizations
-
-A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
-
-- A speed=3 optimization coupled with debug<3 optimization results in (attempts to) inline-optimizations.
-- Inline optimizations may be avoided by `(declare (notinline my-polymorph))` - however, inlining is the only way to optimize polymorphic-functions.
-
-It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under some definition of same-ness.
-
-For instance, consider
-
-```lisp
-(define-polymorphic-function my-type (obj))
-(defpolymorph my-type ((obj vector)) symbol
-  (declare (ignore obj))
-  'vector)
-(defpolymorph my-type ((obj string)) symbol
-  (declare (ignore obj))
-  'string)
-```
-
-Then, the behavior of `my-type-caller` depends on optimization policies:
-
-```lisp
-(defun my-type-caller (a)
-  (declare (optimize debug))
-  (my-type a))
-(my-type-caller "hello") ;=> STRING
-
-;;; VS
-
-(defun my-type-caller (a)
-  (declare (optimize speed)
-           (type vector a))
-  (my-type a))
-(my-type-caller "hello") ;=> VECTOR
-```
-
-The mistake here is polymorph with type list `(vector)` produces a different behavior as compared to polymorph with type list `(string)`. (The behavior is "same" in the sense that `"hello"` is indeed a `vector`; perspective matters?)
-
-This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
-
-Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. `generic-cl` (since `static-dispatch` version 0.5) overcomes this on SBCL by using `sb-c:deftransform`; for portable projects, one could use `inlined-generic-functions` [superseded by `fast-generic-functions`] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.
-
 ## Related Projects
 
 - [static-dispatch](https://github.com/alex-gutev/static-dispatch)
@@ -252,13 +267,6 @@ Well...
 
 \*\*Using [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions) - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries. But, there's also [static-dispatch](https://github.com/alex-gutev/static-dispatch).
 
-## Limitations
-
-- For form-type-inference, polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [cl-form-types](https://github.com/alex-gutev/cl-form-types) does get pretty extensive. In cases wherein it does fail, we also rely on `sb-c:deftransform` on SBCL.
-- Integration with SLIME is yet to be thought about; etags could work, but this needs more thinking given the apparant non-extensibility of internals of `slime-edit-definition`. imenu is also another option.
-- ANSI is insufficient for our purposes: we need `introspect-environment:policy-quality` and CLTL2 and more for cl-form-types; if someone needs a reduced feature version within the bounds of ANSI standard, please raise an issue!
-- A [bug on CCL](https://github.com/Clozure/ccl/pull/369) may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
-- A `polymorphic-functions.extended-types` package (not system!) is also provided based on [ctype](https://github.com/s-expressionists/ctype). This allows one to extend the CL type system to define types beyond what `cl:deftype` can do to some extent. While these cannot be used inside an arbitrary CL form with `cl:declare`, these can be used in the type lists of polymorphs. See [src/extended-types/supertypep.lisp](src/extended-types/supertypep.lisp) for an example put to use in [trivial-coerce](https://github.com/digikar99/trivial-coerce).
 
 ## Acknowledgements
 

@@ -252,7 +252,11 @@ Proceed at your own risk."
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list
                                        &body body)
-  "An example of a type-list for a function with optional args would be (STRING &OPTIONAL INTEGER)"
+  "Example TYPE-LISTs:
+  (NUMBER NUMBER)
+  (STRING &OPTIONAL INTEGER)
+  (STRING &KEY (:ARG INTEGER))
+  (NUMBER &REST)"
   (declare (type function-name name)
            (type type-list type-list))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
