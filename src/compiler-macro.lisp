@@ -79,16 +79,20 @@
           (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph)))
             (when inline-lambda-body
               (setq inline-lambda-body
-                    (destructuring-bind (lambda args declarations &body body)
-                        inline-lambda-body
-                      (declare (ignore declarations))
-                      `(,lambda ,args
-                         ;; The source of parametric-polymorphism
-                         ,(enhanced-lambda-declarations lambda-list-type
-                                                        type-list
-                                                        args
-                                                        arg-types)
-                         ,@body))))
+                    (trivial-macroexpand-all:macroexpand-all
+                     ;; Yes we are expanding it in null env
+                     ;; because the POLYMORPH was originally expected to be defined in
+                     ;; null env
+                     (destructuring-bind (lambda args declarations &body body)
+                         inline-lambda-body
+                       (declare (ignore declarations))
+                       `(,lambda ,args
+                          ;; The source of parametric-polymorphism
+                          ,(enhanced-lambda-declarations lambda-list-type
+                                                         type-list
+                                                         args
+                                                         arg-types)
+                          ,@body)))))
             (return-from pf-compiler-macro
               (cond (compiler-macro-lambda
                      (funcall compiler-macro-lambda

@@ -19,6 +19,7 @@ The library provides both [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad
 - Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
 - Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a polymorph that was defined for `vector` when compiled with arguments declared to be `simple-string`, then the body is made aware at *compiler/macroexpansion time* that the arguments are actually `simple-string` rather than just `vector`. Code further in the succeeding compiler/macroexpansion phases can then make use of this information. For code in the inner scopes of the polymorph, a `type-like` declaration is provided with example usage in [src/misc-tests.lisp](src/misc-tests.lisp).
 - Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for *correctness*.
+- Currently inlining uses the lexical environment of the call-site rather than the definition-site as is the usual case. To work around this, users should avoid shadowing global lexical elements.
 
 ### Examples
 
@@ -115,7 +116,7 @@ CL-USER> (my= 5 "hello")
   - and more...
 
 
-### Inline Optimizations
+### Static Dispatch / Inline Optimizations
 
 A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
 
