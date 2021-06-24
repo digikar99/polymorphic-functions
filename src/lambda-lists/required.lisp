@@ -21,35 +21,34 @@
 
 (defmethod compute-polymorphic-function-lambda-body
     ((type (eql 'required)) (untyped-lambda-list list) &optional invalidated-p)
-  `((declare (optimize speed))
-    ,(cond (invalidated-p
-            `(progn
-               (update-polymorphic-function-lambda (fdefinition ',*name*))
-               (funcall (fdefinition ',*name*) ,@untyped-lambda-list)))
-           (t
-            `(funcall
-              (the function
-                   (locally
-                       (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
-                     (cond
-                       ,@(loop
-                           :for i :from 0
-                           :for polymorph
-                             :in (polymorphic-function-polymorphs (fdefinition *name*))
-                           :for static-dispatch-name
-                             := (polymorph-static-dispatch-name polymorph)
-                           :for runtime-applicable-p-form
-                             := (polymorph-runtime-applicable-p-form polymorph)
-                           :collect
-                           `(,runtime-applicable-p-form #',static-dispatch-name))
-                       (t
-                        (error 'no-applicable-polymorph/error
-                               :name ',*name*
-                               :arg-list (list ,@untyped-lambda-list)
-                               :effective-type-lists
-                               (polymorphic-function-effective-type-lists
-                                (function ,*name*)))))))
-              ,@untyped-lambda-list)))))
+  (let ((block-name (blockify-name *name*)))
+    `((declare (optimize speed))
+      (block ,block-name
+        ,(cond (invalidated-p
+                `(progn
+                   (update-polymorphic-function-lambda (fdefinition ',*name*))
+                   (funcall (fdefinition ',*name*) ,@untyped-lambda-list)))
+               (t
+                `(funcall
+                  (the function
+                       (locally
+                           (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                         (cond
+                           ,@(loop
+                               :for i :from 0
+                               :for polymorph
+                                 :in (polymorphic-function-polymorphs (fdefinition *name*))
+                               :for static-dispatch-name
+                                 := (polymorph-static-dispatch-name polymorph)
+                               :for runtime-applicable-p-form
+                                 := (polymorph-runtime-applicable-p-form polymorph)
+                               :collect
+                               `(,runtime-applicable-p-form #',static-dispatch-name))
+                           (t
+                            (return-from ,block-name
+                              (funcall ,(polymorphic-function-default (fdefinition *name*))
+                                       ',*name* (list ,@untyped-lambda-list)))))))
+                  ,@untyped-lambda-list)))))))
 
 (defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required))
                                                             (untyped-lambda-list list))

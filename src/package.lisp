@@ -49,7 +49,8 @@
            #:no-applicable-polymorph
            #:polymorphic-function-type-lists
            #:inline-pf
-           #:notinline-pf))
+           #:notinline-pf
+           #:*compiler-macro-expanding-p*))
 
 (defpackage #:polymorphic-functions.nonuser
   (:use)

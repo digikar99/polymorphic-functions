@@ -67,36 +67,35 @@
     ((type (eql 'rest)) (untyped-lambda-list list) &optional invalidated-p)
   (let* ((rest-position       (position '&rest untyped-lambda-list))
          (rest-args           (nth (1+ rest-position) untyped-lambda-list))
-         (required-parameters (subseq untyped-lambda-list 0 rest-position)))
+         (required-parameters (subseq untyped-lambda-list 0 rest-position))
+         (block-name          (blockify-name *name*)))
     `((declare (ignorable ,@required-parameters)
                (dynamic-extent ,rest-args)
                (optimize speed))
-      ,(if invalidated-p
-           `(progn
-              (update-polymorphic-function-lambda (fdefinition ',*name*))
-              (apply (fdefinition ',*name*) ,@required-parameters ,rest-args))
-           `(apply
-             (the function
-                  (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
-                    (cond
-                      ,@(loop
-                          :for i :from 0
-                          :for polymorph :in (polymorphic-function-polymorphs
-                                              (fdefinition *name*))
-                          :for static-dispatch-name
-                             := (polymorph-static-dispatch-name polymorph)
-                          :for runtime-applicable-p-form
-                            := (polymorph-runtime-applicable-p-form polymorph)
-                          :collect
-                          `(,runtime-applicable-p-form #',static-dispatch-name))
-                      (t
-                       (error 'no-applicable-polymorph/error
-                              :name ',*name*
-                              :arg-list (list* ,@required-parameters ,rest-args)
-                              :effective-type-lists
-                              (polymorphic-function-effective-type-lists
-                               (function ,*name*)))))))
-             ,@required-parameters ,rest-args)))))
+      (block ,block-name
+        ,(if invalidated-p
+             `(progn
+                (update-polymorphic-function-lambda (fdefinition ',*name*))
+                (apply (fdefinition ',*name*) ,@required-parameters ,rest-args))
+             `(apply
+               (the function
+                    (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                      (cond
+                        ,@(loop
+                            :for i :from 0
+                            :for polymorph :in (polymorphic-function-polymorphs
+                                                (fdefinition *name*))
+                            :for static-dispatch-name
+                              := (polymorph-static-dispatch-name polymorph)
+                            :for runtime-applicable-p-form
+                              := (polymorph-runtime-applicable-p-form polymorph)
+                            :collect
+                            `(,runtime-applicable-p-form #',static-dispatch-name))
+                        (t
+                         (return-from ,block-name
+                           (funcall ,(polymorphic-function-default (fdefinition *name*))
+                                    ',*name* (list* ,@required-parameters ,rest-args)))))))
+               ,@required-parameters ,rest-args))))))
 
 (defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'rest))
                                                             (untyped-lambda-list list))

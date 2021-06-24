@@ -354,3 +354,12 @@ ARG-TYPES into account."))
   (is (equalp '(&key c)   (untyped-lambda-list '(&key ((c string))))))
   (is (equalp '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
   (is (equalp '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
+
+(defun blockify-name (name)
+  (etypecase name
+    (symbol name)
+    (list
+     (assert (and (eq 'setf (first name))
+                  (second name)
+                  (null (nthcdr 2 name))))
+     (second name))))

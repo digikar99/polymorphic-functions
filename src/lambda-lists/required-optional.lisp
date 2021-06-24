@@ -138,57 +138,56 @@
          (optional-parameters  (subseq effective-lambda-list (1+ optional-position)))
          (args `(nconc (list ,@required-parameters)
                        ,@(loop :for (op default op-p) :in optional-parameters
-                               :collect `(when ,op-p (list ,op))))))
+                               :collect `(when ,op-p (list ,op)))))
+         (block-name (blockify-name *name*)))
     (with-gensyms (static-dispatch-fn)
       `((declare (optimize speed)
                  (ignorable ,@(mapcar #'first optional-parameters)
                             ,@(mapcar #'third optional-parameters)))
-        ,(if invalidated-p
-             `(progn
-                (update-polymorphic-function-lambda (fdefinition ',*name*))
-                (cond ,@(loop :for (name default supplied-p) :in (reverse optional-parameters)
-                              :for optional-idx :downfrom (length optional-parameters) :above 0
-                              :for parameters := (append required-parameters
-                                                         (mapcar #'first
-                                                                 (subseq optional-parameters
-                                                                         0 optional-idx)))
-                              :collect `(,supplied-p
-                                         (funcall (fdefinition ',*name*) ,@parameters)))
-                      (t
-                       (funcall (fdefinition ',*name*) ,@required-parameters))))
-             `(let ((,static-dispatch-fn
-                      (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
-                        (cond
-                          ,@(loop
-                              :for i :from 0
-                              :for polymorph
-                                :in (polymorphic-function-polymorphs (fdefinition *name*))
-                              :for static-dispatch-name
-                                := (polymorph-static-dispatch-name polymorph)
-                              :for runtime-applicable-p-form
-                                := (polymorph-runtime-applicable-p-form polymorph)
-                              :collect
-                              `(,runtime-applicable-p-form #',static-dispatch-name))
-                          (t
-                           (error 'no-applicable-polymorph/error
-                                  :name ',*name*
-                                  :arg-list ,args
-                                  :effective-type-lists
-                                  (polymorphic-function-effective-type-lists
-                                   (function ,*name*))))))))
-                (cond ,@(loop :for (name default supplied-p) :in (reverse optional-parameters)
-                              :for optional-idx :downfrom (length optional-parameters) :above 0
-                              :for parameters := (append required-parameters
-                                                         (mapcar #'first
-                                                                 (subseq optional-parameters
-                                                                         0 optional-idx)))
-                              :collect `(,supplied-p
-                                         (funcall
-                                          (the function ,static-dispatch-fn)
-                                          ,@parameters)))
-                      (t
-                       (funcall (the function ,static-dispatch-fn)
-                                ,@required-parameters)))))))))
+        (block ,block-name
+          ,(if invalidated-p
+               `(progn
+                  (update-polymorphic-function-lambda (fdefinition ',*name*))
+                  (cond ,@(loop :for (name default supplied-p) :in (reverse optional-parameters)
+                                :for optional-idx :downfrom (length optional-parameters) :above 0
+                                :for parameters := (append required-parameters
+                                                           (mapcar #'first
+                                                                   (subseq optional-parameters
+                                                                           0 optional-idx)))
+                                :collect `(,supplied-p
+                                           (funcall (fdefinition ',*name*) ,@parameters)))
+                        (t
+                         (funcall (fdefinition ',*name*) ,@required-parameters))))
+               `(let ((,static-dispatch-fn
+                        (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                          (cond
+                            ,@(loop
+                                :for i :from 0
+                                :for polymorph
+                                  :in (polymorphic-function-polymorphs (fdefinition *name*))
+                                :for static-dispatch-name
+                                  := (polymorph-static-dispatch-name polymorph)
+                                :for runtime-applicable-p-form
+                                  := (polymorph-runtime-applicable-p-form polymorph)
+                                :collect
+                                `(,runtime-applicable-p-form #',static-dispatch-name))
+                            (t
+                             (return-from ,block-name
+                               (funcall ,(polymorphic-function-default (fdefinition *name*))
+                                        ',*name* ,args)))))))
+                  (cond ,@(loop :for (name default supplied-p) :in (reverse optional-parameters)
+                                :for optional-idx :downfrom (length optional-parameters) :above 0
+                                :for parameters := (append required-parameters
+                                                           (mapcar #'first
+                                                                   (subseq optional-parameters
+                                                                           0 optional-idx)))
+                                :collect `(,supplied-p
+                                           (funcall
+                                            (the function ,static-dispatch-fn)
+                                            ,@parameters)))
+                        (t
+                         (funcall (the function ,static-dispatch-fn)
+                                  ,@required-parameters))))))))))
 
 (defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required-optional))
                                                             (untyped-lambda-list list))

@@ -67,11 +67,8 @@
                (mapc #'compiler-macro-notes:muffle form-type-failures)))
         (when (and (null polymorph)
                    (or optim-speed optim-safety))
-          (signal 'no-applicable-polymorph/compiler-note
-                  :name name
-                  :arg-list arg-list
-                  :effective-type-lists
-                  (polymorphic-function-effective-type-lists (fdefinition name))))
+          (funcall (polymorphic-function-default (fdefinition name))
+                   name arg-list env))
         (when (or (null polymorph)
                   (not optim-speed))
           (return-from pf-compiler-macro original-form))

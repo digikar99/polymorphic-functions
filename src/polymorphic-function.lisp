@@ -84,12 +84,6 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
     (with-slots (name type-list) o
       (format stream "~S ~S" name type-list))))
 
-(defun polymorph (polymorph)
-  "Returns the LAMBDA associated with POLYMORPH"
-  (declare (type polymorph polymorph)
-           (optimize speed))
-  (polymorph-lambda polymorph))
-
 (defclass polymorphic-function ()
   ((name        :initarg :name
                 :initform (error "NAME must be supplied.")
@@ -101,6 +95,10 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
                      :initarg :lambda-list-type
                      :initform (error "LAMBDA-LIST-TYPE must be supplied.")
                      :reader polymorphic-function-lambda-list-type)
+   (default     :initarg :default
+                :initform (error ":DEFAULT must be supplied")
+                :reader polymorphic-function-default
+                :type function)
    (polymorphs  :initform nil
                 :accessor polymorphic-function-polymorphs)
    (documentation :initarg :documentation
@@ -136,8 +134,10 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
       "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH for
 use by functions like TYPE-LIST-APPLICABLE-P")
 
-(defun register-polymorphic-function (name untyped-lambda-list documentation &key overwrite)
+(defun register-polymorphic-function (name untyped-lambda-list documentation default
+                                      &key overwrite)
   (declare (type function-name       name)
+           (type function            default)
            (type (or null string)    documentation)
            (type untyped-lambda-list untyped-lambda-list))
   (unless overwrite                     ; so, OVERWRITE is NIL
@@ -168,6 +168,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               :name name
                               :documentation documentation
                               :lambda-list lambda-list
+                              :default default
                               :lambda-list-type (lambda-list-type untyped-lambda-list))))
       (invalidate-polymorphic-function-lambda apf)
       (setf (fdefinition name) apf)

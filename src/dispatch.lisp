@@ -27,13 +27,23 @@
 ;;;   - DEFPOLYMORPH-COMPILER-MACRO
 
 (defmacro define-polymorphic-function (name untyped-lambda-list
-                                       &key overwrite (documentation nil docp) &environment env)
+                                       &key overwrite
+                                         (documentation nil docp)
+                                         (default '(function no-applicable-polymorph))
+                                       &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH
 for specializing on various argument types.
 
 If OVERWRITE is T, all the existing polymorphs associated with NAME are deleted,
 and new polymorphs will be ready to be installed.
-If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has changed."
+If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has changed.
+
+DEFAULT should be a FUNCTION that can be called with two arguments at run-time
+and compile-time in case no polymorph is applicable.
+- the first of these arguments is the NAME, while
+- the second argument is the argument list with which the polymorphic-function
+  was called or compiled.
+At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
   (when docp (check-type documentation string))
@@ -43,7 +53,8 @@ If OVERWRITE is NIL, a continuable error is raised if the LAMBDA-LIST has change
        (eval-when (:compile-toplevel :load-toplevel :execute)
          ,(when overwrite
             `(undefine-polymorphic-function ',name))
-         (register-polymorphic-function ',name ',untyped-lambda-list ,documentation)
+         (register-polymorphic-function ',name ',untyped-lambda-list ,documentation
+                                        ,default)
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
          (setf (compiler-macro-function ',name) #'pf-compiler-macro))
        #+sbcl (setf (slot-value (fdefinition ',name) 'sb-pcl::source)
@@ -220,7 +231,8 @@ Proceed at your own risk."
                    (unless (and (fboundp ',name)
                                 (typep (function ,name) 'polymorphic-function))
                      #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-                     (register-polymorphic-function ',name ',untyped-lambda-list nil)
+                     (register-polymorphic-function ',name ',untyped-lambda-list nil
+                                                    (function no-applicable-polymorph))
                      (setf (compiler-macro-function ',name) #'pf-compiler-macro)))
                  #+sbcl ,(when inline-safe-lambda-body
                            (if optim-debug

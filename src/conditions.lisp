@@ -61,6 +61,20 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
     (no-applicable-polymorph compiler-macro-notes:note)
   ())
 
+(defun no-applicable-polymorph (name arg-list &optional env)
+  (declare (ignore env))
+  (if *compiler-macro-expanding-p*
+      (signal 'no-applicable-polymorph/compiler-note
+              :name name
+              :arg-list arg-list
+              :effective-type-lists
+              (polymorphic-function-effective-type-lists (fdefinition name)))
+      (error 'no-applicable-polymorph/error
+             :name name
+             :arg-list arg-list
+             :effective-type-lists
+             (polymorphic-function-effective-type-lists (fdefinition name)))))
+
 (defun note-null-env (form datum &rest arguments)
   (let ((*print-pretty* t))
     (pprint-logical-block (*error-output* nil :per-line-prefix "; " :suffix (string #\newline))
