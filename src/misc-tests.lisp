@@ -511,8 +511,8 @@
                              nil)))))
            (eval `(progn
                     (define-polymorphic-function foo (a b) :overwrite t)
-                    (defpolymorph foo ((a array) (b (type-like a element-type))) t
-                      (= b (aref a 0)))))
+                    (defpolymorph foo ((array array) (elt (type-like array element-type))) t
+                      (= elt (aref array 0)))))
 
            ;; Runtime tests
            (5am:is-true  (eval `(foo (make-array 2 :element-type 'single-float) 0.0)))

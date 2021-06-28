@@ -237,9 +237,10 @@ ARG-TYPES into account."))
 ;; RUNTIME-APPLICABLE-P-FORM ===================================================
 
 (defgeneric runtime-applicable-p-form
-    (lambda-list-type untyped-lambda-list type-list))
+    (lambda-list-type untyped-lambda-list type-list parameter-alist))
 
-(defmethod runtime-applicable-p-form ((type t) (untyped-lambda-list t) (type-list t))
+(defmethod runtime-applicable-p-form
+    ((type t) (untyped-lambda-list t) (type-list t) (parameter-alist t))
   (assert (typep type 'lambda-list-type) nil
           "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
           +lambda-list-types+ type)
@@ -248,7 +249,12 @@ ARG-TYPES into account."))
           untyped-lambda-list)
   (assert (typep type-list 'type-list) nil
           "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
+  (assert (typep parameter-alist 'trivial-types:association-list) nil
+          "Expected PARAMETER-ALIST to be a ALIST but is ~a" parameter-alist)
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
+
+(defvar *name*)
+(defvar *environment*)
 
 
 ;; TYPE-LIST-SUBTYPE-P =========================================================

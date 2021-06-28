@@ -342,18 +342,20 @@
 
 (defmethod runtime-applicable-p-form ((type (eql 'required-key))
                                       (untyped-lambda-list list)
-                                      (type-list list))
+                                      (type-list list)
+                                      (parameter-alist list))
   (let* ((rest-position (position '&rest untyped-lambda-list))
          (key-position  (position '&key untyped-lambda-list))
          (param-list    untyped-lambda-list))
     `(and ,@(loop :for param :in (subseq param-list 0 rest-position)
                   :for type  :in (subseq type-list  0 rest-position)
-                  :collect `(typep ,param ,(deparameterize-runtime-type type)))
+                  :collect `(typep ,param ,(deparameterize-runtime-type type parameter-alist)))
           ,@(let ((param-types (subseq type-list (1+ rest-position))))
               (loop :for (param default supplied-p)
                       :in (subseq param-list (1+ key-position))
                     :for type := (second (assoc param param-types :test #'string=))
-                    :collect `(typep ,param ,(deparameterize-runtime-type type)))))))
+                    :collect `(typep ,param ,(deparameterize-runtime-type type
+                                                                          parameter-alist)))))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required-key))
                                  (type-2 (eql 'required-key))

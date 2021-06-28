@@ -245,11 +245,12 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                    (add-polymorph p-new polymorphs)))
            nil))))
 
-(defun register-polymorph (name inline-p type-list effective-type-list
+(defun register-polymorph (name inline-p typed-lambda-list type-list effective-type-list
                            return-type inline-lambda-body static-dispatch-name
                            lambda-list-type compiler-applicable-p-lambda)
   (declare (type function-name  name)
            (type (member t nil :maybe) inline-p)
+           (type typed-lambda-list typed-lambda-list)
            (type function-name  static-dispatch-name)
            (type type-list      type-list)
            (type type-list      effective-type-list)
@@ -257,7 +258,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (type list           inline-lambda-body))
   (let* ((apf                        (fdefinition name))
          (apf-lambda-list-type       (polymorphic-function-lambda-list-type apf))
-         (untyped-lambda-list        (polymorphic-function-lambda-list apf)))
+         (untyped-lambda-list        (polymorphic-function-lambda-list apf))
+         (parameter-alist (typed-lambda-list-parameter-alist untyped-lambda-list
+                                                             typed-lambda-list)))
     (when (eq apf-lambda-list-type 'rest)
       ;; required-optional can simply be split up into multiple required or required-key
       (assert (member lambda-list-type '(rest required required-key))
@@ -283,7 +286,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      :runtime-applicable-p-form
                                      (runtime-applicable-p-form apf-lambda-list-type
                                                                 untyped-lambda-list
-                                                                effective-type-list)
+                                                                effective-type-list
+                                                                parameter-alist)
                                      :inline-lambda-body inline-lambda-body
                                      :static-dispatch-name static-dispatch-name
                                      :compiler-macro-lambda nil)))
@@ -400,7 +404,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                          :runtime-applicable-p-form
                          (runtime-applicable-p-form lambda-list-type
                                                     lambda-list
-                                                    type-list)
+                                                    type-list
+                                                    ;; Well... We do not know the names!
+                                                    nil)
                          :compiler-applicable-p-lambda
                          (compile nil
                                   (compiler-applicable-p-lambda-body lambda-list-type

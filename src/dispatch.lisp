@@ -251,7 +251,9 @@ Proceed at your own risk."
                    ;; because we need to take parametric polymorphism into account
                    ;; while inlining.
                    (setf (fdefinition ',static-dispatch-name) ,lambda-body)
-                   (register-polymorph ',name ',inline ',type-list
+                   (register-polymorph ',name ',inline
+                                       ',typed-lambda-list
+                                       ',type-list
                                        ',effective-type-list
                                        ',return-type
                                        ',inline-safe-lambda-body

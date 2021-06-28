@@ -61,19 +61,19 @@ and returns the type to be substituted in place of the list."
                                  node))
                        (t node))))))
 
-(defun deparameterize-runtime-type (type)
+(defun deparameterize-runtime-type (type parameter-alist)
   (if (type-like-p type)
       ;; No, for simplicity's / speed's sake, we do not allow TYPE-LIKE
       ;; to be "embedded" inside other type-specifiers; that case can be
       ;; handled by defining an appropriate TYPE-PARAMETERIZER
-      (destructuring-bind (var type-parameterizer) (cdr type)
-        `(,type-parameterizer ,var))
+      (destructuring-bind (local-name type-parameterizer) (cdr type)
+        `(,type-parameterizer ,(parameter-form-in-pf (assoc-value parameter-alist local-name))))
       `',type))
 
 (defun deparameterize-compile-time-type (type ll-param-alist)
   (if (type-like-p type)
       (destructuring-bind (var type-parameterizer) (cdr type)
-        `(,type-parameterizer ',(assoc-value ll-param-alist var)))
+        `(,type-parameterizer (cdr ,(assoc-value ll-param-alist var))))
       `',type))
 
 (defun type-specifier-p (object &optional env)

@@ -83,7 +83,7 @@
                                               (type-list list))
   (let* ((param-list     (mapcar #'type->param type-list))
          (ll-param-alist (mapcar #'cons
-                                 untyped-lambda-list type-list)))
+                                 untyped-lambda-list param-list)))
     (with-gensyms (form form-type)
       `(lambda ,param-list
          (declare (optimize speed))
@@ -105,11 +105,12 @@
 
 (defmethod runtime-applicable-p-form ((type (eql 'required))
                                       (untyped-lambda-list list)
-                                      (type-list list))
+                                      (type-list list)
+                                      (parameter-alist list))
   `(and ,@(loop :for param :in untyped-lambda-list
                 :for type  :in type-list
                 :collect `(typep ,param
-                                 ,(deparameterize-runtime-type type)))))
+                                 ,(deparameterize-runtime-type type parameter-alist)))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required))
                                  (type-2 (eql 'required))

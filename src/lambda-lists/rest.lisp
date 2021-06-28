@@ -169,13 +169,16 @@
 
 (defmethod runtime-applicable-p-form ((type (eql 'rest))
                                       (untyped-lambda-list list)
-                                      (type-list list))
+                                      (type-list list)
+                                      (parameter-alist list))
   (let* ((rest-position (position '&rest untyped-lambda-list))
          (param-list    untyped-lambda-list)
          (rest-arg      (nth (1+ rest-position) untyped-lambda-list)))
     `(and ,@(loop :for param :in (subseq param-list 0 rest-position)
                   :for type  :in (subseq type-list  0 rest-position)
-                  :collect `(typep ,param ',type))
+                  :collect `(typep ,param
+                                   ,(deparameterize-runtime-type type
+                                                                 parameter-alist)))
           ,@(let* ((type-list    (subseq type-list rest-position))
                    (min-rest-length (or (position '&key type-list)
                                         (position '&rest type-list)
@@ -192,19 +195,28 @@
                                                 ,rest-arg))
                                  (loop :for i :from 0
                                        :for type :in type-list
-                                       :collect `(typep (nth ,i ,rest-arg) ',type))))
+                                       :collect
+                                       `(typep (nth ,i ,rest-arg)
+                                               ,(deparameterize-runtime-type type
+                                                                             parameter-alist)))))
                           ((equalp (intersection lambda-list-keywords type-list)
                                    '(&rest))
                            (loop :for i :from 0
                                  :for type :in (butlast type-list)
-                                 :collect `(typep (nth ,i ,rest-arg) ',type)))
+                                 :collect
+                                 `(typep (nth ,i ,rest-arg)
+                                         ,(deparameterize-runtime-type type
+                                                                       parameter-alist))))
                           ((member '&key type-list)
                            (let* ((pos-key (position '&key type-list))
                                   (param-types (subseq type-list (1+ pos-key)))
                                   (i 0))
                              (nconc
                               (loop :for type :in (subseq type-list 0 pos-key)
-                                    :collect `(typep (nth ,i ,rest-arg) ',type)
+                                    :collect
+                                    `(typep (nth ,i ,rest-arg)
+                                            ,(deparameterize-runtime-type type
+                                                                          parameter-alist))
                                     :do (incf i))
                               `((evenp (length (nthcdr ,i ,rest-arg))))
                               (let ((key-tmp-args
@@ -214,8 +226,10 @@
                                       (nthcdr ,i ,rest-arg)
                                     (and ,@(loop :for (param type) :in param-types
                                                  :for key-tmp-arg :in key-tmp-args
-                                                 :collect `(typep ,key-tmp-arg
-                                                                  ',type)))))))))
+                                                 :collect
+                                                 `(typep ,key-tmp-arg
+                                                         ,(deparameterize-runtime-type
+                                                           type parameter-alist))))))))))
                           (t
                            (error "Not expected to reach here"))))))))
 

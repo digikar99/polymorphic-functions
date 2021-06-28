@@ -305,16 +305,20 @@
 
 (defmethod runtime-applicable-p-form ((type (eql 'required-optional))
                                       (untyped-lambda-list list)
-                                      (type-list list))
+                                      (type-list list)
+                                      (parameter-alist list))
   (let* ((optional-position (position '&optional type-list))
          (param-list        untyped-lambda-list))
     `(and ,@(loop :for param :in (subseq param-list 0 optional-position)
                   :for type  :in (subseq type-list  0 optional-position)
-                  :collect `(typep ,param ,(deparameterize-runtime-type type)))
+                  :collect `(typep ,param
+                                   ,(deparameterize-runtime-type type parameter-alist)))
+          ;; Why not use DEFAULT? Because EFFECTIVE-TYPE-LIST takes care of it!
           ,@(loop :for (param default supplied-p)
                     :in (subseq param-list (1+ optional-position))
                   :for type  :in (subseq type-list (1+ optional-position))
-                  :collect `(typep ,param ,(deparameterize-runtime-type type))))))
+                  :collect `(typep ,param
+                                   ,(deparameterize-runtime-type type parameter-alist))))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required-optional))
                                  (type-2 (eql 'required-optional))

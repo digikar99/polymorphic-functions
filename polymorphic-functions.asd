@@ -21,14 +21,16 @@
                              (:file "supertypep"   :depends-on ("core"))
                              (:file "type="        :depends-on ("core"))
                              (:file "subtypep"     :depends-on ("core"))))
-               (:file "polymorphic-function"       :depends-on ("extended-types"))
                (:module "lambda-lists"             :depends-on ("extended-types")
                 :components ((:file "doc")
                              (:file "base"         :depends-on ("doc"))
                              (:file "required"     :depends-on ("base"))
                              (:file "required-optional" :depends-on ("base"))
                              (:file "required-key" :depends-on ("base"))
-                             (:file "rest"         :depends-on ("base"))))
+                             (:file "rest"         :depends-on ("base"))
+                             (:file "parameter-alist")))
+               (:file "polymorphic-function"       :depends-on ("extended-types"
+                                                                "lambda-lists"))
                (:file "conditions"                 :depends-on ("extended-types"))
                (:file "compiler-macro"             :depends-on ("polymorphic-function"
                                                                 "lambda-lists"
@@ -48,4 +50,4 @@
                     (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
                                                    (5AM:*ON-ERROR* :DEBUG)
                                                    (CL:*COMPILE-VERBOSE* NIL))
-                                               (FIVEAM:RUN :POLYMORPHIC-FUNCTIONS))"))))
+                                               (FIVEAM:RUN! :POLYMORPHIC-FUNCTIONS))"))))
