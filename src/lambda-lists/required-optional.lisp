@@ -255,40 +255,53 @@
                 (pos-2 (position '&optional untyped-lambda-list)))
          (= pos-1 pos-2))))
 
-(defmethod compiler-applicable-p-lambda-body ((type (eql 'required-optional)) (type-list list))
+(defmethod compiler-applicable-p-lambda-body ((type (eql 'required-optional))
+                                              (untyped-lambda-list list)
+                                              (type-list list))
   (let* ((optional-position (position '&optional type-list))
          (param-list (loop :for i :from 0
                            :for type :in type-list
                            :collect (if (> i optional-position)
                                         (type->param type '&optional)
-                                        (type->param type)))))
+                                        (type->param type))))
+         (ll-param-alist (loop :for i :from 0
+                               :for param :in param-list
+                               :for name :in untyped-lambda-list
+                               :if (not (eq name '&optional))
+                                 :collect (cons name param))))
     (with-gensyms (form form-type)
       `(lambda ,param-list
          (declare (optimize speed))
          (and ,@(loop :for param :in (subseq param-list 0 optional-position)
                       :for type  :in (subseq type-list  0 optional-position)
-                      :collect `(let ((,form      (car ,param))
-                                      (,form-type (cdr ,param)))
-                                  (cond ((eq t ',type)
-                                         t)
-                                        ((eq t ,form-type)
-                                         (signal 'form-type-failure
-                                                 :form ,form))
-                                        (t
-                                         (subtypep ,form-type ',type)))))
+                      :collect
+                      `(let ((,form      (car ,param))
+                             (,form-type (cdr ,param)))
+                         (cond ((eq t ',type)
+                                t)
+                               ((eq t ,form-type)
+                                (signal 'form-type-failure
+                                        :form ,form))
+                               (t
+                                (subtypep ,form-type
+                                          ,(deparameterize-compile-time-type type
+                                                                             ll-param-alist))))))
               ,@(loop :for (param default supplied-p)
                         :in (subseq param-list (1+ optional-position))
                       :for type  :in (subseq type-list (1+ optional-position))
-                      :collect `(or (not ,supplied-p)
-                                    (let ((,form      (car ,param))
-                                          (,form-type (cdr ,param)))
-                                      (cond ((eq t ',type)
-                                             t)
-                                            ((eq t ,form-type)
-                                             (signal 'form-type-failure
-                                                     :form ,form))
-                                            (t
-                                             (subtypep ,form-type ',type)))))))))))
+                      :collect
+                      `(or (not ,supplied-p)
+                           (let ((,form      (car ,param))
+                                 (,form-type (cdr ,param)))
+                             (cond ((eq t ',type)
+                                    t)
+                                   ((eq t ,form-type)
+                                    (signal 'form-type-failure
+                                            :form ,form))
+                                   (t
+                                    (subtypep ,form-type
+                                              ,(deparameterize-compile-time-type type
+                                                                                 ll-param-alist))))))))))))
 
 (defmethod runtime-applicable-p-form ((type (eql 'required-optional))
                                       (untyped-lambda-list list)
@@ -297,11 +310,11 @@
          (param-list        untyped-lambda-list))
     `(and ,@(loop :for param :in (subseq param-list 0 optional-position)
                   :for type  :in (subseq type-list  0 optional-position)
-                  :collect `(typep ,param ',type))
+                  :collect `(typep ,param ,(deparameterize-runtime-type type)))
           ,@(loop :for (param default supplied-p)
                     :in (subseq param-list (1+ optional-position))
                   :for type  :in (subseq type-list (1+ optional-position))
-                  :collect `(typep ,param ',type)))))
+                  :collect `(typep ,param ,(deparameterize-runtime-type type))))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required-optional))
                                  (type-2 (eql 'required-optional))

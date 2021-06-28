@@ -439,7 +439,8 @@
   (fmakunbound 'setf-foo-caller)
   (undefine-polymorphic-function '(setf foo)))
 
-(def-test parametric-polymorphism ()
+(def-test subtype-polymorphism ()
+  ;; FIXME: Rename and update to test SUBTYPE-POLYMORPHISM
   (unwind-protect
        (handler-bind ((warning #'muffle-warning))
          (eval `(progn
@@ -490,3 +491,59 @@
     (unintern 'outer)
     (fmakunbound 'outer-caller)
     (unintern 'outer-caller)))
+
+
+
+(def-test parametric-polymorphism ()
+
+  (unwind-protect
+       (ignoring-error-output
+         (handler-bind ((warning #'muffle-warning))
+           (eval `(defun element-type (object)
+                    (typecase object
+                      (array (array-element-type object))
+                      ;; This is still incomplete
+                      (t (if (and (listp object)
+                                  (or (eq 'array (first object))
+                                      (eq 'simple-array (first object)))
+                                  (not (eq 'cl:* (second object))))
+                             (second object)
+                             nil)))))
+           (eval `(progn
+                    (define-polymorphic-function foo (a b) :overwrite t)
+                    (defpolymorph foo ((a array) (b (type-like a element-type))) t
+                      (= b (aref a 0)))))
+
+           ;; Runtime tests
+           (5am:is-true  (eval `(foo (make-array 2 :element-type 'single-float) 0.0)))
+           (5am:is-false (eval `(foo (make-array 2 :element-type 'single-float) 1.0)))
+           (5am:signals no-applicable-polymorph
+             (eval `(foo (make-array 2 :element-type 'single-float) 1.0d0)))
+
+           ;; Compile-time tests
+
+           (5am:is-true  (eval `(funcall (lambda (a b)
+                                           (declare (optimize speed)
+                                                    (type (simple-array single-float) a)
+                                                    (type single-float b))
+                                           (foo a b))
+                                         (make-array 2 :element-type 'single-float)
+                                         0.0)))
+           (5am:is-false (eval `(funcall (lambda (a b)
+                                           (declare (optimize speed)
+                                                    (type (simple-array single-float) a)
+                                                    (type single-float b))
+                                           (foo a b))
+                                         (make-array 2 :element-type 'single-float)
+                                         1.0)))
+           (5am:signals no-applicable-polymorph
+             (eval `(funcall (lambda (a b)
+                               (declare (optimize speed)
+                                        (type (simple-array single-float) a)
+                                        (type double-float b))
+                               (foo a b))
+                             (make-array 2 :element-type 'single-float)
+                             1.0d0)))))
+
+    (fmakunbound 'element-type)
+    (fmakunbound 'foo)))

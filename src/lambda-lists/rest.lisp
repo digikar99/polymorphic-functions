@@ -138,25 +138,34 @@
           (t
            (<= rest-position (length type-list))))))
 
-(defmethod compiler-applicable-p-lambda-body ((type (eql 'rest)) (type-list list))
+(defmethod compiler-applicable-p-lambda-body ((type (eql 'rest))
+                                              (untyped-lambda-list list)
+                                              (type-list list))
   (let* ((rest-position (position '&rest type-list))
          (param-list (append (mapcar #'type->param (subseq type-list 0 rest-position))
-                             `(&rest ,(gensym)))))
+                             `(&rest ,(gensym))))
+         (ll-param-alist (loop :for param :in param-list
+                               :for i :below rest-position
+                               :for name :in untyped-lambda-list
+                               :collect (cons name param))))
     (with-gensyms (form form-type)
       `(lambda ,param-list
          (declare (optimize speed)
                   (ignore ,@(last param-list)))
          (and ,@(loop :for param :in (subseq param-list 0 rest-position)
                       :for type  :in (subseq type-list  0 rest-position)
-                      :collect `(let ((,form      (car ,param))
-                                      (,form-type (cdr ,param)))
-                                  (cond ((eq t ',type)
-                                         t)
-                                        ((eq t ,form-type)
-                                         (signal 'form-type-failure
-                                                 :form ,form))
-                                        (t
-                                         (subtypep ,form-type ',type))))))))))
+                      :collect
+                      `(let ((,form      (car ,param))
+                             (,form-type (cdr ,param)))
+                         (cond ((eq t ',type)
+                                t)
+                               ((eq t ,form-type)
+                                (signal 'form-type-failure
+                                        :form ,form))
+                               (t
+                                (subtypep ,form-type
+                                          ,(deparameterize-compile-time-type type
+                                                                             ll-param-alist)))))))))))
 
 (defmethod runtime-applicable-p-form ((type (eql 'rest))
                                       (untyped-lambda-list list)

@@ -219,12 +219,17 @@ ARG-TYPES into account."))
 
 ;; COMPILER-APPLICABLE-P-LAMBDA-BODY ===========================================
 
-(defgeneric compiler-applicable-p-lambda-body (lambda-list-type type-list))
+(defgeneric compiler-applicable-p-lambda-body
+    (lambda-list-type untyped-lambda-list type-list))
 
-(defmethod compiler-applicable-p-lambda-body ((type t) (type-list t))
+(defmethod compiler-applicable-p-lambda-body
+    ((type t) (untyped-lambda-list t) (type-list t))
   (assert (typep type 'lambda-list-type) nil
           "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
           +lambda-list-types+ type)
+  (assert (typep untyped-lambda-list 'untyped-lambda-list) nil
+          "Expected UNTYPED-LAMBDA-LIST to be a UNTYPED-LAMBDA-LIST %but is ~a"
+          untyped-lambda-list)
   (assert (typep type-list 'type-list) nil
           "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
   (error "This code shouldn't have reached here; perhaps file a bug report!"))
@@ -268,10 +273,13 @@ ARG-TYPES into account."))
   #.+type-list-causes-ambiguous-call-p+
   (declare (type type-list type-list-1 type-list-2))
   (let ((*lambda-list-typed-p* nil))
-    (%type-list-causes-ambiguous-call-p (potential-type-of-lambda-list type-list-1)
-                                        (potential-type-of-lambda-list type-list-2)
-                                        type-list-1
-                                        type-list-2)))
+    (handler-case
+        (%type-list-causes-ambiguous-call-p (potential-type-of-lambda-list type-list-1)
+                                            (potential-type-of-lambda-list type-list-2)
+                                            type-list-1
+                                            type-list-2)
+      (illegal-type-like ()
+        t))))
 
 (defgeneric %type-list-causes-ambiguous-call-p
     (type-1 type-2 type-list-1 type-list-2)

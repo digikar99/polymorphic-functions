@@ -404,6 +404,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                          :compiler-applicable-p-lambda
                          (compile nil
                                   (compiler-applicable-p-lambda-body lambda-list-type
+                                                                     lambda-list
                                                                      type-list))
                          :compiler-macro-lambda lambda))))))
 

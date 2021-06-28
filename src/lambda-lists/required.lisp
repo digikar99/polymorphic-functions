@@ -79,30 +79,37 @@
   (length= type-list untyped-lambda-list))
 
 (defmethod compiler-applicable-p-lambda-body ((type (eql 'required))
+                                              (untyped-lambda-list list)
                                               (type-list list))
-  (let ((param-list (mapcar #'type->param type-list)))
+  (let* ((param-list     (mapcar #'type->param type-list))
+         (ll-param-alist (mapcar #'cons
+                                 untyped-lambda-list type-list)))
     (with-gensyms (form form-type)
       `(lambda ,param-list
          (declare (optimize speed))
          (block nil
            (and ,@(loop :for param :in param-list
                         :for type  :in type-list
-                        :collect `(let ((,form      (car ,param))
-                                        (,form-type (cdr ,param)))
-                                    (cond ((eq t ',type)
-                                           t)
-                                          ((eq t ,form-type)
-                                           (signal 'form-type-failure
-                                                   :form ,form))
-                                          (t
-                                           (subtypep ,form-type ',type)))))))))))
+                        :collect
+                        `(let ((,form      (car ,param))
+                               (,form-type (cdr ,param)))
+                           (cond ((eq t ',type)
+                                  t)
+                                 ((eq t ,form-type)
+                                  (signal 'form-type-failure
+                                          :form ,form))
+                                 (t
+                                  (subtypep ,form-type
+                                            ,(deparameterize-compile-time-type
+                                              type ll-param-alist))))))))))))
 
 (defmethod runtime-applicable-p-form ((type (eql 'required))
                                       (untyped-lambda-list list)
                                       (type-list list))
   `(and ,@(loop :for param :in untyped-lambda-list
                 :for type  :in type-list
-                :collect `(typep ,param ',type))))
+                :collect `(typep ,param
+                                 ,(deparameterize-runtime-type type)))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required))
                                  (type-2 (eql 'required))

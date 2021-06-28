@@ -19,7 +19,6 @@ The library provides both [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad
 - Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
 - Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a polymorph that was defined for `vector` when compiled with arguments declared to be `simple-string`, then the body is made aware at *compiler/macroexpansion time* that the arguments are actually `simple-string` rather than just `vector`. Code further in the succeeding compiler/macroexpansion phases can then make use of this information. For code in the inner scopes of the polymorph, a `type-like` declaration is provided with example usage in [src/misc-tests.lisp](src/misc-tests.lisp).
 - Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for *correctness*.
-- Currently inlining uses the lexical environment of the call-site rather than the definition-site as is the usual case. To work around this, users should avoid shadowing global lexical elements.
 
 ### Examples
 
@@ -167,6 +166,7 @@ Inlining especially becomes necessary for mathematical operations, wherein a cal
 - ANSI is insufficient for our purposes: we need `introspect-environment:policy-quality` and CLTL2 and more for cl-form-types; if someone needs a reduced feature version within the bounds of ANSI standard, please raise an issue!
 - A [bug on CCL](https://github.com/Clozure/ccl/pull/369) may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
 - A `polymorphic-functions.extended-types` package (not system!) is also provided based on [ctype](https://github.com/s-expressionists/ctype). This allows one to extend the CL type system to define types beyond what `cl:deftype` can do to some extent. While these cannot be used inside an arbitrary CL form with `cl:declare`, these can be used in the type lists of polymorphs. See [src/extended-types/supertypep.lisp](src/extended-types/supertypep.lisp) for an example put to use in [trivial-coerce](https://github.com/digikar99/trivial-coerce).
+- Currently inlining uses the lexical environment of the call-site rather than the definition-site as is the usual case. To work around this, users should avoid shadowing global lexical elements.
 
 ## Rationale
 

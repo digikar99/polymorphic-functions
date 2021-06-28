@@ -259,6 +259,7 @@ Proceed at your own risk."
                                        ',lambda-list-type
                                        ,(compiler-applicable-p-lambda-body
                                          lambda-list-type
+                                         untyped-lambda-list
                                          effective-type-list))
                    ',name)))))))))
 
