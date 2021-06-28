@@ -21,16 +21,17 @@
                              (:file "supertypep"   :depends-on ("core"))
                              (:file "type="        :depends-on ("core"))
                              (:file "subtypep"     :depends-on ("core"))))
-               (:module "lambda-lists"             :depends-on ("extended-types")
+               (:file "polymorphic-function"       :depends-on ("extended-types"))
+               (:file "parameter-alist"            :depends-on ("polymorphic-function"))
+               (:module "lambda-lists"             :depends-on ("extended-types"
+                                                                "polymorphic-function"
+                                                                "parameter-alist")
                 :components ((:file "doc")
                              (:file "base"         :depends-on ("doc"))
                              (:file "required"     :depends-on ("base"))
                              (:file "required-optional" :depends-on ("base"))
                              (:file "required-key" :depends-on ("base"))
-                             (:file "rest"         :depends-on ("base"))
-                             (:file "parameter-alist")))
-               (:file "polymorphic-function"       :depends-on ("extended-types"
-                                                                "lambda-lists"))
+                             (:file "rest"         :depends-on ("base"))))
                (:file "conditions"                 :depends-on ("extended-types"))
                (:file "compiler-macro"             :depends-on ("polymorphic-function"
                                                                 "lambda-lists"
