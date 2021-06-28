@@ -34,7 +34,7 @@ to the appropriate PARAMETER."
                                            :type type))
                      (setq untyped-lambda-list (cdr untyped-lambda-list))))
                   (&optional
-                   (destructuring-bind ((name type) default) parameter-specifier
+                   (destructuring-bind ((name type) &optional default) parameter-specifier
                      (declare (ignore default))
                      (setf (assoc-value parameter-alist name)
                            (make-parameter :local-name name
@@ -57,7 +57,7 @@ to the appropriate PARAMETER."
                        (setq untyped-lambda-list (cdr untyped-lambda-list))
                        (incf rest-idx))))
                   (&key
-                   (destructuring-bind ((name type) default) parameter-specifier
+                   (destructuring-bind ((name type) &optional default) parameter-specifier
                      (declare (ignore default))
                      (setf (assoc-value parameter-alist name)
                            (make-parameter :local-name name
