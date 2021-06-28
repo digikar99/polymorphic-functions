@@ -167,7 +167,7 @@ Proceed at your own risk."
                                  ,declarations
                                  (block ,block-name
                                    ,@(butlast body)
-                                   (the ,return-type ,@(or (last body) '(nil)))))
+                                   ,(ensure-type-form return-type (lastcar body))))
                               #+ccl
                               `(ccl:nfunction (polymorph ,name ,type-list)
                                               (lambda ,param-list
@@ -175,14 +175,14 @@ Proceed at your own risk."
                                                 ,declarations
                                                 (block ,block-name
                                                   ,@(butlast body)
-                                                  (the ,return-type ,@(or (last body) '(nil))))))
+                                                  ,(ensure-type-form return-type (lastcar body)))))
                               #-(or ccl sbcl)
                               `(lambda ,param-list
                                  ,(lambda-declarations typed-lambda-list :typed t)
                                  ,declarations
                                  (block ,block-name
                                    ,@(butlast body)
-                                   (the ,return-type ,@(or (last body) '(nil))))))
+                                   ,(ensure-type-form return-type (lastcar body)))))
                  ;; Currently we only need INLINE-LAMBDA-BODY and the checks in M-V-B
                  ;; below for DEFTRANSFORM
                  ;; FIXME: Do away with this use even

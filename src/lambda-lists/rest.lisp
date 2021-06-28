@@ -120,12 +120,18 @@
 (defmethod enhanced-lambda-declarations ((type (eql 'rest))
                                          (type-list list)
                                          (param-list list)
-                                         (arg-types list))
-  `(declare ,@(mapcar (lambda (arg arg-type)
-                        `(type ,arg-type ,arg))
-                      (subseq param-list 0
-                              (position '&rest param-list))
-                      arg-types)))
+                                         (arg-types list)
+                                         &optional return-type)
+  (destructuring-bind (name parameterizer) (or (cdr return-type) '(nil nil))
+    (let* (declarations)
+      (loop :for param :in param-list
+            :while (not (eq '&rest param))
+            :for arg-type :in arg-types
+            :do (push `(type ,arg-type ,param) declarations)
+            :if (eq name param)
+              :do (setq return-type (funcall parameterizer arg-type)))
+      (values `(declare ,@declarations)
+              return-type))))
 
 (defmethod %type-list-compatible-p ((type (eql 'rest))
                                     (type-list list)

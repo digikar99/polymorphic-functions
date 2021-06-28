@@ -76,6 +76,19 @@ and returns the type to be substituted in place of the list."
         `(,type-parameterizer (cdr ,(assoc-value ll-param-alist var))))
       `',type))
 
+(defun ensure-type-form (type form)
+  (if (type-like-p type)
+      (with-gensyms (form-value)
+        `(let ((,form-value ,form))
+           (assert (typep ,form-value
+                          (,(third type) ,(second type)))
+                   ()
+                   'simple-type-error)
+           ,form-value))
+      ;; If we sometime decide to emit the LET form in both cases (since THE has
+      ;; no guarantee, apparantly), do handle the VALUES types correctly!
+      `(the ,type ,form)))
+
 (defun type-specifier-p (object &optional env)
   "Assumes everything is a type-specifier unless the object TYPEXPANDs to a LIST
 starting with an element in *EXTENDED-TYPE-SPECIFIERS*"

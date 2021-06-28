@@ -79,20 +79,38 @@
           (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph)))
             (when inline-lambda-body
               (setq inline-lambda-body
+                    ;; Yes we are expanding it in null env
+                    ;; because the POLYMORPH was originally expected to be defined in
+                    ;; null env
                     (trivial-macroexpand-all:macroexpand-all
-                     ;; Yes we are expanding it in null env
-                     ;; because the POLYMORPH was originally expected to be defined in
-                     ;; null env
-                     (destructuring-bind (lambda args declarations &body body)
-                         inline-lambda-body
-                       (declare (ignore declarations))
-                       `(,lambda ,args
-                          ;; The source of parametric-polymorphism
-                          ,(enhanced-lambda-declarations lambda-list-type
-                                                         type-list
-                                                         args
-                                                         arg-types)
-                          ,@body)))))
+                     ;; The source of compile-time subtype-polymorphism
+                     (if (type-like-p return-type)
+                         (destructuring-bind (lambda args declarations
+                                               more-decl (block block-name &body body))
+                             inline-lambda-body
+                           (declare (ignore declarations block more-decl))
+                           `(,lambda ,args
+                              ;; The source of compile-time subtype-polymorphism
+                              ,(multiple-value-bind (enhanced-decl deparameterized-return-type)
+                                   (enhanced-lambda-declarations lambda-list-type
+                                                                 type-list
+                                                                 args
+                                                                 arg-types
+                                                                 return-type)
+                                 (setq return-type (or deparameterized-return-type return-type))
+                                 enhanced-decl)
+                              (block ,block-name
+                                ,@(butlast body)
+                                ,(car (cdaadr (lastcar body))))))
+                         (destructuring-bind (lambda args declarations &body body)
+                             inline-lambda-body
+                           (declare (ignore declarations))
+                           `(,lambda ,args
+                              ,(enhanced-lambda-declarations lambda-list-type
+                                                             type-list
+                                                             args
+                                                             arg-types)
+                              ,@body))))))
             (return-from pf-compiler-macro
               (cond (compiler-macro-lambda
                      (funcall compiler-macro-lambda
