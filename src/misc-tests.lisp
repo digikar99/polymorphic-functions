@@ -440,7 +440,6 @@
   (undefine-polymorphic-function '(setf foo)))
 
 (def-test subtype-polymorphism ()
-  ;; FIXME: Rename and update to test SUBTYPE-POLYMORPHISM
   (unwind-protect
        (handler-bind ((warning #'muffle-warning))
          (eval `(progn
@@ -473,7 +472,7 @@
                                                        (type string a))
                                               (outer a)))
                                  "hello")))
-
+         ;; FIXME: Perhaps, this does not belong here:
          (eval `(defpolymorph (outer :inline t) ((a array)) t
                   (let ((b a))
                     (declare (type-like a b))
@@ -500,15 +499,15 @@
        (ignoring-error-output
          (handler-bind ((warning #'muffle-warning))
            (eval `(defun element-type (object)
-                    (typecase object
-                      (array (array-element-type object))
-                      ;; This is still incomplete
-                      (t (if (and (listp object)
-                                  (or (eq 'array (first object))
-                                      (eq 'simple-array (first object)))
-                                  (not (eq 'cl:* (second object))))
-                             (second object)
-                             nil)))))
+                    (if *compiler-macro-expanding-p*
+                        ;; This is still incomplete
+                        (if (and (listp object)
+                                 (or (eq 'array (first object))
+                                     (eq 'simple-array (first object)))
+                                 (not (eq 'cl:* (second object))))
+                            (second object)
+                            nil)
+                        (array-element-type object))))
            (eval `(progn
                     (define-polymorphic-function foo (a b) :overwrite t)
                     (defpolymorph foo ((array array) (elt (type-like array element-type))) t
@@ -521,7 +520,6 @@
              (eval `(foo (make-array 2 :element-type 'single-float) 1.0d0)))
 
            ;; Compile-time tests
-
            (5am:is-true  (eval `(funcall (lambda (a b)
                                            (declare (optimize speed)
                                                     (type (simple-array single-float) a)
@@ -546,4 +544,7 @@
                              1.0d0)))))
 
     (fmakunbound 'element-type)
-    (fmakunbound 'foo)))
+    (undefine-polymorphic-function 'foo)))
+
+
+

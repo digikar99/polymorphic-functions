@@ -11,16 +11,24 @@
 > - undefpolymorph
 > - find-polymorph
 
-The library provides both [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism) and ~~AOT (IIUC) [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism)~~ [Subtype Polymorphism](https://en.wikipedia.org/wiki/Subtyping) to dispatch and/or optimize on the basis of types rather than classes. See [this](https://www.reddit.com/r/lisp/comments/nho7gr/polymorphicfunctions_possibly_aot_dispatch_on/gyyovkh?utm_source=share&utm_medium=web2x&context=3) and nearby comments for an attempt at explaining this.
+The library provides all of
+
+- [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism) and
+- [Subtype Polymorphism](https://en.wikipedia.org/wiki/Subtyping)
+- (IIUC) [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism)
+
+to dispatch and/or optimize on the basis of types rather than classes. See [this](https://www.reddit.com/r/lisp/comments/nho7gr/polymorphicfunctions_possibly_aot_dispatch_on/gyyovkh?utm_source=share&utm_medium=web2x&context=3) and nearby comments for an attempt at explaining this.
 
 ## Usage
 
+### Basic Usage
+
 - Users are expected to define a `polymorphic-function` (analogous to `cl:generic-function`) with one or more `polymorph` (similar to `cl:method`). These may be dispatched at runtime or at compile time if optimization policy is `(and (= speed 3) (/= debug 3))` abbreviated as `optim-speed`.
 - Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
-- Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a polymorph that was defined for `vector` when compiled with arguments declared to be `simple-string`, then the body is made aware at *compiler/macroexpansion time* that the arguments are actually `simple-string` rather than just `vector`. Code further in the succeeding compiler/macroexpansion phases can then make use of this information. For code in the inner scopes of the polymorph, a `type-like` declaration is provided with example usage in [src/misc-tests.lisp](src/misc-tests.lisp).
+- Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a polymorph that was defined for `vector` when compiled with arguments declared to be `simple-string`, then the body is made aware at *compiler/macroexpansion time* that the arguments are actually `simple-string` rather than just `vector`. Code further in the succeeding compiler/macroexpansion phases can then make use of this information.
 - Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for *correctness*.
 
-### Examples
+#### Examples
 
 See [src/misc-tests.lisp](src/misc-tests.lisp) for some more examples.
 
@@ -158,6 +166,16 @@ The mistake here is polymorph with type list `(vector)` produces a different beh
 This problem also arises with [static-dispatch](https://github.com/alex-gutev/static-dispatch) and [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function). The way to avoid it is to either maintain discipline on the part of the user (the way polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
 
 Inlining especially becomes necessary for mathematical operations, wherein a call to `generic-+` on SBCL can be a 3-10 times slower than the optimized calls to `fixnum +` or `single-float +` etc. `generic-cl` (since `static-dispatch` version 0.5) overcomes this on SBCL by using `sb-c:deftransform`; for portable projects, one could use `inlined-generic-functions` [superseded by `fast-generic-functions`] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.
+
+### Advanced Usage aka Parametric Polymorphism
+
+In addition to subtype-polymorphism described above (under [Basic Usage](#basic-usage)), PF also provides support for parametric-polymorphism in the following sense: type-lists and return-type allows a type-specifier of the form `(type-like parameter type-parameterizer)`. A parameter `x` when indicated to have such a type-specifier implies `(typep x (type-parameterizer parameter))` at runtime. `parameter` is expected to be one of the parameters in the lambda-list of the polymorph.
+
+See [this](https://github.com/digikar99/polymorphic-functions/blob/master/src/misc-tests.lisp#L497) for an example. While this seems to provide no additional "power", this can provide greater type safety; sometimes at the cost of runtime performance (unless inlined).
+
+A `type-parameterizer` should be bound to a function (or generic-function or polymorph or ... - can it be a lambda?) that takes the object as input at runtime, and returns a type-specifier. At compile time, it takes a type-specifier as input, and is expected to return a type-specifier. The two cases can be distinguised by the value of `*compiler-macro-expanding-p*`.
+
+Unstable aka undefined-behavior according to CLHS: For code in the inner scopes of the polymorph, a `type-like` declaration is provided with example usage in [src/misc-tests.lisp](src/misc-tests.lisp).
 
 ### Limitations
 
