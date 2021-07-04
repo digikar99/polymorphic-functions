@@ -50,6 +50,7 @@
            #:polymorphic-function-type-lists
            #:inline-pf
            #:notinline-pf
+           #:pf-defined-before-use
            #:*compiler-macro-expanding-p*))
 
 (defpackage #:polymorphic-functions.nonuser

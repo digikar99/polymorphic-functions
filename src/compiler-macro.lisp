@@ -1,5 +1,7 @@
 (in-package :polymorphic-functions)
 
+
+;;; TODO: Allow user to specify custom optim-speed etc
 (defun pf-compiler-macro (form &optional env)
   (when (eq 'apply (first form))
     (format *error-output* "~A can optimize cases other than FUNCALL and raw call!~%Assk maintainer of ADHOC-POLYMORPHIC-FUNCTIONS to provide support for this case!"
@@ -53,7 +55,8 @@
                                                (push c form-type-failures)))))
                           (apply #'compiler-retrieve-polymorph
                                  name (mapcar #'cons (rest form) arg-types)))))
-        (when optim-debug
+        (when (and optim-debug
+                   (not (cltl2:declaration-information 'pf-defined-before-use env)))
           (return-from pf-compiler-macro original-form))
         (cond ((and (null polymorph)
                     optim-speed
@@ -63,10 +66,13 @@
                     ;; NO-APPLICABLE-POLYMORPH/COMPILER-NOTE below.
                     form-type-failures)
                (return-from pf-compiler-macro original-form))
-              ((not (null polymorph))
+              (polymorph
+               ;; We muffle, because unsuccessful searches could have resulted
+               ;; in compiler notes
                (mapc #'compiler-macro-notes:muffle form-type-failures)))
         (when (and (null polymorph)
-                   (or optim-speed optim-safety))
+                   (or optim-speed optim-safety
+                       (cltl2:declaration-information 'pf-defined-before-use env)))
           (funcall (polymorphic-function-default (fdefinition name))
                    name arg-list env))
         (when (or (null polymorph)
