@@ -150,7 +150,8 @@ Proceed at your own risk."
       (multiple-value-bind (param-list type-list effective-type-list)
           (compute-effective-lambda-list typed-lambda-list :typed t)
         (multiple-value-bind (declarations body) (extract-declarations body)
-          (let* ((static-dispatch-name (let* ((p-old (and (typep (fdefinition name)
+          (let* ((static-dispatch-name (let* ((p-old (and (fboundp name)
+                                                          (typep (fdefinition name)
                                                                  'polymorphic-function)
                                                           (find-polymorph name type-list)))
                                               (old-name
