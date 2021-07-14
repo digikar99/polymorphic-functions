@@ -1,0 +1,18 @@
+;;; -*- Mode: common-lisp; -*-
+(:api-version "0.3")
+
+(:source "quicklisp" :url "https://quicklisp.common-lisp-project-index.org/" :type :ql-clpi)
+
+(:asd "polymorphic-functions.asd")
+
+(:system "alexandria")
+(:system "closer-mop")
+(:system "fiveam")
+(:system "cl-form-types")
+(:system "trivial-macroexpand-all")
+(:system "trivial-package-local-nicknames")
+(:system "introspect-environment")
+
+(:github "ctype" :path "s-expressionists/ctype" :branch "main" :systems ("ctype"))
+(:github "trivial-types" :path "digikar99/trivial-types" :branch "master" :systems ("trivial-types"))
+(:github "compiler-macro-notes" :path "digikar99/compiler-macro-notes" :branch "main" :systems ("compiler-macro-notes"))
