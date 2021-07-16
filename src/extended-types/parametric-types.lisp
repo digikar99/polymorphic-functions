@@ -1,10 +1,9 @@
 (in-package :polymorphic-functions)
 
 (defvar *parametric-type-symbol-predicates* ()
-  "If the type-specifier in the type-list of a polymorph is a list, then each symbol
-in the list is tested against the functions (predicates) in this list. The
-type-specifier aka list qualifies as a parametric-type-specifier if at least one
-predicate returns non-NIL for at least one symbol.")
+  "A type-specifier in the type-list of a polymorph qualifies as parametric-type-specifier
+if there exists a symbol in the list, which when tested against the functions (predicates)
+in this list, returns non-NIL for at least one predicate")
 
 (defun parametric-type-symbol-p (atom)
   (and (symbolp atom)
@@ -63,8 +62,33 @@ predicate returns non-NIL for at least one symbol.")
 
 ;; TODO: Documentation
 
-(defgeneric parametric-type-run-time-lambda-body (type-car type-cdr type-parameter))
-(defgeneric parametric-type-compile-time-lambda  (type-car type-cdr type-parameter))
+(defgeneric parametric-type-run-time-lambda-body (type-car type-cdr type-parameter)
+  (:documentation
+   "Users are expected to specialize on the TYPE-CAR using an (EQL symbol) specializer.
+TYPE-CAR and TYPE-CDR together make up the parametric-type, while TYPE-PARAMETER
+is one of the type parameter in the parametric-type.
+
+The methods implemented should return a one-argument lambda-*expression* (not function).
+The expression will be compiled to a function and called with the appropriate *object*
+at run-time. The function should return the value of the TYPE-PARAMTER corresponding
+to the *object* and the parametric type."))
+
+(defgeneric parametric-type-compile-time-lambda  (type-car type-cdr type-parameter)
+  (:documentation
+   "Users are expected to specialize on the TYPE-CAR using an (EQL symbol) specializer.
+TYPE-CAR and TYPE-CDR together make up the parametric-type, while TYPE-PARAMETER
+is one of the type parameter in the parametric-type.
+
+The methods implemented should return a one-argument lambda-*expression* (not function).
+The expression will be compiled to a function and called with the appropriate
+*form-type* at run-time. The function should return the value of the TYPE-PARAMTER
+corresponding to the *form-type* and the parametric type."))
+
+(defgeneric upgrade-parametric-type (type-car type-cdr)
+  (:documentation
+   "Should return a regular aka non-parametric / non-extended type-specifier
+corresponding to the parametric-type (CONS TYPE-CAR TYPE-CDR). The returned-value
+is expected to be usable in (CL:DECLARE (TYPE ...)) contexts."))
 
 (defun type-parameters-from-parametric-type (parametric-type-spec)
   "Returns a list oF TYPE-PARAMETERS"
@@ -102,26 +126,46 @@ predicate returns non-NIL for at least one symbol.")
 (defmethod parametric-type-run-time-lambda-body
     ((type-car (eql 'array)) type-cdr parameter)
   (destructuring-bind (&optional (elt-type 'cl:*) (rank/dimensions 'cl:*)) type-cdr
-    (declare (ignore rank/dimensions))
     (cond ((eq parameter elt-type)
            `(lambda (array) (array-element-type array)))
+          ((symbolp rank/dimensions)
+           (cond ((eq parameter rank/dimensions)
+                  `(lambda (array) (array-dimensions array)))
+                 (t
+                  (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
+                         parameter (cons type-car type-cdr)))))
           (t
-           (error "This case has not been handled!")))))
+           (loop :for s :in rank/dimensions
+                 :for i :from 0
+                 :do (cond ((eq parameter s)
+                            (return-from parametric-type-run-time-lambda-body
+                              `(lambda (array) (array-dimension array ,i))))
+                           (t
+                            (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
+                                   parameter (cons type-car type-cdr)))))))))
 
 (defmethod parametric-type-compile-time-lambda-body
     ((type-car (eql 'array)) type-cdr parameter)
   (destructuring-bind (&optional (elt-type 'cl:*) (rank/dimensions 'cl:*)) type-cdr
-    (declare (ignore rank/dimensions))
-    (cond ((eq parameter elt-type)
-           `(lambda (type)
-              (if (and (listp type)
-                       (or (eq 'array (first type))
-                           (eq 'simple-array (first type)))
-                       (not (eq 'cl:* (second type))))
-                  (second type)
-                  nil)))
-          (t
-           (error "This case has not been handled!")))))
+    `(lambda (type)
+       (if (and (listp type)
+                (or (eq 'array (first type))
+                    (eq 'simple-array (first type)))
+                (not (eq 'cl:* (second type))))
+           ,(cond ((eq parameter elt-type)
+                   `(second type))
+                  ((symbolp rank/dimensions)
+                   `(third type))
+                  (t
+                   (block loop-block
+                     (loop :for s :in rank/dimensions
+                           :for i :from 0
+                           :do (cond ((eq parameter s)
+                                      (return-from loop-block
+                                        `(nth ,i (third type))))
+                                     (t
+                                      (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
+                                             parameter (cons type-car type-cdr))))))))))))
 
 (defmethod upgrade-parametric-type ((type-car (eql 'array)) type-cdr)
   'cl:array)

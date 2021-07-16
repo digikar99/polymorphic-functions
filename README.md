@@ -15,9 +15,9 @@ The library provides all of
 
 - [Ad hoc polymorphism](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism) and
 - [Subtype Polymorphism](https://en.wikipedia.org/wiki/Subtyping)
-- (IIUC) [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism)
+- [Parametric Polymorphism](https://en.wikipedia.org/wiki/Parametric_polymorphism)
 
-to dispatch and/or optimize on the basis of types rather than classes. See [this](https://www.reddit.com/r/lisp/comments/nho7gr/polymorphicfunctions_possibly_aot_dispatch_on/gyyovkh?utm_source=share&utm_medium=web2x&context=3) and nearby comments for an attempt at explaining this.
+to dispatch and/or optimize on the basis of types rather than classes.
 
 ## Usage
 
@@ -27,6 +27,7 @@ to dispatch and/or optimize on the basis of types rather than classes. See [this
 - Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
 - Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a polymorph that was defined for `vector` when compiled with arguments declared to be `simple-string`, then the body is made aware at *compiler/macroexpansion time* that the arguments are actually `simple-string` rather than just `vector`. Code further in the succeeding compiler/macroexpansion phases can then make use of this information.
 - Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for *correctness*.
+- See [Advanced Usage](#advanced-usage-aka-parametric-polymorphism) for parametric polymorphism. Adhoc and Subtype polymorphisms should suffice in most cases for optimization; parametric polymorphism can aid in further type safety.
 
 #### Examples
 
@@ -128,9 +129,9 @@ CL-USER> (my= 5 "hello")
 A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
 
 - A speed=3 optimization coupled with debug<3 optimization results in (attempts to) static-dispatch. This is done using by f-binding gentemps to appropriate function objects.
-- Inline optimization may also be provided by `(declare (inline-pf my-polymorph))` or supplying `:inline t` or `:inline :maybe` option in the `name` field of `defpolymorph` form.
+- Inline optimization may also be provided by `(declare (inline-pf my-polymorph))` or supplying `:inline t` (default) or `:inline :maybe` option in the `name` field of `defpolymorph` form.
 
-It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under some definition of same-ness.
+It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under the appropriate definition of same-ness.
 
 For instance, consider
 
@@ -169,13 +170,102 @@ Inlining especially becomes necessary for mathematical operations, wherein a cal
 
 ### Advanced Usage aka Parametric Polymorphism
 
-In addition to subtype-polymorphism described above (under [Basic Usage](#basic-usage)), PF also provides support for parametric-polymorphism in the following sense: type-lists and return-type allows a type-specifier of the form `(type-like parameter type-parameterizer)`. A parameter `x` when indicated to have such a type-specifier implies `(typep x (type-parameterizer parameter))` at runtime. `parameter` is expected to be one of the parameters in the lambda-list of the polymorph.
+In addition to subtype-polymorphism described above (under [Basic Usage](#basic-usage)), PF also provides support for parametric-polymorphism. The interface for this is through the following symbols:
 
-See [this](https://github.com/digikar99/polymorphic-functions/blob/master/src/misc-tests.lisp#L497) for an example. While this seems to provide no additional "power", this can provide greater type safety; sometimes at the cost of runtime performance (unless inlined).
+- \*parametric-type-symbol-predicates\*
+- parametric-type-run-time-lambda-body
+- parametric-type-compilep-time-lambda-body
+- upgrade-parametric-type
 
-A `type-parameterizer` should be bound to a function (or generic-function or polymorph or ... - can it be a lambda?) that takes the object as input at runtime, and returns a type-specifier. At compile time, it takes a type-specifier as input, and is expected to return a type-specifier. The two cases can be distinguised by the value of `*compiler-macro-expanding-p*`.
+An example for this is at [src/extended-types/parametric-types.lisp](src/extended-types/parametric-types.lisp#L126) and [src/misc-tests.lisp](src/misc-tests.lisp#L496).
 
-Unstable aka undefined-behavior according to CLHS: For code in the inner scopes of the polymorph, a `type-like` declaration is provided with example usage in [src/misc-tests.lisp](src/misc-tests.lisp).
+```lisp
+CL-USER> (use-package :polymorphic-functions)
+T
+CL-USER> (setq *parametric-type-symbol-predicates*
+               (list (lambda (s)
+                       (let* ((name (symbol-name s))
+                              (len  (length name)))
+                         (and (char= #\< (elt name 0))
+                              (char= #\> (elt name (1- len))))))))
+(#<FUNCTION (LAMBDA (S)) {53A475DB}>)
+
+CL-USER> (defpolymorph foo ((a (array <t>))) <t>
+           (aref a 0))
+FOO
+CL-USER> (disassemble (lambda (a)
+                        (declare (optimize speed)
+                                 (type (simple-array single-float 1) a))
+                        (aref a 0)))
+; disassembly for (LAMBDA (A))
+; Size: 38 bytes. Origin: #x53A49A5C                          ; (LAMBDA (A))
+; 5C:       48837AF900       CMP QWORD PTR [RDX-7], 0
+; 61:       7618             JBE L0
+; 63:       F30F104201       MOVSS XMM0, [RDX+1]
+; 68:       660F7EC2         MOVD EDX, XMM0
+; 6C:       48C1E220         SHL RDX, 32
+; 70:       80CA19           OR DL, 25
+; 73:       488BE5           MOV RSP, RBP
+; 76:       F8               CLC
+; 77:       5D               POP RBP
+; 78:       C3               RET
+; 79:       CC10             INT3 16                          ; Invalid argument count trap
+; 7B: L0:   CC24             INT3 36                          ; INVALID-VECTOR-INDEX-ERROR
+; 7D:       08               BYTE #X08                        ; RDX
+; 7E:       82808010         BYTE #X82, #X80, #X80, #X10      ; 0
+NIL
+CL-USER> (disassemble (lambda (a)
+                        (declare (optimize speed)
+                                 (type (simple-array single-float 1) a))
+                        (foo a)))
+; disassembly for (LAMBDA (A))
+; Size: 38 bytes. Origin: #x53A49B0C                          ; (LAMBDA (A))
+; 0C:       48837AF900       CMP QWORD PTR [RDX-7], 0
+; 11:       7618             JBE L0
+; 13:       F30F104201       MOVSS XMM0, [RDX+1]
+; 18:       660F7EC2         MOVD EDX, XMM0
+; 1C:       48C1E220         SHL RDX, 32
+; 20:       80CA19           OR DL, 25
+; 23:       488BE5           MOV RSP, RBP
+; 26:       F8               CLC
+; 27:       5D               POP RBP
+; 28:       C3               RET
+; 29:       CC10             INT3 16                          ; Invalid argument count trap
+; 2B: L0:   CC24             INT3 36                          ; INVALID-VECTOR-INDEX-ERROR
+; 2D:       08               BYTE #X08                        ; RDX
+; 2E:       82808010         BYTE #X82, #X80, #X80, #X10      ; 0
+NIL
+
+CL-USER> (defpolymorph my-add ((a (array <t> (<len>))) (b (array <t> (<len>))))
+             (array <t> (<len>))
+           (let ((out (make-array <len> :element-type <t>)))
+             (loop :for i below <len>
+                   :do (setf (aref out i)
+                             (+ (aref a i)
+                                (aref b i))))
+             out))
+MY-ADD
+CL-USER> (my-add #(0 1) #(1 2)) ; no compilation necessary for usage
+#(1 3)
+CL-USER> (my-add #(0 1) (make-array 2 :element-type 'single-float
+                                    :initial-contents '(3.0 4.0)))
+; Evaluation aborted on #<POLYMORPHIC-FUNCTIONS::NO-APPLICABLE-POLYMORPH/ERROR {1024EB1EA3}>.
+CL-USER> (my-add (make-array 2 :element-type 'single-float
+                               :initial-contents '(3.0 4.0))
+                 (make-array 2 :element-type 'single-float
+                               :initial-contents '(3.0 4.0)))
+#(6.0 8.0)
+CL-USER> (type-of *)
+(SIMPLE-ARRAY SINGLE-FLOAT (2))
+
+;;; NOTE that the type-parameters cannot be further used in an unevaluated context
+CL-USER> (defpolymorph foo ((a (array <t>))) <t>
+           (the <t> (aref a 0)))
+; WARNING that <T> is an undefined type
+```
+
+TODO (perhaps?): Ping/PR [gtype](https://github.com/numcl/gtype) for compile time optimization.
+
 
 ### Limitations
 
@@ -265,8 +355,7 @@ Tests are distributed throughout the system. Run `(asdf:test-system "polymorphic
 - [fast-generic-functions](https://github.com/marcoheisig/fast-generic-functions)
 - [inlined-generic-functions](https://github.com/guicho271828/inlined-generic-function)
 - [specialized-function](https://github.com/numcl/specialized-function)
-
-
+- [gtype](https://github.com/numcl/gtype)
 
 ## Feature Parity
 
@@ -279,7 +368,7 @@ The runtime dispatch performance of all the three of polymorphic-functions, cl:g
 | &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                  |
 | Run-time Speed                  | Fast                | Fast                 | Fast                  |
 | Compile-time support            | Partial**           | Yes                  | Yes                   |
-| Parametric Polymorphism         | Partial**           | No                   | Yes                   |
+| Parametric Polymorphism         | No                  | No                   | Yes                   |
 
 ^See [#comparison-with-specialization-store](#comparison-with-specialization-store).
 Well...
