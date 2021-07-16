@@ -138,17 +138,23 @@ Proceed at your own risk."
           (list name)
           name)
     (declare (type function-name name))
-    (let* ((block-name       (if (and (listp name)
-                                      (eq 'setf (first name)))
-                                 (second name)
-                                 name))
+    (let* ((block-name       (blockify-name name))
            (*environment*    env)
-           (typed-lambda-list (normalize-typed-lambda-list typed-lambda-list))
+           (typed-lambda-list   (normalize-typed-lambda-list typed-lambda-list))
            (untyped-lambda-list (untyped-lambda-list typed-lambda-list))
+           (pf-lambda-list      (if (and (fboundp name)
+                                         (typep (fdefinition name) 'polymorphic-function))
+                                    (mapcar (lambda (elt)
+                                              (if (atom elt) elt (first elt)))
+                                            (polymorphic-function-lambda-list
+                                             (fdefinition name)))
+                                    untyped-lambda-list))
+           (parameters          (make-polymorph-parameters-from-lambda-lists
+                                 pf-lambda-list typed-lambda-list))
            (lambda-list-type  (lambda-list-type typed-lambda-list :typed t)))
       (declare (type typed-lambda-list typed-lambda-list))
       (multiple-value-bind (param-list type-list effective-type-list)
-          (compute-effective-lambda-list typed-lambda-list :typed t)
+          (polymorph-effective-lambda-list parameters)
         (multiple-value-bind (declarations body) (extract-declarations body)
           (let* ((static-dispatch-name (let* ((p-old (and (fboundp name)
                                                           (typep (fdefinition name)
@@ -164,7 +170,7 @@ Proceed at your own risk."
                                                       '#:polymorphic-functions.nonuser))))
                  (lambda-body #+sbcl
                               `(sb-int:named-lambda (polymorph ,name ,type-list) ,param-list
-                                 ,(lambda-declarations typed-lambda-list :typed t)
+                                 ,(lambda-declarations parameters)
                                  ,declarations
                                  (block ,block-name
                                    ,@(butlast body)
@@ -172,14 +178,14 @@ Proceed at your own risk."
                               #+ccl
                               `(ccl:nfunction (polymorph ,name ,type-list)
                                               (lambda ,param-list
-                                                ,(lambda-declarations typed-lambda-list :typed t)
+                                                ,(lambda-declarations parameters)
                                                 ,declarations
                                                 (block ,block-name
                                                   ,@(butlast body)
                                                   ,(ensure-type-form return-type (lastcar body)))))
                               #-(or ccl sbcl)
                               `(lambda ,param-list
-                                 ,(lambda-declarations typed-lambda-list :typed t)
+                                 ,(lambda-declarations parameters)
                                  ,declarations
                                  (block ,block-name
                                    ,@(butlast body)
@@ -194,7 +200,8 @@ Proceed at your own risk."
                  #+sbcl
                  (sbcl-transform-body (make-sbcl-transform-body name
                                                                 typed-lambda-list
-                                                                inline-lambda-body)))
+                                                                inline-lambda-body
+                                                                parameters)))
             (multiple-value-bind (inline-safe-lambda-body inline-note)
                 (cond ((and ip inline)
                        (values inline-lambda-body
@@ -260,10 +267,8 @@ Proceed at your own risk."
                                        ',inline-safe-lambda-body
                                        ',static-dispatch-name
                                        ',lambda-list-type
-                                       ,(compiler-applicable-p-lambda-body
-                                         lambda-list-type
-                                         untyped-lambda-list
-                                         effective-type-list))
+                                       ',(run-time-applicable-p-form parameters)
+                                       ,(compiler-applicable-p-lambda-body parameters))
                    ',name)))))))))
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list

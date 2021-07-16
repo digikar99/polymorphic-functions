@@ -31,37 +31,23 @@
                             :typed t)))
   (is-error (lambda-list-type '((a string) &rest (args number)) :typed t)))
 
-(defmethod %effective-lambda-list ((type (eql 'rest)) (lambda-list list))
-  (let ((rest-position (position '&rest lambda-list)))
-    (if *lambda-list-typed-p*
-        (values (append (mapcar 'first (subseq lambda-list 0 rest-position))
-                        (subseq lambda-list rest-position))
-                (append (mapcar #'second (subseq lambda-list 0 rest-position))
-                        '(&rest))
-                (append (mapcar #'second (subseq lambda-list 0 rest-position))
-                        '(&rest)))
-        (copy-list lambda-list))))
-
 (def-test effective-lambda-list-rest (:suite effective-lambda-list)
-  (is (equalp '(a b &rest c)
-              (compute-effective-lambda-list '(a b &rest c))))
-  (is-error (compute-effective-lambda-list '(a b &rest)))
-  (destructuring-bind (first second third)
-      (compute-effective-lambda-list '(a &rest c))
-    (is (eq first 'a))
-    (is (eq second '&rest))
-    (is (eq 'c third)))
-  (destructuring-bind ((first second third fourth) type-list effective-type-list)
-      (multiple-value-list (compute-effective-lambda-list '((a string) (b number) &rest
-                                                            c)
-                                                          :typed t))
-    (is (eq first 'a))
-    (is (eq second 'b))
-    (is (eq third '&rest))
-    (is (eq fourth 'c))
-    (is (equalp type-list '(string number &rest)))
-    (is (equalp effective-type-list
-                '(string number &rest)))))
+  (flet ((effective-typed-lambda-list (typed-lambda-list)
+           (let ((typed-lambda-list (normalize-typed-lambda-list typed-lambda-list)))
+             (polymorph-effective-lambda-list
+              (make-polymorph-parameters-from-lambda-lists
+               (untyped-lambda-list typed-lambda-list)
+               typed-lambda-list)))))
+    (destructuring-bind ((first second third fourth) type-list effective-type-list)
+        (multiple-value-list (effective-typed-lambda-list '((a string) (b number) &rest
+                                                            c)))
+      (is (eq first 'a))
+      (is (eq second 'b))
+      (is (eq third '&rest))
+      (is (eq fourth 'c))
+      (is (equalp type-list '(string number &rest)))
+      (is (equalp effective-type-list
+                  '(string number &rest))))))
 
 (defmethod compute-polymorphic-function-lambda-body
     ((type (eql 'rest)) (untyped-lambda-list list) &optional invalidated-p)
@@ -107,32 +93,6 @@
               (loop :for ,lvar :in ,(nth (1+ rest-position) untyped-lambda-list)
                     :collect (cons (gensym) ,lvar))))))
 
-(defmethod %lambda-declarations ((type (eql 'rest)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  `(declare ,@(mapcar (lambda (elt)
-                        (if (type-specifier-p (second elt))
-                            `(type ,(second elt) ,(first elt))
-                            `(type ,(upgrade-extended-type (second elt)) ,(first elt))))
-                      (subseq typed-lambda-list
-                              0
-                              (position '&rest typed-lambda-list)))))
-
-(defmethod enhanced-lambda-declarations ((type (eql 'rest))
-                                         (type-list list)
-                                         (param-list list)
-                                         (arg-types list)
-                                         &optional return-type)
-  (destructuring-bind (name parameterizer) (or (cdr return-type) '(nil nil))
-    (let* (declarations)
-      (loop :for param :in param-list
-            :while (not (eq '&rest param))
-            :for arg-type :in arg-types
-            :do (push `(type ,arg-type ,param) declarations)
-            :if (eq name param)
-              :do (setq return-type (funcall parameterizer arg-type)))
-      (values `(declare ,@declarations)
-              return-type))))
-
 (defmethod %type-list-compatible-p ((type (eql 'rest))
                                     (type-list list)
                                     (untyped-lambda-list list))
@@ -143,101 +103,6 @@
            (<= rest-position (position '&key type-list)))
           (t
            (<= rest-position (length type-list))))))
-
-(defmethod compiler-applicable-p-lambda-body ((type (eql 'rest))
-                                              (untyped-lambda-list list)
-                                              (type-list list))
-  (let* ((rest-position (position '&rest type-list))
-         (param-list (append (mapcar #'type->param (subseq type-list 0 rest-position))
-                             `(&rest ,(gensym))))
-         (ll-param-alist (loop :for param :in param-list
-                               :for i :below rest-position
-                               :for name :in untyped-lambda-list
-                               :collect (cons name param))))
-    (with-gensyms (form form-type)
-      `(lambda ,param-list
-         (declare (optimize speed)
-                  (ignore ,@(last param-list)))
-         (and ,@(loop :for param :in (subseq param-list 0 rest-position)
-                      :for type  :in (subseq type-list  0 rest-position)
-                      :collect
-                      `(let ((,form      (car ,param))
-                             (,form-type (cdr ,param)))
-                         (cond ((eq t ',type)
-                                t)
-                               ((eq t ,form-type)
-                                (signal 'form-type-failure
-                                        :form ,form))
-                               (t
-                                (subtypep ,form-type
-                                          ,(deparameterize-compile-time-type type
-                                                                             ll-param-alist)))))))))))
-
-(defmethod runtime-applicable-p-form ((type (eql 'rest))
-                                      (untyped-lambda-list list)
-                                      (type-list list)
-                                      (parameter-alist list))
-  (let* ((rest-position (position '&rest untyped-lambda-list))
-         (param-list    untyped-lambda-list)
-         (rest-arg      (nth (1+ rest-position) untyped-lambda-list)))
-    `(and ,@(loop :for param :in (subseq param-list 0 rest-position)
-                  :for type  :in (subseq type-list  0 rest-position)
-                  :collect `(typep ,param
-                                   ,(deparameterize-runtime-type type
-                                                                 parameter-alist)))
-          ,@(let* ((type-list    (subseq type-list rest-position))
-                   (min-rest-length (or (position '&key type-list)
-                                        (position '&rest type-list)
-                                        (length type-list)))
-                   (max-rest-length (if (null (intersection type-list
-                                                            lambda-list-keywords))
-                                        (length type-list)
-                                        nil)))
-              (cons (if (zerop min-rest-length)
-                        t
-                        `(nthcdr ,(1- min-rest-length) ,rest-arg))
-                    (cond ((null (intersection lambda-list-keywords type-list))
-                           (cons `(null (nthcdr ,max-rest-length
-                                                ,rest-arg))
-                                 (loop :for i :from 0
-                                       :for type :in type-list
-                                       :collect
-                                       `(typep (nth ,i ,rest-arg)
-                                               ,(deparameterize-runtime-type type
-                                                                             parameter-alist)))))
-                          ((equalp (intersection lambda-list-keywords type-list)
-                                   '(&rest))
-                           (loop :for i :from 0
-                                 :for type :in (butlast type-list)
-                                 :collect
-                                 `(typep (nth ,i ,rest-arg)
-                                         ,(deparameterize-runtime-type type
-                                                                       parameter-alist))))
-                          ((member '&key type-list)
-                           (let* ((pos-key (position '&key type-list))
-                                  (param-types (subseq type-list (1+ pos-key)))
-                                  (i 0))
-                             (nconc
-                              (loop :for type :in (subseq type-list 0 pos-key)
-                                    :collect
-                                    `(typep (nth ,i ,rest-arg)
-                                            ,(deparameterize-runtime-type type
-                                                                          parameter-alist))
-                                    :do (incf i))
-                              `((evenp (length (nthcdr ,i ,rest-arg))))
-                              (let ((key-tmp-args
-                                      (loop :for (param type) :in param-types
-                                            :collect (make-symbol (symbol-name param)))))
-                                `((destructuring-bind (&key ,@key-tmp-args &allow-other-keys)
-                                      (nthcdr ,i ,rest-arg)
-                                    (and ,@(loop :for (param type) :in param-types
-                                                 :for key-tmp-arg :in key-tmp-args
-                                                 :collect
-                                                 `(typep ,key-tmp-arg
-                                                         ,(deparameterize-runtime-type
-                                                           type parameter-alist))))))))))
-                          (t
-                           (error "Not expected to reach here"))))))))
 
 (5am:def-suite type-list-subtype-rest :in type-list-subtype-p)
 

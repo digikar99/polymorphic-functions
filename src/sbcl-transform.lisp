@@ -6,9 +6,9 @@
     (equalp type-list
             (polymorph-type-list (apply #'compiler-retrieve-polymorph name arg-types-alist)))))
 
-(defun make-sbcl-transform-body (name typed-lambda-list inline-lambda-body)
+(defun make-sbcl-transform-body (name typed-lambda-list inline-lambda-body polymorph-parameters)
   (multiple-value-bind (param-list type-list effective-type-list)
-      (compute-effective-lambda-list typed-lambda-list :typed t)
+      (polymorph-effective-lambda-list polymorph-parameters)
     (declare (ignore effective-type-list))
     (when (or (extended-type-list-p type-list)
               (some #'type-like-p type-list))
@@ -64,9 +64,8 @@
                          ',inline-lambda-body
                        `(lambda ,',param-list
                           ;; The source of parametric-polymorphism
-                          ,(enhanced-lambda-declarations ',lambda-list-type
-                                                         ',type-list
-                                                         ',param-list
+                          ,(enhanced-lambda-declarations (polymorph-parameters
+                                                          (find-polymorph ',name ',type-list))
                                                          ,arg-types)
                           ,@,body))))
 

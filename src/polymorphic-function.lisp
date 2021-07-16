@@ -1,10 +1,19 @@
 (in-package polymorphic-functions)
 
+(defun blockify-name (name)
+  (etypecase name
+    (symbol name)
+    (list
+     (assert (and (eq 'setf (first name))
+                  (second name)
+                  (null (nthcdr 2 name))))
+     (second name))))
+
 (defun type-list-p (list)
   ;; TODO: what parameter-names are valid?
   (let ((valid-p t))
     (loop :for elt := (first list)
-          :while (and list valid-p) ; we don't want list to be empty
+          :while (and list valid-p)   ; we don't want list to be empty
           :until (member elt '(&key &rest))
           :do (setq valid-p
                     (and valid-p
@@ -77,7 +86,8 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   (inline-p)
   (inline-lambda-body)
   (static-dispatch-name)
-  (compiler-macro-lambda))
+  (compiler-macro-lambda)
+  (parameters))
 
 (defmethod print-object ((o polymorph) stream)
   (print-unreadable-object (o stream :type t)
@@ -91,6 +101,9 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
    (lambda-list :initarg :lambda-list :type list
                 :initform (error "LAMBDA-LIST must be supplied.")
                 :reader polymorphic-function-lambda-list)
+   (effective-lambda-list :initarg :effective-lambda-list :type list
+                          :initform (error "EFFECTIVE-LAMBDA-LIST must be supplied.")
+                          :reader polymorphic-function-effective-lambda-list)
    (lambda-list-type :type lambda-list-type
                      :initarg :lambda-list-type
                      :initform (error "LAMBDA-LIST-TYPE must be supplied.")
@@ -160,14 +173,16 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                           "Yes, delete existing FUNCTION associated with ~S and associate an POLYMORPHIC-FUNCTION" name)
                   'not-a-ahp :name name))))
   (let* ((*name* name)
-         (lambda-list (compute-effective-lambda-list untyped-lambda-list)))
+         (effective-lambda-list
+           (polymorphic-function-make-effective-lambda-list untyped-lambda-list)))
     ;; We do not call UPDATE-POLYMORPHIC-FUNCTION-LAMBDA because
     ;; the first call is an exception: the LAMBDA-LIST received here should be used
     ;; to construct apf
     (let ((apf (make-instance 'polymorphic-function
                               :name name
                               :documentation documentation
-                              :lambda-list lambda-list
+                              :lambda-list untyped-lambda-list
+                              :effective-lambda-list effective-lambda-list
                               :default default
                               :lambda-list-type (lambda-list-type untyped-lambda-list))))
       (invalidate-polymorphic-function-lambda apf)
@@ -180,22 +195,22 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (when (and invalidate (polymorphic-function-invalidated-p polymorphic-function))
     (return-from update-polymorphic-function-lambda polymorphic-function))
   (let* ((apf polymorphic-function)
-         (*name*           (polymorphic-function-name apf))
-         (lambda-list      (polymorphic-function-lambda-list apf))
-         (lambda-list-type (polymorphic-function-lambda-list-type apf))
+         (*name*                (polymorphic-function-name apf))
+         (effective-lambda-list (polymorphic-function-effective-lambda-list apf))
+         (lambda-list-type      (polymorphic-function-lambda-list-type apf))
          (lambda-body (if invalidate
                           (compute-polymorphic-function-lambda-body lambda-list-type
-                                                                    lambda-list
+                                                                    effective-lambda-list
                                                                     t)
                           (compute-polymorphic-function-lambda-body lambda-list-type
-                                                                    lambda-list))))
+                                                                    effective-lambda-list))))
     (closer-mop:set-funcallable-instance-function
      apf #+sbcl (compile nil `(sb-int:named-lambda (polymorphic-function ,*name*)
-                                ,lambda-list ,@lambda-body))
+                                ,effective-lambda-list ,@lambda-body))
          ;; FIXME: https://github.com/Clozure/ccl/issues/361
      #+ccl (eval `(ccl:nfunction (polymorphic-function ,*name*)
-                                 (lambda ,lambda-list ,@lambda-body)))
-     #-(or ccl sbcl) (compile nil `(lambda ,lambda-list ,@lambda-body)))
+                                 (lambda ,effective-lambda-list ,@lambda-body)))
+     #-(or ccl sbcl) (compile nil `(lambda ,effective-lambda-list ,@lambda-body)))
     (setf (polymorphic-function-invalidated-p apf) invalidate)
     apf))
 
@@ -247,7 +262,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defun register-polymorph (name inline-p typed-lambda-list type-list effective-type-list
                            return-type inline-lambda-body static-dispatch-name
-                           lambda-list-type compiler-applicable-p-lambda)
+                           lambda-list-type runtime-applicable-p-form
+                           compiler-applicable-p-lambda)
   (declare (type function-name  name)
            (type (member t nil :maybe) inline-p)
            (type typed-lambda-list typed-lambda-list)
@@ -257,9 +273,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (type list           inline-lambda-body))
   (let* ((apf                        (fdefinition name))
          (apf-lambda-list-type       (polymorphic-function-lambda-list-type apf))
-         (untyped-lambda-list        (polymorphic-function-lambda-list apf))
-         (parameter-alist (typed-lambda-list-parameter-alist untyped-lambda-list
-                                                             typed-lambda-list)))
+         (untyped-lambda-list        (polymorphic-function-effective-lambda-list apf)))
     (when (eq apf-lambda-list-type 'rest)
       ;; required-optional can simply be split up into multiple required or required-key
       (assert (member lambda-list-type '(rest required required-key))
@@ -283,13 +297,13 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      :compiler-applicable-p-lambda
                                      compiler-applicable-p-lambda
                                      :runtime-applicable-p-form
-                                     (runtime-applicable-p-form apf-lambda-list-type
-                                                                untyped-lambda-list
-                                                                effective-type-list
-                                                                parameter-alist)
+                                     runtime-applicable-p-form
                                      :inline-lambda-body inline-lambda-body
                                      :static-dispatch-name static-dispatch-name
-                                     :compiler-macro-lambda nil)))
+                                     :compiler-macro-lambda nil
+                                     :parameters
+                                     (make-polymorph-parameters-from-lambda-lists
+                                      untyped-lambda-list typed-lambda-list))))
       (add-or-update-polymorph apf polymorph)
       (invalidate-polymorphic-function-lambda apf)
       polymorph)))
@@ -361,7 +375,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (type type-list type-list)
            (type function lambda))
   (let* ((apf              (fdefinition name))
-         (lambda-list      (polymorphic-function-lambda-list apf))
+         (lambda-list      (polymorphic-function-effective-lambda-list apf))
          (lambda-list-type (polymorphic-function-lambda-list-type apf))
          (polymorph-lambda-list-type
            (eswitch ((intersection type-list lambda-list-keywords) :test #'equal)
@@ -400,17 +414,6 @@ use by functions like TYPE-LIST-APPLICABLE-P")
          (make-polymorph :name name
                          :type-list type-list
                          :lambda-list-type polymorph-lambda-list-type
-                         :runtime-applicable-p-form
-                         (runtime-applicable-p-form lambda-list-type
-                                                    lambda-list
-                                                    type-list
-                                                    ;; Well... We do not know the names!
-                                                    nil)
-                         :compiler-applicable-p-lambda
-                         (compile nil
-                                  (compiler-applicable-p-lambda-body lambda-list-type
-                                                                     lambda-list
-                                                                     type-list))
                          :compiler-macro-lambda lambda))))))
 
 (defun retrieve-polymorph-compiler-macro (name &rest arg-list)

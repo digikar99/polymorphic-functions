@@ -65,92 +65,24 @@
                                 (c number))
                               :typed t)))
 
-(defmethod %effective-lambda-list ((type (eql 'required-key)) (lambda-list list))
-  (let ((state               :required)
-        (param-list          ())
-        (type-list           ())
-        (effective-type-list ()))
-    (dolist (elt lambda-list)
-      (ecase state
-        (:required (cond ((and (eq elt '&key)
-                               *lambda-list-typed-p*)
-                          (push '&key param-list)
-                          (push '&key type-list)
-                          (push '&key effective-type-list)
-                          (setf state '&key))
-                         ((and (eq elt '&key)
-                               (not *lambda-list-typed-p*))
-                          (push '&rest param-list)
-                          (push (gensym "ARGS") param-list)
-                          (push '&key param-list)
-                          (setf state '&key))
-                         ((not *lambda-list-typed-p*)
-                          (push elt param-list))
-                         (*lambda-list-typed-p*
-                          (push (first  elt) param-list)
-                          (push (second elt) type-list)
-                          (push (second elt) effective-type-list))
-                         (t
-                          (return-from %effective-lambda-list nil))))
-        (&key (cond ((not *lambda-list-typed-p*)
-                     (push (list elt nil (gensym (symbol-name elt)))
-                           param-list))
-                    (*lambda-list-typed-p*
-                     ;; FIXME: Handle the case when keyword is non-default
-                     (destructuring-bind ((name type) &optional (default nil defaultp)
-                                                        name-supplied-p-arg) elt
-                       (push (if name-supplied-p-arg
-                                 (list name default name-supplied-p-arg)
-                                 (list name default))
-                             param-list)
-                       (push (list (intern (symbol-name name) :keyword)
-                                   type)
-                             type-list)
-                       (push (list (intern (symbol-name name) :keyword)
-                                   (cond ((and defaultp (subtypep 'null type))
-                                          type)
-                                         (defaultp `(or null ,type))
-                                         ((not defaultp) type)))
-                             effective-type-list)))
-                    (t
-                     (return-from %effective-lambda-list nil))))))
-    (if *lambda-list-typed-p*
-        (values (nreverse param-list)
-                (let* ((type-list    (nreverse type-list))
-                       (key-position (position '&key type-list)))
-                  (append (subseq type-list 0 key-position)
-                          '(&key)
-                          (sort (subseq type-list (1+ key-position)) #'string< :key #'first)))
-                (let* ((effective-type-list    (nreverse effective-type-list))
-                       (key-position (position '&key effective-type-list)))
-                  (append (subseq effective-type-list 0 key-position)
-                          '(&key)
-                          (sort (subseq effective-type-list
-                                        (1+ key-position)) #'string< :key #'first))))
-        (nreverse param-list))))
-
 (def-test effective-lambda-list-key (:suite effective-lambda-list)
-  (is-error (compute-effective-lambda-list '(a b &rest args &key)))
-  (destructuring-bind (first second third fourth fifth sixth)
-      (compute-effective-lambda-list '(a &key c d))
-    (declare (ignore third))
-    (is (eq first 'a))
-    (is (eq second '&rest))
-    (is (eq fourth '&key))
-    (is (eq 'c (first fifth)))
-    (is (eq 'd (first sixth))))
-  (destructuring-bind ((first second third fourth) type-list effective-type-list)
-      (multiple-value-list (compute-effective-lambda-list '((a string) (b number) &key
-                                                            ((c number) 5))
-                                                          :typed t))
-    (is (eq first 'a))
-    (is (eq second 'b))
-    (is (eq third '&key))
-    (is (equalp '(c 5) fourth))
-    (is (equalp type-list
-                '(string number &key (:c number))))
-    (is (equalp effective-type-list
-                '(string number &key (:c (or null number)))))))
+  (flet ((effective-typed-lambda-list (typed-lambda-list)
+           (let ((typed-lambda-list (normalize-typed-lambda-list typed-lambda-list)))
+             (polymorph-effective-lambda-list
+              (make-polymorph-parameters-from-lambda-lists
+               (untyped-lambda-list typed-lambda-list)
+               typed-lambda-list)))))
+    (destructuring-bind ((first second third fourth) type-list effective-type-list)
+        (multiple-value-list (effective-typed-lambda-list '((a string) (b number) &key
+                                                            ((c number) 5))))
+      (is (eq first 'a))
+      (is (eq second 'b))
+      (is (eq third '&key))
+      (is (equalp '(c 5) fourth))
+      (is (equalp type-list
+                  '(string number &key (:c number))))
+      (is (equalp effective-type-list
+                  '(string number &key (:c (or null number))))))))
 
 (defmethod compute-polymorphic-function-lambda-body
     ((type (eql 'required-key)) (untyped-lambda-list list) &optional invalidated-p)
@@ -202,93 +134,12 @@
                                              (cons ',param-name ,param-name)))
                                    nil)))))
 
-(defmethod %lambda-declarations ((type (eql 'required-key)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  (let ((declarations ()))
-    (loop :for elt := (first typed-lambda-list)
-          :until (eq elt '&key)
-          :do (push (if (type-specifier-p (second elt))
-                        `(type ,(second elt) ,(first elt))
-                        `(type ,(upgrade-extended-type (second elt)) ,(first elt)))
-                    declarations)
-              (setf typed-lambda-list (rest typed-lambda-list)))
-    (when (eq '&key (first typed-lambda-list))
-      (setf typed-lambda-list (rest typed-lambda-list))
-      (loop :for elt := (first (first typed-lambda-list))
-            :while elt
-            :do (push (if (type-specifier-p (second elt))
-                          `(type ,(second elt) ,(first elt))
-                          `(type ,(upgrade-extended-type (second elt)) ,(first elt)))
-                      declarations)
-                (setf typed-lambda-list (rest typed-lambda-list))))
-    `(declare ,@(nreverse declarations))))
-
-(defmethod enhanced-lambda-declarations ((type (eql 'required-key))
-                                         (type-list list)
-                                         (param-list list)
-                                         (arg-types list)
-                                         &optional return-type)
-  (destructuring-bind (name parameterizer) (or (cdr return-type) '(nil nil))
-    (let ((declarations ()))
-      (loop :for arg := (first param-list)
-            :for arg-type := (first arg-types)
-            :until (eq arg '&key)
-            :do (push `(type ,arg-type ,arg) declarations)
-                (when (eq name arg) (setq return-type (funcall parameterizer arg-type)))
-                (setf param-list (rest param-list))
-                (setf arg-types  (rest arg-types)))
-      (when (eq '&key (first param-list))
-        (setf param-list (rest param-list)
-              type-list  (rest (member '&key type-list)))
-        (loop :for key := (let ((arg-type (first arg-types)))
-                            (when arg-type
-                              (assert (and (listp arg-type)
-                                           (eq 'eql (first arg-type))
-                                           (null (cddr arg-type))))
-                              (second arg-type)))
-              :while key
-              :for arg := (let ((arg (find key param-list
-                                           :test (lambda (key arg)
-                                                   (string= key
-                                                            (etypecase arg
-                                                              (symbol arg)
-                                                              (list (first arg))))))))
-                            (etypecase arg
-                              (symbol arg)
-                              (list (first arg))))
-              :for arg-type := (second arg-types)
-              :do (push `(type ,arg-type ,arg) declarations)
-                  (when (eq name arg) (setq return-type (funcall parameterizer arg-type)))
-                  (setf arg-types  (cddr arg-types))
-                  (setf param-list (remove key param-list
-                                           :test (lambda (first second)
-                                                   (string= first
-                                                            (etypecase second
-                                                              (symbol second)
-                                                              (list (first second))))))))
-        (loop :while param-list
-              :for arg := (let ((arg (first param-list)))
-                            (etypecase arg
-                              (symbol arg)
-                              (list (first arg))))
-              :for original-type := (second (assoc arg type-list :test #'string=))
-              :do (push `(type ,original-type ,arg) declarations)
-                  (when (eq name arg) (setq return-type (funcall parameterizer original-type)))
-                  (setf arg-types  (cddr arg-types))
-                  (setf param-list (remove arg param-list
-                                           :test (lambda (first second)
-                                                   (string= first
-                                                            (etypecase second
-                                                              (symbol second)
-                                                              (list (first second)))))))))
-      (values `(declare ,@(nreverse declarations))
-              return-type))))
-
 (defmethod %type-list-compatible-p ((type (eql 'required-key))
                                     (type-list list)
                                     (untyped-lambda-list list))
   (let ((pos-key  (position '&key type-list))
-        (pos-rest (position '&rest untyped-lambda-list)))
+        (pos-rest (or (position '&rest untyped-lambda-list)
+                      (position '&key untyped-lambda-list))))
     (unless (and (numberp pos-key)
                  (numberp pos-rest)
                  (= pos-key pos-rest))
@@ -298,70 +149,6 @@
             :do (unless (assoc-value assoc-list (intern (symbol-name param) :keyword))
                   (return-from %type-list-compatible-p nil))))
     t))
-
-(defmethod compiler-applicable-p-lambda-body ((type (eql 'required-key))
-                                              (untyped-lambda-list list)
-                                              (type-list list))
-  (let* ((key-position (position '&key type-list))
-         (param-list (loop :for i :from 0
-                           :for type :in type-list
-                           :collect (if (> i key-position)
-                                        (type->param type '&key)
-                                        (type->param type))))
-         (ll-param-alist (loop :for i :from 0
-                               :for param :in (set-difference param-list lambda-list-keywords)
-                               :for name :in (set-difference untyped-lambda-list
-                                                             lambda-list-keywords)
-                               :collect (cons name param))))
-    (with-gensyms (form form-type)
-      `(lambda ,param-list
-         (declare (optimize speed))
-         (and ,@(loop :for param :in (subseq param-list 0 key-position)
-                      :for type  :in (subseq type-list  0 key-position)
-                      :collect
-                      `(let ((,form      (car ,param))
-                             (,form-type (cdr ,param)))
-                         (cond ((eq t ',type)
-                                t)
-                               ((eq t ,form-type)
-                                (signal 'form-type-failure
-                                        :form ,form))
-                               (t
-                                (subtypep ,form-type
-                                          ,(deparameterize-compile-time-type type
-                                                                             ll-param-alist))))))
-              ,@(loop :for (param default supplied-p)
-                        :in (subseq param-list (1+ key-position))
-                      :for type  :in (subseq type-list (1+ key-position))
-                      :collect
-                      `(let ((,form      (car ,param))
-                             (,form-type (cdr ,param)))
-                         (cond ((eq t ',type)
-                                t)
-                               ((eq t ,form-type)
-                                (signal 'form-type-failure
-                                        :form ,form))
-                               (t
-                                (subtypep ,form-type
-                                          ,(deparameterize-compile-time-type (second type)
-                                                                             ll-param-alist)))))))))))
-
-(defmethod runtime-applicable-p-form ((type (eql 'required-key))
-                                      (untyped-lambda-list list)
-                                      (type-list list)
-                                      (parameter-alist list))
-  (let* ((rest-position (position '&rest untyped-lambda-list))
-         (key-position  (position '&key untyped-lambda-list))
-         (param-list    untyped-lambda-list))
-    `(and ,@(loop :for param :in (subseq param-list 0 rest-position)
-                  :for type  :in (subseq type-list  0 rest-position)
-                  :collect `(typep ,param ,(deparameterize-runtime-type type parameter-alist)))
-          ,@(let ((param-types (subseq type-list (1+ rest-position))))
-              (loop :for (param default supplied-p)
-                      :in (subseq param-list (1+ key-position))
-                    :for type := (second (assoc param param-types :test #'string=))
-                    :collect `(typep ,param ,(deparameterize-runtime-type type
-                                                                          parameter-alist)))))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required-key))
                                  (type-2 (eql 'required-key))

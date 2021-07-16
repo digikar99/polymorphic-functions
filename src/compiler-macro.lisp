@@ -80,7 +80,7 @@
           (return-from pf-compiler-macro original-form))
         (with-slots (inline-p return-type type-list
                      compiler-macro-lambda lambda-list-type
-                     static-dispatch-name)
+                     static-dispatch-name parameters)
             polymorph
           (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph)))
             (when inline-lambda-body
@@ -98,11 +98,8 @@
                            `(,lambda ,args
                               ;; The source of compile-time subtype-polymorphism
                               ,(multiple-value-bind (enhanced-decl deparameterized-return-type)
-                                   (enhanced-lambda-declarations lambda-list-type
-                                                                 type-list
-                                                                 args
-                                                                 arg-types
-                                                                 return-type)
+                                   (enhanced-lambda-declarations parameters
+                                                                 arg-types)
                                  (setq return-type (or deparameterized-return-type return-type))
                                  enhanced-decl)
                               (block ,block-name
@@ -112,9 +109,7 @@
                              inline-lambda-body
                            (declare (ignore declarations))
                            `(,lambda ,args
-                              ,(enhanced-lambda-declarations lambda-list-type
-                                                             type-list
-                                                             args
+                              ,(enhanced-lambda-declarations parameters
                                                              arg-types)
                               ,@body))))))
             (return-from pf-compiler-macro

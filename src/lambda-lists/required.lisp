@@ -12,13 +12,6 @@
   (is-error (lambda-list-type '(a 5)))
   (is-error (lambda-list-type '(a b &rest))))
 
-(defmethod %effective-lambda-list ((type (eql 'required)) (lambda-list list))
-  (if *lambda-list-typed-p*
-      (values (mapcar 'first  lambda-list)
-              (mapcar 'second lambda-list)
-              (mapcar 'second lambda-list))
-      (copy-list lambda-list)))
-
 (defmethod compute-polymorphic-function-lambda-body
     ((type (eql 'required)) (untyped-lambda-list list) &optional invalidated-p)
   (let ((block-name (blockify-name *name*)))
@@ -56,67 +49,10 @@
   `(list ,@(loop :for arg :in untyped-lambda-list
                  :collect `(cons ',arg ,arg))))
 
-(defmethod %lambda-declarations ((type (eql 'required)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  `(declare ,@(mapcar (lambda (elt)
-                        (if (type-specifier-p (second elt))
-                            `(type ,(second elt) ,(first elt))
-                            `(type ,(upgrade-extended-type (second elt)) ,(first elt))))
-                      typed-lambda-list)))
-
-(defmethod enhanced-lambda-declarations ((type (eql 'required))
-                                         (type-list list)
-                                         (param-list list)
-                                         (arg-types list)
-                                         &optional return-type)
-  (destructuring-bind (name parameterizer) (or (cdr return-type) '(nil nil))
-    (let* (declarations)
-      (loop :for param :in param-list
-            :for arg-type :in arg-types
-            :do (push `(type ,arg-type ,param) declarations)
-            :if (eq name param)
-              :do (setq return-type (funcall parameterizer arg-type)))
-      (values `(declare ,@declarations)
-              return-type))))
-
 (defmethod %type-list-compatible-p ((type (eql 'required))
                                     (type-list list)
                                     (untyped-lambda-list list))
   (length= type-list untyped-lambda-list))
-
-(defmethod compiler-applicable-p-lambda-body ((type (eql 'required))
-                                              (untyped-lambda-list list)
-                                              (type-list list))
-  (let* ((param-list     (mapcar #'type->param type-list))
-         (ll-param-alist (mapcar #'cons
-                                 untyped-lambda-list param-list)))
-    (with-gensyms (form form-type)
-      `(lambda ,param-list
-         (declare (optimize speed))
-         (block nil
-           (and ,@(loop :for param :in param-list
-                        :for type  :in type-list
-                        :collect
-                        `(let ((,form      (car ,param))
-                               (,form-type (cdr ,param)))
-                           (cond ((eq t ',type)
-                                  t)
-                                 ((eq t ,form-type)
-                                  (signal 'form-type-failure
-                                          :form ,form))
-                                 (t
-                                  (subtypep ,form-type
-                                            ,(deparameterize-compile-time-type
-                                              type ll-param-alist))))))))))))
-
-(defmethod runtime-applicable-p-form ((type (eql 'required))
-                                      (untyped-lambda-list list)
-                                      (type-list list)
-                                      (parameter-alist list))
-  `(and ,@(loop :for param :in untyped-lambda-list
-                :for type  :in type-list
-                :collect `(typep ,param
-                                 ,(deparameterize-runtime-type type parameter-alist)))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required))
                                  (type-2 (eql 'required))

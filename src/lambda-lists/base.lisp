@@ -3,17 +3,11 @@
 ;; In this file, our main functions/macros are
 ;; - DEFINE-LAMBDA-LIST-HELPER
 ;; - LAMBDA-LIST-TYPE
-;; - EFFECTIVE-LAMBDA-LIST
 ;; - COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY
 ;; - SBCL-TRANSFORM-ARGS-FROM-LAMBDA-LIST-FORM
-;; - LAMBDA-DECLARATIONS
-;; - ENHANCED-LAMBDA-DECLARATIONS
 ;; - TYPE-LIST-COMPATIBLE-P
-;; - COMPILER-APPLICABLE-P-LAMBDA-BODY
-;; - RUNTIME-APPLICABLE-P-FORM
 ;; - TYPE-LIST-SUBTYPE-P
 ;; - TYPE-LIST-CAUSES-AMBIGUOUS-CALL-P
-;; - MISCELLANEOUS
 
 ;; THE BASICS ==================================================================
 
@@ -123,16 +117,6 @@ Non-examples:
   ((a integer) &optional ((b integer) 0 b-supplied-p))"
   `(satisfies typed-lambda-list-p))
 
-;; EFFECTIVE-LAMBDA-LIST ===============================================
-
-;; FIXME: Implement a SLOT-UNBOUND method for lambda list
-(define-lambda-list-helper
-    (compute-effective-lambda-list  #.+compute-effective-lambda-list-doc+)
-    (%effective-lambda-list #.+effective-lambda-list-doc-helper+)
-  (%effective-lambda-list *potential-type* *lambda-list*))
-
-(5am:def-suite effective-lambda-list :in lambda-list)
-
 ;; COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY ====================================
 
 (defgeneric compute-polymorphic-function-lambda-body
@@ -149,31 +133,6 @@ Non-examples:
   (progn
     (assert (untyped-lambda-list-p *lambda-list*))
     (%sbcl-transform-arg-lvars-from-lambda-list-form *potential-type* *lambda-list*)))
-
-;; LAMBDA-DECLARATIONS =========================================================
-
-(define-lambda-list-helper
-    (lambda-declarations  #.+lambda-declarations-doc+)
-    (%lambda-declarations #.+lambda-declarations-doc+)
-  (progn
-    (assert (typed-lambda-list-p *lambda-list*))
-    (%lambda-declarations *potential-type* *lambda-list*)))
-
-;; ENHANCED-LAMBDA-DECLARATIONS ================================================
-
-(defgeneric enhanced-lambda-declarations (lambda-list-type type-list param-list arg-types
-                                          &optional return-type)
-  (:documentation "Like LAMBDA-DECLARATIONS, but along with the TYPE-LIST, also takes
-ARG-TYPES into account."))
-
-(defmethod enhanced-lambda-declarations (type type-list param-list arg-types
-                                         &optional return-type)
-  (assert (typep type 'lambda-list-type) nil
-          "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
-          +lambda-list-types+ type)
-  (assert (typep type-list 'type-list) nil
-          "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
-  (error "This code shouldn't have reached here; perhaps file a bug report!"))
 
 ;; TYPE-LIST-COMPATIBLE-P ======================================================
 
@@ -219,42 +178,6 @@ ARG-TYPES into account."))
   (5am:is-false (type-list-compatible-p 'rest
                                         '(&rest) '(c &rest e))))
 
-;; COMPILER-APPLICABLE-P-LAMBDA-BODY ===========================================
-
-(defgeneric compiler-applicable-p-lambda-body
-    (lambda-list-type untyped-lambda-list type-list))
-
-(defmethod compiler-applicable-p-lambda-body
-    ((type t) (untyped-lambda-list t) (type-list t))
-  (assert (typep type 'lambda-list-type) nil
-          "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
-          +lambda-list-types+ type)
-  (assert (typep untyped-lambda-list 'untyped-lambda-list) nil
-          "Expected UNTYPED-LAMBDA-LIST to be a UNTYPED-LAMBDA-LIST %but is ~a"
-          untyped-lambda-list)
-  (assert (typep type-list 'type-list) nil
-          "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
-  (error "This code shouldn't have reached here; perhaps file a bug report!"))
-
-;; RUNTIME-APPLICABLE-P-FORM ===================================================
-
-(defgeneric runtime-applicable-p-form
-    (lambda-list-type untyped-lambda-list type-list parameter-alist))
-
-(defmethod runtime-applicable-p-form
-    ((type t) (untyped-lambda-list t) (type-list t) (parameter-alist t))
-  (assert (typep type 'lambda-list-type) nil
-          "Expected LAMBDA-LIST-TYPE to be one of ~%  ~a~%but is ~a"
-          +lambda-list-types+ type)
-  (assert (typep untyped-lambda-list 'untyped-lambda-list) nil
-          "Expected UNTYPED-LAMBDA-LIST to be a UNTYPED-LAMBDA-LIST %but is ~a"
-          untyped-lambda-list)
-  (assert (typep type-list 'type-list) nil
-          "Expected TYPE-LIST to be a TYPE-LIST but is ~a" type-list)
-  (assert (typep parameter-alist 'trivial-types:association-list) nil
-          "Expected PARAMETER-ALIST to be a ALIST but is ~a" parameter-alist)
-  (error "This code shouldn't have reached here; perhaps file a bug report!"))
-
 (defvar *name*)
 (defvar *environment*)
 
@@ -295,87 +218,3 @@ ARG-TYPES into account."))
 
 (5am:def-suite type-list-causes-ambiguous-call-p :in lambda-list)
 
-
-;; MISCELLANEOUS ===============================================================
-
-(defun type->param (type-specifier &optional type)
-  (if (member type-specifier lambda-list-keywords)
-      type-specifier
-      (case type
-        (&key (list (intern (symbol-name (first type-specifier))
-                            :polymorphic-functions)
-                    nil))
-        (&optional (list (gensym (write-to-string type-specifier))
-                         nil
-                         (gensym (concatenate 'string
-                                              (write-to-string type-specifier)
-                                              "-SUPPLIED-P"))))
-        (t (gensym (write-to-string type-specifier))))))
-
-(defun normalize-typed-lambda-list (typed-lambda-list)
-  (let ((state           'required)
-        (normalized-list ()))
-    (dolist (elt typed-lambda-list)
-      (if (member elt lambda-list-keywords)
-          (progn
-            (setq state elt)
-            (push elt normalized-list))
-          (push (case state
-                  (required
-                   (if (listp elt)
-                       elt
-                       (list elt t)))
-                  ((&optional &key)
-                   (cond ((not (listp elt))
-                          (list (list elt t) nil))
-                         ((not (listp (first elt)))
-                          (list (list (first elt) t)
-                                (second elt)))
-                         (t elt)))
-                  (&rest elt))
-                normalized-list)))
-    (nreverse normalized-list)))
-
-(def-test normalize-typed-lambda-list (:suite lambda-list)
-  (5am:is-true (equalp '((a t))
-                       (normalize-typed-lambda-list '(a))))
-  (5am:is-true (equalp '(&optional ((a t) nil))
-                       (normalize-typed-lambda-list '(&optional a))))
-  (5am:is-true (equalp '(&key ((a t) nil))
-                       (normalize-typed-lambda-list '(&key a))))
-  (5am:is-true (equalp '(&rest a)
-                       (normalize-typed-lambda-list '(&rest a)))))
-
-(defun untyped-lambda-list (normalized-typed-lambda-list)
-  (let ((typed-lambda-list   normalized-typed-lambda-list)
-        (state               'required)
-        (untyped-lambda-list ()))
-    (dolist (elt typed-lambda-list)
-      (if (member elt lambda-list-keywords)
-          (progn
-            (setq state elt)
-            (push elt untyped-lambda-list))
-          (push (case state
-                  (required (first elt))
-                  ((&optional &key) (caar elt))
-                  (&rest elt))
-                untyped-lambda-list)))
-    (nreverse untyped-lambda-list)))
-
-(def-test untyped-lambda-list ()
-  (is (equalp '(a)   (untyped-lambda-list '((a string)))))
-  (is (equalp '(a b) (untyped-lambda-list '((a string) (b number)))))
-  (is (equalp '(&optional c)   (untyped-lambda-list '(&optional ((c string))))))
-  (is (equalp '(a &optional c) (untyped-lambda-list '((a number) &optional ((c string))))))
-  (is (equalp '(&key c)   (untyped-lambda-list '(&key ((c string))))))
-  (is (equalp '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
-  (is (equalp '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
-
-(defun blockify-name (name)
-  (etypecase name
-    (symbol name)
-    (list
-     (assert (and (eq 'setf (first name))
-                  (second name)
-                  (null (nthcdr 2 name))))
-     (second name))))

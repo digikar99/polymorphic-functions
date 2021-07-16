@@ -64,72 +64,22 @@
                                 (c number))
                               :typed t)))
 
-(defmethod %effective-lambda-list ((type (eql 'required-optional)) (lambda-list list))
-  (let ((state               :required)
-        (param-list          ())
-        (type-list           ())
-        (effective-type-list ()))
-    (dolist (elt lambda-list)
-      (ecase state
-        (:required (cond ((eq elt '&optional)
-                          (push '&optional param-list)
-                          (push '&optional type-list)
-                          (push '&optional effective-type-list)
-                          (setf state '&optional))
-                         ((not *lambda-list-typed-p*)
-                          (push elt param-list))
-                         (*lambda-list-typed-p*
-                          (push (first  elt) param-list)
-                          (push (second elt) type-list)
-                          (push (second elt) effective-type-list))
-                         (t
-                          (return-from %effective-lambda-list nil))))
-        (&optional (cond ((not *lambda-list-typed-p*)
-                          (push (list elt nil (gensym (symbol-name elt)))
-                                param-list))
-                         (*lambda-list-typed-p*
-                          ;; FIXME: Handle the case when keyword is non-default
-                          (destructuring-bind ((name type) &optional (default nil defaultp)
-                                                             name-supplied-p-arg)
-                              elt
-                            (push (if name-supplied-p-arg
-                                      (list name default name-supplied-p-arg)
-                                      (list name default))
-                                  param-list)
-                            (push type type-list)
-                            (push (cond ((and defaultp (subtypep 'null type))
-                                          type)
-                                         (defaultp `(or null ,type))
-                                         ((not defaultp) type))
-                                  effective-type-list)))
-                         (t
-                          (return-from %effective-lambda-list nil))))))
-    (if *lambda-list-typed-p*
-        (values (nreverse param-list)
-                (reverse  type-list)
-                (reverse  effective-type-list))
-        (nreverse param-list))))
-
 (def-test effective-lambda-list-optional (:suite effective-lambda-list)
-  (is (equalp '(a b &optional)
-              (compute-effective-lambda-list '(a b &optional))))
-  (is-error (compute-effective-lambda-list '(a b &optional &rest)))
-  (destructuring-bind (first second third fourth)
-      (compute-effective-lambda-list '(a &optional c d))
-    (is (eq first 'a))
-    (is (eq second '&optional))
-    (is (eq 'c (first third)))
-    (is (eq 'd (first fourth))))
-  (destructuring-bind ((first second third fourth) type-list effective-type-list)
-      (multiple-value-list (compute-effective-lambda-list '((a string) (b number) &optional
-                                                            ((c number) 5))
-                                                          :typed t))
-    (is (eq first 'a))
-    (is (eq second 'b))
-    (is (eq third '&optional))
-    (is (equalp '(c 5) fourth))
-    (is (equalp type-list '(string number &optional number)))
-    (is (equalp effective-type-list '(string number &optional (or null number))))))
+  (flet ((effective-typed-lambda-list (typed-lambda-list)
+           (let ((typed-lambda-list (normalize-typed-lambda-list typed-lambda-list)))
+             (polymorph-effective-lambda-list
+              (make-polymorph-parameters-from-lambda-lists
+               (untyped-lambda-list typed-lambda-list)
+               typed-lambda-list)))))
+    (destructuring-bind ((first second third fourth) type-list effective-type-list)
+        (multiple-value-list (effective-typed-lambda-list '((a string) (b number) &optional
+                                                            ((c number) 5))))
+      (is (eq first 'a))
+      (is (eq second 'b))
+      (is (eq third '&optional))
+      (is (equalp '(c 5) fourth))
+      (is (equalp type-list '(string number &optional number)))
+      (is (equalp effective-type-list '(string number &optional (or null number)))))))
 
 (defmethod compute-polymorphic-function-lambda-body
     ((type (eql 'required-optional)) (effective-lambda-list list) &optional invalidated-p)
@@ -201,58 +151,6 @@
                                    (list (cons ',param-name ,param-name))
                                    nil)))))
 
-(defmethod %lambda-declarations ((type (eql 'required-optional)) (typed-lambda-list list))
-  (assert *lambda-list-typed-p*)
-  (let ((declarations ()))
-    (loop :for elt := (first typed-lambda-list)
-          :until (eq elt '&optional)
-          :do (push (if (type-specifier-p (second elt))
-                        `(type ,(second elt) ,(first elt))
-                        `(type ,(upgrade-extended-type (second elt)) ,(first elt)))
-                    declarations)
-              (setf typed-lambda-list (rest typed-lambda-list)))
-    (when (eq '&optional (first typed-lambda-list))
-      (setf typed-lambda-list (rest typed-lambda-list))
-      (loop :for elt := (first (first typed-lambda-list))
-            :while elt
-            :do (push (if (type-specifier-p (second elt))
-                          `(type ,(second elt) ,(first elt))
-                          `(type ,(upgrade-extended-type (second elt)) ,(first elt)))
-                      declarations)
-                (setf typed-lambda-list (rest typed-lambda-list))))
-    `(declare ,@(nreverse declarations))))
-
-(defmethod enhanced-lambda-declarations ((type (eql 'required-optional))
-                                         (type-list list)
-                                         (param-list list)
-                                         (arg-types list)
-                                         &optional return-type)
-  (destructuring-bind (name parameterizer) (or (cdr return-type) '(nil nil))
-    (let ((declarations ()))
-      (loop :for arg := (first param-list)
-            :for arg-type := (first arg-types)
-            :until (eq arg '&optional)
-            :do (push `(type ,arg-type ,arg) declarations)
-                (when (eq name arg) (setq return-type (funcall parameterizer arg-type)))
-                (setf param-list (rest param-list))
-                (setf arg-types  (rest arg-types)))
-      (when (eq '&optional (first param-list))
-        (setf param-list  (rest param-list)
-              type-list (rest (member '&optional type-list)))
-        (loop :for arg := (let ((arg (first param-list)))
-                            (etypecase arg
-                              (symbol arg)
-                              (list (first arg))))
-              :for original-type :in type-list
-              :for arg-type := (first arg-types)
-              :do (push `(type ,(or arg-type original-type) ,arg) declarations)
-                  (when (eq name arg) (setq return-type (funcall parameterizer
-                                                                 (or arg-type original-type))))
-                  (setf arg-types  (rest arg-types))
-                  (setf param-list (rest param-list))))
-      (values `(declare ,@(nreverse declarations))
-              return-type))))
-
 (defmethod %type-list-compatible-p ((type (eql 'required-optional))
                                     (type-list list)
                                     (untyped-lambda-list list))
@@ -260,71 +158,6 @@
        (if-let ((pos-1 (position '&optional type-list))
                 (pos-2 (position '&optional untyped-lambda-list)))
          (= pos-1 pos-2))))
-
-(defmethod compiler-applicable-p-lambda-body ((type (eql 'required-optional))
-                                              (untyped-lambda-list list)
-                                              (type-list list))
-  (let* ((optional-position (position '&optional type-list))
-         (param-list (loop :for i :from 0
-                           :for type :in type-list
-                           :collect (if (> i optional-position)
-                                        (type->param type '&optional)
-                                        (type->param type))))
-         (ll-param-alist (loop :for i :from 0
-                               :for param :in param-list
-                               :for name :in untyped-lambda-list
-                               :if (not (eq name '&optional))
-                                 :collect (cons name param))))
-    (with-gensyms (form form-type)
-      `(lambda ,param-list
-         (declare (optimize speed))
-         (and ,@(loop :for param :in (subseq param-list 0 optional-position)
-                      :for type  :in (subseq type-list  0 optional-position)
-                      :collect
-                      `(let ((,form      (car ,param))
-                             (,form-type (cdr ,param)))
-                         (cond ((eq t ',type)
-                                t)
-                               ((eq t ,form-type)
-                                (signal 'form-type-failure
-                                        :form ,form))
-                               (t
-                                (subtypep ,form-type
-                                          ,(deparameterize-compile-time-type type
-                                                                             ll-param-alist))))))
-              ,@(loop :for (param default supplied-p)
-                        :in (subseq param-list (1+ optional-position))
-                      :for type  :in (subseq type-list (1+ optional-position))
-                      :collect
-                      `(or (not ,supplied-p)
-                           (let ((,form      (car ,param))
-                                 (,form-type (cdr ,param)))
-                             (cond ((eq t ',type)
-                                    t)
-                                   ((eq t ,form-type)
-                                    (signal 'form-type-failure
-                                            :form ,form))
-                                   (t
-                                    (subtypep ,form-type
-                                              ,(deparameterize-compile-time-type type
-                                                                                 ll-param-alist))))))))))))
-
-(defmethod runtime-applicable-p-form ((type (eql 'required-optional))
-                                      (untyped-lambda-list list)
-                                      (type-list list)
-                                      (parameter-alist list))
-  (let* ((optional-position (position '&optional type-list))
-         (param-list        untyped-lambda-list))
-    `(and ,@(loop :for param :in (subseq param-list 0 optional-position)
-                  :for type  :in (subseq type-list  0 optional-position)
-                  :collect `(typep ,param
-                                   ,(deparameterize-runtime-type type parameter-alist)))
-          ;; Why not use DEFAULT? Because EFFECTIVE-TYPE-LIST takes care of it!
-          ,@(loop :for (param default supplied-p)
-                    :in (subseq param-list (1+ optional-position))
-                  :for type  :in (subseq type-list (1+ optional-position))
-                  :collect `(typep ,param
-                                   ,(deparameterize-runtime-type type parameter-alist))))))
 
 (defmethod %type-list-subtype-p ((type-1 (eql 'required-optional))
                                  (type-2 (eql 'required-optional))
