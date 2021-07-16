@@ -188,7 +188,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       (invalidate-polymorphic-function-lambda apf)
       (setf (fdefinition name) apf)
       (setf (documentation name 'function) documentation)
-      #+ccl (setf (ccl:arglist name) lambda-list)
+      #+ccl (setf (ccl:arglist name) effective-lambda-list)
       apf)))
 
 (defun update-polymorphic-function-lambda (polymorphic-function &optional invalidate)
