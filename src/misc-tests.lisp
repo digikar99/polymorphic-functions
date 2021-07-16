@@ -498,20 +498,18 @@
   (unwind-protect
        (ignoring-error-output
          (handler-bind ((warning #'muffle-warning))
-           (eval `(defun element-type (object)
-                    (if *compiler-macro-expanding-p*
-                        ;; This is still incomplete
-                        (if (and (listp object)
-                                 (or (eq 'array (first object))
-                                     (eq 'simple-array (first object)))
-                                 (not (eq 'cl:* (second object))))
-                            (second object)
-                            nil)
-                        (array-element-type object))))
-           (eval `(progn
-                    (define-polymorphic-function foo (a b) :overwrite t)
-                    (defpolymorph foo ((array array) (elt (type-like array element-type))) t
-                      (= elt (aref array 0)))))
+           (let ((*parametric-type-symbol-predicates*
+                   (list (lambda (s)
+                           (let* ((name (symbol-name s))
+                                  (len  (length name)))
+                             (and (char= #\< (elt name 0))
+                                  (char= #\> (elt name (1- len)))))))))
+             (eval `(progn
+                      (define-polymorphic-function foo (a b) :overwrite t)
+                      (defpolymorph foo ((array (array <t>))
+                                         (elt <t>))
+                          t
+                        (= elt (aref array 0))))))
 
            ;; Runtime tests
            (5am:is-true  (eval `(foo (make-array 2 :element-type 'single-float) 0.0)))
@@ -534,17 +532,15 @@
                                            (foo a b))
                                          (make-array 2 :element-type 'single-float)
                                          1.0)))
-           (5am:signals no-applicable-polymorph
-             (eval `(funcall (lambda (a b)
-                               (declare (optimize speed)
-                                        (type (simple-array single-float) a)
-                                        (type double-float b))
-                               (foo a b))
-                             (make-array 2 :element-type 'single-float)
-                             1.0d0)))))
+           (ignoring-error-output
+             (5am:signals no-applicable-polymorph
+               (eval `(funcall (lambda (a b)
+                                 (declare (optimize speed)
+                                          (type (simple-array single-float) a)
+                                          (type double-float b))
+                                 (foo a b))
+                               (make-array 2 :element-type 'single-float)
+                               1.0d0))))))
 
     (fmakunbound 'element-type)
     (undefine-polymorphic-function 'foo)))
-
-
-

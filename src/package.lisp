@@ -45,13 +45,17 @@
            ;; Unstable API
            #:polymorphic-function
            #:polymorph
-           #:type-like
            #:no-applicable-polymorph
            #:polymorphic-function-type-lists
            #:inline-pf
            #:notinline-pf
            #:pf-defined-before-use
-           #:*compiler-macro-expanding-p*))
+           #:*compiler-macro-expanding-p*
+
+           #:*parametric-type-symbol-predicates*
+           #:parametric-type-run-time-lambda-body
+           #:parametric-type-compile-time-lambda-body
+           #:upgrade-parametric-type))
 
 (defpackage #:polymorphic-functions.nonuser
   (:use)

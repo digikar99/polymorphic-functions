@@ -10,14 +10,6 @@
     (traverse-tree body #'%recursive-p)
     nil))
 
-(defun translate-body (body translation-alist)
-  (flet ((translate (node)
-           (if (listp node)
-               node
-               (or (cdr (assoc node translation-alist))
-                   node))))
-    (traverse-tree body #'translate)))
-
 ;;; - run-time correctness requires
 ;;;   - DEFINE-POLYMORPH-FUNCTION -> DEFUN
 ;;;   - DEFPOLYMORPH

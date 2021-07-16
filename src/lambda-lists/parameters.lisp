@@ -147,18 +147,19 @@ Note: Only LOCAL-NAME and FORM-IN-PF are relevant for &REST parameter
 
 (defstruct type-parameter
   "
-RUN-TIME-TYPE-DEPARAMETERIZERS-LAMBDA-BODY :
+RUN-TIME-DEPARAMETERIZERS-LAMBDA-BODY :
   A lambda *expression*, which when compiled produces a one argument function.
   The function is called at run-time with the value bound to the parameter
   (not type-parameter) to obtain the value of the TYPE-PARAMETER.
-COMPILE-TIME-TYPE-DEPARAMETERIZER-LAMBDA-BODY :
+COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
   A lambda *expression*, which when compiled produces a one argument function.
   The function is called at compile-time with the type of the value bound
   to the parameter (not type-parameter) to obtain the value of the TYPE-PARAMETER.
 "
   name
-  run-time-type-deparameterizer-lambda-body
-  compile-time-type-deparameterizer-lambda-body)
+  run-time-deparameterizer-lambda-body
+  compile-time-deparameterizer-lambda
+  compile-time-deparameterizer-lambda-body)
 
 (defun make-polymorph-parameters-from-lambda-lists (polymorphic-function-lambda-list
                                                     polymorph-lambda-list)
@@ -199,7 +200,9 @@ COMPILE-TIME-TYPE-DEPARAMETERIZER-LAMBDA-BODY :
                       (&rest '&rest)
                       (t typed-state)))
 
+
               (unless (member parameter-specifier lambda-list-keywords)
+
                 (ecase untyped-state
                   (:required
                    (destructuring-bind (name type) parameter-specifier
@@ -272,11 +275,14 @@ COMPILE-TIME-TYPE-DEPARAMETERIZER-LAMBDA-BODY :
                                                          type)))
                      (setq untyped-lambda-list (cdr untyped-lambda-list)))))
 
+                (setf (pp-type-parameters parameter)
+                      (type-parameters-from-parametric-type (pp-value-type parameter)))
+
                 (ecase typed-state
                   (:required (push parameter (polymorph-parameters-required parameters)))
                   (&optional (push parameter (polymorph-parameters-optional parameters)))
                   (&key      (push parameter (polymorph-parameters-keyword parameters)))
-                  ;; FIXME: May be we should avoid list for &REST ?
+                  ;; May be we should avoid list for &REST ?
                   (&rest     (push parameter (polymorph-parameters-rest parameters))))))
 
     (nreversef (polymorph-parameters-required parameters))
@@ -333,23 +339,44 @@ COMPILE-TIME-TYPE-DEPARAMETERIZER-LAMBDA-BODY :
 - The first value is the LAMBDA-LIST suitable for constructing polymorph's lambda
 - The second value is the TYPE-LIST corresponding to the polymorph
 - The third value is the EFFECTIVE-TYPE-LIST corresponding to the polymorph"
-  (values (map-polymorph-parameters polymorph-parameters
-                                    :required #'pp-local-name
-                                    :optional
-                                    (lambda (pp)
-                                      (with-slots (local-name default-value-form supplied-p-name)
-                                          pp
-                                        (if supplied-p-name
-                                            (list local-name default-value-form supplied-p-name)
-                                            (list local-name default-value-form))))
-                                    :rest #'pp-local-name
-                                    :keyword
-                                    (lambda (pp)
-                                      (with-slots (local-name default-value-form supplied-p-name)
-                                          pp
-                                        (if supplied-p-name
-                                            (list local-name default-value-form supplied-p-name)
-                                            (list local-name default-value-form)))))
+  (values (let ((type-parameter-name-deparameterizer-list))
+            (flet ((populate-type-parameters (pp)
+                     (loop :for tp :in (pp-type-parameters pp)
+                           :do (with-slots (name
+                                            run-time-deparameterizer-lambda-body)
+                                   tp
+                                 (unless (assoc-value type-parameter-name-deparameterizer-list
+                                                      name)
+                                   (push `(,name
+                                           (,run-time-deparameterizer-lambda-body
+                                            ,(pp-local-name pp)))
+                                         type-parameter-name-deparameterizer-list))))))
+              (append
+               (map-polymorph-parameters
+                polymorph-parameters
+                :required
+                (lambda (pp)
+                  (populate-type-parameters pp)
+                  (pp-local-name pp))
+                :optional
+                (lambda (pp)
+                  (populate-type-parameters pp)
+                  (with-slots (local-name default-value-form supplied-p-name)
+                      pp
+                    (if supplied-p-name
+                        (list local-name default-value-form supplied-p-name)
+                        (list local-name default-value-form))))
+                :rest #'pp-local-name
+                :keyword
+                (lambda (pp)
+                  (populate-type-parameters pp)
+                  (with-slots (local-name default-value-form supplied-p-name)
+                      pp
+                    (if supplied-p-name
+                        (list local-name default-value-form supplied-p-name)
+                        (list local-name default-value-form)))))
+               '(&aux)
+               type-parameter-name-deparameterizer-list)))
           (map-polymorph-parameters polymorph-parameters
                                     :required #'pp-value-type
                                     :optional #'pp-value-type
@@ -372,156 +399,216 @@ COMPILE-TIME-TYPE-DEPARAMETERIZER-LAMBDA-BODY :
                                                        value-effective-type))))))
 
 (defun lambda-declarations (polymorph-parameters)
-  (flet ((type-decl (pp)
-           (with-slots (local-name value-type) pp
-             (if (type-specifier-p value-type)
-                 `(type ,value-type ,local-name)
-                 `(type ,(upgrade-extended-type value-type) ,local-name)))))
-    `(declare ,@(set-difference (map-polymorph-parameters polymorph-parameters
-                                                          :required #'type-decl
-                                                          :optional #'type-decl
-                                                          :keyword  #'type-decl
-                                                          :rest (lambda (pp)
-                                                                  (declare (ignore pp))
-                                                                  nil))
-                                lambda-list-keywords))))
+  (let ((type-parameter-names ()))
+    (flet ((type-decl (pp)
+             (with-slots (local-name value-type type-parameters) pp
+               (cond (type-parameters
+                      (loop :for tp :in type-parameters
+                            :do (pushnew (type-parameter-name tp) type-parameter-names))
+                      `(type ,(if (atom value-type)
+                                  t
+                                  (upgrade-parametric-type (car value-type) (cdr value-type)))
+                             ,local-name))
+                     ((type-specifier-p value-type)
+                      `(type ,value-type ,local-name))
+                     (t
+                      `(type ,(upgrade-extended-type value-type) ,local-name))))))
+      `(declare ,@(set-difference (map-polymorph-parameters polymorph-parameters
+                                                            :required #'type-decl
+                                                            :optional #'type-decl
+                                                            :keyword  #'type-decl
+                                                            :rest (lambda (pp)
+                                                                    (declare (ignore pp))
+                                                                    nil))
+                                  lambda-list-keywords)
+                (ignorable ,@type-parameter-names)))))
+
 
 
 (defun compiler-applicable-p-lambda-body (polymorph-parameters)
 
-  (let* ((lambda-list
-           (map-polymorph-parameters polymorph-parameters
-                                     :required
-                                     (lambda (pp)
-                                       (gensym (write-to-string (pp-local-name pp))))
-                                     :optional
-                                     (lambda (pp)
-                                       (list (gensym (write-to-string (pp-local-name pp)))
-                                             nil
-                                             (gensym (concatenate 'string
-                                                                  (write-to-string
-                                                                   (pp-local-name pp))
-                                                                  "-SUPPLIED-P"))))
-                                     :keyword
-                                     (lambda (pp)
-                                       (list (intern (symbol-name (pp-local-name pp))
-                                                     :polymorphic-functions)
-                                             nil))
-                                     :rest
-                                     (lambda (pp)
-                                       (gensym (write-to-string (pp-local-name pp))))))
+  ;; TODO: Handle parametric-types
 
-         (lambda-body-forms
-           (let ((ll lambda-list))
-             (with-gensyms (form form-type)
-               (flet ((app-p-form (param type)
-                        `(let ((,form      (car ,param))
-                               (,form-type (cdr ,param)))
-                           (cond ((eq t ',type)
-                                  t)
-                                 ((eq t ,form-type)
-                                  (signal 'form-type-failure
-                                          :form ,form))
-                                 (t
-                                  (subtypep ,form-type ',type))))))
+  (let ((type-parameters-alist ()))
+
+    (with-gensyms (form form-type)
+      (flet ((app-p-form (param pp)
+               (let ((type (pp-value-type pp))
+                     (type-parameters (pp-type-parameters pp)))
+                 `(let ((,form      (car ,param))
+                        (,form-type (cdr ,param)))
+                    (cond ((eq t ',type)
+                           t)
+                          ((eq t ,form-type)
+                           (signal 'form-type-failure
+                                   :form ,form))
+                          (t
+                           ,(if type-parameters
+                                (loop :for type-parameter :in type-parameters
+                                      :do (with-slots (name
+                                                       compile-time-deparameterizer-lambda-body)
+                                              type-parameter
+                                            (push `(,compile-time-deparameterizer-lambda-body
+                                                    (cdr ,param))
+                                                  (assoc-value type-parameters-alist name)))
+                                      :finally (return t))
+                                `(subtypep ,form-type ',type))))))))
+
+        (let* ((lambda-list
                  (map-polymorph-parameters polymorph-parameters
                                            :required
                                            (lambda (pp)
-                                             (let ((form (app-p-form (car ll)
-                                                                     (pp-value-type pp))))
-                                               (setq ll (cdr ll))
-                                               form))
+                                             (gensym (write-to-string (pp-local-name pp))))
                                            :optional
                                            (lambda (pp)
-                                             (loop :while (member (car ll) lambda-list-keywords)
-                                                   :do (setq ll (cdr ll)))
-                                             (let ((form `(or (not ,(third (car ll)))
-                                                              ,(app-p-form (first (car ll))
-                                                                           (pp-value-type pp)))))
-                                               (setq ll (cdr ll))
-                                               form))
+                                             (list (gensym (write-to-string (pp-local-name pp)))
+                                                   nil
+                                                   (gensym (concatenate 'string
+                                                                        (write-to-string
+                                                                         (pp-local-name pp))
+                                                                        "-SUPPLIED-P"))))
                                            :keyword
                                            (lambda (pp)
-                                             (loop :while (member (car ll) lambda-list-keywords)
-                                                   :do (setq ll (cdr ll)))
-                                             (let ((form (app-p-form (first (car ll))
-                                                                     (pp-value-type pp))))
-                                               (setq ll (cdr ll))
-                                               form))
+                                             (list (intern (symbol-name (pp-local-name pp))
+                                                           :polymorphic-functions)
+                                                   nil))
                                            :rest
                                            (lambda (pp)
-                                             (declare (ignore pp))
-                                             nil)))))))
+                                             (gensym (write-to-string (pp-local-name pp))))))
 
-    `(lambda ,lambda-list
-       (declare (optimize speed))
-       (and ,@(set-difference lambda-body-forms lambda-list-keywords)))))
+               (lambda-body-forms
+                 (let ((ll lambda-list))
+                   (map-polymorph-parameters
+                    polymorph-parameters
+                    :required
+                    (lambda (pp)
+                      (let ((form (app-p-form (car ll) pp)))
+                        (setq ll (cdr ll))
+                        form))
+                    :optional
+                    (lambda (pp)
+                      (loop :while (member (car ll) lambda-list-keywords)
+                            :do (setq ll (cdr ll)))
+                      (let ((form `(or (not ,(third (car ll)))
+                                       ,(app-p-form (first (car ll))
+                                                    pp))))
+                        (setq ll (cdr ll))
+                        form))
+                    :keyword
+                    (lambda (pp)
+                      (loop :while (member (car ll) lambda-list-keywords)
+                            :do (setq ll (cdr ll)))
+                      (let ((form (app-p-form (first (car ll)) pp)))
+                        (setq ll (cdr ll))
+                        form))
+                    :rest
+                    (lambda (pp)
+                      (declare (ignore pp))
+                      nil)))))
+
+          `(lambda ,lambda-list
+             (declare (optimize speed))
+             (and ,@(set-difference lambda-body-forms lambda-list-keywords)
+                  ,@(loop :for (param . forms) :in type-parameters-alist
+                          :collect `(and ,@(loop :for form :in (rest forms)
+                                                 :collect `(equalp ,(first forms)
+                                                                   ,form)))))))))))
+
 
 (defun run-time-applicable-p-form (polymorph-parameters)
-  (let ((forms
-          (map-polymorph-parameters polymorph-parameters
-                                    :required
-                                    (lambda (pp)
-                                      (with-slots (form-in-pf value-effective-type) pp
-                                        `(typep ,form-in-pf ',value-effective-type)))
-                                    :optional
-                                    (lambda (pp)
-                                      (with-slots (form-in-pf value-effective-type) pp
-                                        `(typep ,form-in-pf ',value-effective-type)))
-                                    :keyword
-                                    (lambda (pp)
-                                      (with-slots (form-in-pf value-effective-type) pp
-                                        `(typep ,form-in-pf ',value-effective-type)))
-                                    :rest
-                                    (lambda (pp)
-                                      (declare (ignore pp))
-                                      nil))))
-    `(and ,(or (polymorph-parameters-validator-form polymorph-parameters)
-               t)
-          ,@(set-difference forms lambda-list-keywords))))
+  (let ((type-parameter-alist ()))
+    (flet ((process (pp)
+             (if-let (type-parameters (pp-type-parameters pp))
+               (loop :for type-parameter :in type-parameters
+                     :do (with-slots (name run-time-deparameterizer-lambda-body)
+                             type-parameter
+                           (push `(,run-time-deparameterizer-lambda-body
+                                   ,(pp-form-in-pf pp))
+                                 (assoc-value type-parameter-alist name)))
+                     :finally (return nil))
+               (with-slots (form-in-pf value-effective-type) pp
+                 `(typep ,form-in-pf ',value-effective-type)))))
+      (let ((type-forms
+              (map-polymorph-parameters polymorph-parameters
+                                        :required #'process
+                                        :optional #'process
+                                        :keyword #'process
+                                        :rest
+                                        (lambda (pp)
+                                          (declare (ignore pp))
+                                          nil))))
+        `(and ,(or (polymorph-parameters-validator-form polymorph-parameters)
+                   t)
+              ,@(set-difference type-forms lambda-list-keywords)
+              ,@(loop :for (name . forms) :in type-parameter-alist
+                      :collect `(and ,@(loop :for form :in (rest forms)
+                                             :collect `(equalp ,(first forms)
+                                                               ,form)))))))))
 
-(defun enhanced-lambda-declarations (polymorph-parameters arg-types)
-  (let* ((processed-for-keyword-arguments nil)
-         (type-forms
-           (map-polymorph-parameters
-            polymorph-parameters
-            :required
-            (lambda (pp)
-              (let ((arg-type (car arg-types)))
-                (setq arg-types (cdr arg-types))
-                `(type ,arg-type ,(pp-local-name pp))))
-            :optional
-            (lambda (pp)
-              (let ((arg-type (car arg-types)))
-                (setq arg-types (cdr arg-types))
-                `(type ,(or arg-type (pp-value-type pp))
-                       ,(pp-local-name pp))))
-            :keyword
-            (lambda (pp)
-              (unless processed-for-keyword-arguments
-                (setq processed-for-keyword-arguments t)
-                (setq arg-types
-                      (loop :for i :from 0
-                            :for arg-type :in arg-types
-                            :if (evenp i)
-                              :collect
-                              (progn
-                                (assert (and (member (first arg-type)
-                                                     '(member eql))
-                                             (= 2 (length arg-type)))
-                                        ()
-                                        ;; FIXME: Something better than generic error?
-                                        "Unable to derive keyword from arg-type ~S"
-                                        arg-type)
-                                (second arg-type))
-                            :else
-                              :collect arg-type)))
-              (let ((arg-type (getf arg-types
-                                    (intern (symbol-name (pp-local-name pp)) :keyword))))
-                `(type ,(or arg-type (pp-value-type pp))
-                       ,(pp-local-name pp))))
-            :rest
-            (lambda (pp)
-              (declare (ignore pp))
-              nil))))
-    `(declare ,@(set-difference type-forms lambda-list-keywords))))
+
+
+(defun enhanced-lambda-declarations (polymorph-parameters arg-types &optional return-type)
+
+  (let* ((deparameterizer-alist  ())
+         (processed-for-keyword-arguments nil))
+
+    (flet ((populate-deparameterizer-alist (pp arg-type)
+             (when-let (type-parameters (pp-type-parameters pp))
+               (let* ((type-parameter-names (mapcar #'type-parameter-name type-parameters)))
+                 (loop :for name :in type-parameter-names
+                       :do (unless (assoc-value deparameterizer-alist name)
+                             (setf (assoc-value deparameterizer-alist name)
+                                   (funcall
+                                    (type-parameter-compile-time-deparameterizer-lambda
+                                     (find name type-parameters :key #'type-parameter-name))
+                                    arg-type))))))))
+
+      (let ((type-forms
+              (map-polymorph-parameters
+               polymorph-parameters
+               :required
+               (lambda (pp)
+                 (let ((arg-type  (car arg-types)))
+                   (setq arg-types (cdr arg-types))
+                   (populate-deparameterizer-alist pp arg-type)
+                   `(type ,arg-type ,(pp-local-name pp))))
+               :optional
+               (lambda (pp)
+                 (let ((arg-type (car arg-types)))
+                   (setq arg-types (cdr arg-types))
+                   (populate-deparameterizer-alist pp arg-type)
+                   `(type ,(or arg-type (pp-value-type pp))
+                          ,(pp-local-name pp))))
+               :keyword
+               (lambda (pp)
+                 (unless processed-for-keyword-arguments
+                   (setq processed-for-keyword-arguments t)
+                   (setq arg-types
+                         (loop :for i :from 0
+                               :for arg-type :in arg-types
+                               :if (evenp i)
+                                 :collect
+                                 (progn
+                                   (assert (and (member (first arg-type)
+                                                        '(member eql))
+                                                (= 2 (length arg-type)))
+                                           ()
+                                           ;; FIXME: Something better than generic error?
+                                           "Unable to derive keyword from arg-type ~S"
+                                           arg-type)
+                                   (second arg-type))
+                               :else
+                                 :collect arg-type)))
+                 (let ((arg-type (getf arg-types
+                                       (intern (symbol-name (pp-local-name pp)) :keyword))))
+                   (populate-deparameterizer-alist pp arg-type)
+                   `(type ,(or arg-type (pp-value-type pp))
+                          ,(pp-local-name pp))))
+               :rest
+               (lambda (pp)
+                 (declare (ignore pp))
+                 nil))))
+
+        (values `(declare ,@(set-difference type-forms lambda-list-keywords)
+                          (ignorable ,@(mapcar #'car deparameterizer-alist)))
+                (translate-body return-type deparameterizer-alist))))))

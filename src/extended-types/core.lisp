@@ -3,10 +3,18 @@
 (defun traverse-tree (tree &optional (function #'identity))
   "Traverses TREE and calls function on each subtree and node of TREE."
   (let ((tree (funcall function tree)))
-    (if (listp tree)
+    (if (proper-list-p tree)
         (loop :for node :in tree
               :collect (traverse-tree node function))
         (funcall function tree))))
+
+(defun translate-body (body translation-alist)
+  (flet ((translate (node)
+           (if (listp node)
+               node
+               (or (cdr (assoc node translation-alist))
+                   node))))
+    (traverse-tree body #'translate)))
 
 ;;; Interface for extended type system:
 ;;; - ctype class and constructor
@@ -19,21 +27,12 @@
 ;;; - "extended-type-specifier-p"
 ;;; Shadowed: subtypep typep type=
 
-;;; We need to handle the TYPE-LIKE type a bit specially because CTYPE:SUBCTYPEP
-;;; provides no ability to use the environment :(
-;;; A (TYPE-LIKE * *) specifier is neither a TYPE-SPECIFIER nor an EXTENDED-TYPE-SPECIFIER
-(defun type-like-p (type)
-  (and (listp type)
-       (eq 'type-like (car type))
-       (nthcdr 2 type)
-       (null (nthcdr 3 type))))
-
 (defvar *extended-type-specifiers* nil)
 ;; (declaim (inline extended-type-specifier-p))
 (defun extended-type-specifier-p (object &optional env)
   "Returns T if OBJECT is a type specifier is implemented using CTYPE and TYPEXPAND
 to a tree containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
-  (if (type-like-p object)
+  (if (parametric-type-specifier-p object)
       nil
       (let ((specifier (typexpand object env)))
         (traverse-tree specifier
@@ -49,51 +48,11 @@ to a tree containing a list starting with an element in *EXTENDED-TYPE-SPECIFIER
 containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
   `(satisfies extended-type-specifier-p))
 
-(defun deparameterize (extended-type-specifier env deparameterizer)
-  "DEPARAMETERIZER takes the list (LIST 'TYPE-LIKE VARIABLE PARAMETERIZER) as an argument
-and returns the type to be substituted in place of the list."
-  (let ((specifier (typexpand extended-type-specifier env)))
-    (traverse-tree specifier
-                   (lambda (node)
-                     (typecase node
-                       (list (if (type-like-p node)
-                                 (funcall deparameterizer node)
-                                 node))
-                       (t node))))))
-
-(defun deparameterize-runtime-type (type parameter-alist)
-  (if (type-like-p type)
-      ;; No, for simplicity's / speed's sake, we do not allow TYPE-LIKE
-      ;; to be "embedded" inside other type-specifiers; that case can be
-      ;; handled by defining an appropriate TYPE-PARAMETERIZER
-      (destructuring-bind (local-name type-parameterizer) (cdr type)
-        `(,type-parameterizer ,(parameter-form-in-pf (assoc-value parameter-alist local-name))))
-      `',type))
-
-(defun deparameterize-compile-time-type (type ll-param-alist)
-  (if (type-like-p type)
-      (destructuring-bind (var type-parameterizer) (cdr type)
-        `(,type-parameterizer (cdr ,(assoc-value ll-param-alist var))))
-      `',type))
-
-(defun ensure-type-form (type form)
-  (if (type-like-p type)
-      (with-gensyms (form-value)
-        `(let ((,form-value ,form))
-           (assert (typep ,form-value
-                          (,(third type) ,(second type)))
-                   ()
-                   'simple-type-error)
-           ,form-value))
-      ;; If we sometime decide to emit the LET form in both cases (since THE has
-      ;; no guarantee, apparantly), do handle the VALUES types correctly!
-      `(the ,type ,form)))
-
 (defun type-specifier-p (object &optional env)
   "Assumes everything is a type-specifier unless the object TYPEXPANDs to a LIST
 starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
   (and (not (extended-type-specifier-p object env))
-       (not (type-like-p object))))
+       (not (parametric-type-specifier-p object))))
 
 (defgeneric upgraded-extended-type (type-car)
   (:documentation "Used within POLYMORPHIC-FUNCTIONS to prepare a (CL:DECLARE (CL:TYPE ...))
@@ -119,17 +78,17 @@ CL:UPGRADED-ARRAY-ELEMENT-TYPE."))
                                  node))
                        (t node))))))
 
-(define-condition illegal-type-like (error)
+(define-condition illegal-parametric-type (error)
   ()
   (:report (lambda (c s)
              (declare (ignore c))
-             (format s "Illegal use of TYPE-LIKE parametric type"))))
+             (format s "Illegal use of parametric type"))))
 
 (defun subtypep (type1 type2 &optional environment)
   "Like CL:SUBTYPEP but allows EXTENDED-TYPE-SPECIFIERs. COMPILER-MACROEXPANDs to
 CL:SUBTYPEP if both types are constant objects and neither is a EXTENDED-TYPE-SPECIFIER."
-  (assert (not (type-like-p type1)) () 'illegal-type-like)
-  (assert (not (type-like-p type2)) () 'illegal-type-like)
+  (assert (not (parametric-type-specifier-p type1)) () 'illegal-parametric-type)
+  (assert (not (parametric-type-specifier-p type2)) () 'illegal-parametric-type)
   (if (and (type-specifier-p type1)
            (type-specifier-p type2))
       (cl:subtypep type1 type2 environment)
@@ -138,11 +97,11 @@ CL:SUBTYPEP if both types are constant objects and neither is a EXTENDED-TYPE-SP
 
 (define-compiler-macro subtypep (&whole form type1 type2 &optional env-form &environment env)
   (if (and (constantp type1 env) (constantp type2 env))
-      (cond ((type-like-p (constant-form-value type1 env))
-             (warn 'illegal-type-like)
+      (cond ((parametric-type-specifier-p (constant-form-value type1 env))
+             (warn 'illegal-parametric-type)
              form)
-            ((type-like-p (constant-form-value type2 env))
-             (warn 'illegal-type-like)
+            ((parametric-type-specifier-p (constant-form-value type2 env))
+             (warn 'illegal-parametric-type)
              form)
             ((and (type-specifier-p (constant-form-value type1 env))
                   (type-specifier-p (constant-form-value type2 env)))
@@ -164,15 +123,15 @@ CL:SUBTYPEP if both types are constant objects and neither is a EXTENDED-TYPE-SP
 (defun typep (object type &optional environment)
   "Like CL:TYPEP but allows TYPE to be a EXTENDED-TYPE-SPECIFIER.
 COMPILER-MACROEXPANDs to CL:TYPEP if TYPE is a constant object not a EXTENDED-TYPE-SPECIFIER."
-  (assert (not (type-like-p type)) () 'illegal-type-like)
+  (assert (not (parametric-type-specifier-p type)) () 'illegal-parametric-type)
   (if (type-specifier-p type)
       (cl:typep object type)
       (ctype:ctypep object (ctype:specifier-ctype type environment))))
 
 (define-compiler-macro typep (&whole form object type &optional env-form &environment env)
   (if (constantp type env)
-      (cond ((type-like-p (constant-form-value type env))
-             (warn 'illegal-type-like)
+      (cond ((parametric-type-specifier-p (constant-form-value type env))
+             (warn 'illegal-parametric-type)
              form)
             ((type-specifier-p (constant-form-value type env))
              `(cl:typep ,object ,type ,env-form))

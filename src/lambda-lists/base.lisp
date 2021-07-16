@@ -209,7 +209,7 @@ Non-examples:
                                             (potential-type-of-lambda-list type-list-2)
                                             type-list-1
                                             type-list-2)
-      (illegal-type-like ()
+      (illegal-parametric-type ()
         t))))
 
 (defgeneric %type-list-causes-ambiguous-call-p

@@ -3,10 +3,12 @@
 
 ;;; TODO: Allow user to specify custom optim-speed etc
 (defun pf-compiler-macro (form &optional env)
+
   (when (eq 'apply (first form))
     (format *error-output* "~A can optimize cases other than FUNCALL and raw call!~%Assk maintainer of ADHOC-POLYMORPHIC-FUNCTIONS to provide support for this case!"
             (lisp-implementation-type))
     (return-from pf-compiler-macro form))
+
   (let* ((*environment*                 env)
          (*compiler-macro-expanding-p*    t)
          (original-form                form)
@@ -15,10 +17,12 @@
                                                             (cddr form)))
                                            form))
          (name                         (first form)))
+
     (compiler-macro-notes:with-notes
         (original-form env :name (fdefinition name)
                            :unwind-on-signal nil
                            :optimization-note-condition optim-speed)
+
       (let* ((arg-list  (mapcar (lambda (form)
                                   (with-output-to-string (*error-output*)
                                     (setq form
@@ -55,6 +59,7 @@
                                                (push c form-type-failures)))))
                           (apply #'compiler-retrieve-polymorph
                                  name (mapcar #'cons (rest form) arg-types)))))
+
         (when (and optim-debug
                    (not (cltl2:declaration-information 'pf-defined-before-use env)))
           (return-from pf-compiler-macro original-form))
@@ -78,6 +83,7 @@
         (when (or (null polymorph)
                   (not optim-speed))
           (return-from pf-compiler-macro original-form))
+
         (with-slots (inline-p return-type type-list
                      compiler-macro-lambda lambda-list-type
                      static-dispatch-name parameters)
@@ -90,28 +96,27 @@
                     ;; null env
                     (trivial-macroexpand-all:macroexpand-all
                      ;; The source of compile-time subtype-polymorphism
-                     (if (type-like-p return-type)
-                         (destructuring-bind (lambda args declarations
-                                               more-decl (block block-name &body body))
-                             inline-lambda-body
-                           (declare (ignore declarations block more-decl))
-                           `(,lambda ,args
-                              ;; The source of compile-time subtype-polymorphism
-                              ,(multiple-value-bind (enhanced-decl deparameterized-return-type)
-                                   (enhanced-lambda-declarations parameters
-                                                                 arg-types)
-                                 (setq return-type (or deparameterized-return-type return-type))
-                                 enhanced-decl)
-                              (block ,block-name
-                                ,@(butlast body)
-                                ,(car (cdaadr (lastcar body))))))
-                         (destructuring-bind (lambda args declarations &body body)
-                             inline-lambda-body
-                           (declare (ignore declarations))
-                           `(,lambda ,args
-                              ,(enhanced-lambda-declarations parameters
-                                                             arg-types)
-                              ,@body))))))
+                     (destructuring-bind (lambda args declarations
+                                           more-decl (block block-name &body body))
+                         inline-lambda-body
+                       (declare (ignore block declarations))
+                       `(,lambda ,args
+                          ;; The source of compile-time subtype-polymorphism
+                          ,@(multiple-value-bind (enhanced-decl deparameterized-return-type)
+                                (enhanced-lambda-declarations parameters
+                                                              arg-types
+                                                              return-type)
+                              (if (equalp return-type deparameterized-return-type)
+                                  `(,enhanced-decl
+                                    ,more-decl
+                                    (block ,block-name ,@body))
+                                  (progn
+                                    (setq return-type deparameterized-return-type)
+                                    `(,enhanced-decl
+                                      ,more-decl
+                                      (block ,block-name
+                                        ,@(butlast body)
+                                        ,(car (cdaadr (lastcar body)))))))))))))
             (return-from pf-compiler-macro
               (cond (compiler-macro-lambda
                      (funcall compiler-macro-lambda
