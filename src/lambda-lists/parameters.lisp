@@ -319,20 +319,20 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
 
 (defun map-polymorph-parameters (polymorph-parameters
                                  &key required optional keyword rest)
-  (declare (type function required optional keyword rest))
+  (declare (type (or null function) required optional keyword rest))
   (let ((required-fn required)
         (optional-fn optional)
         (keyword-fn  keyword)
         (rest-fn     rest))
     (with-slots (required optional keyword rest) polymorph-parameters
       (remove-if #'null
-                 (append (mapcar required-fn required)
+                 (append (when required-fn (mapcar required-fn required))
                          (when optional '(&optional))
-                         (mapcar optional-fn optional)
+                         (when optional-fn (mapcar optional-fn optional))
                          (when rest '(&rest))
-                         (mapcar rest-fn rest)
+                         (when rest-fn (mapcar rest-fn rest))
                          (when keyword '(&key))
-                         (mapcar keyword-fn keyword))))))
+                         (when keyword-fn (mapcar keyword-fn keyword)))))))
 
 (defun polymorph-effective-lambda-list (polymorph-parameters)
   "Returns 3 values:
@@ -612,3 +612,12 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
         (values `(declare ,@(set-difference type-forms lambda-list-keywords)
                           (ignorable ,@(mapcar #'car deparameterizer-alist)))
                 (translate-body return-type deparameterizer-alist))))))
+
+(defun accepts-argument-of-type-p (polymorph-parameters type)
+  (flet ((%subtypep (pp) (subtypep type (pp-value-type pp))))
+    (some (lambda (arg)
+            (eq t arg))
+          (map-polymorph-parameters polymorph-parameters
+                                    :required #'%subtypep
+                                    :optional #'%subtypep
+                                    :keyword  #'%subtypep))))

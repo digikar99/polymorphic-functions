@@ -463,6 +463,21 @@ If it exists, the second value is T and the first value is a possibly empty
                          (values polymorph t))))
            (values nil t)))))
 
+(defun polymorph-apropos-list-type (name type)
+  (let* ((apf        (and (fboundp name) (fdefinition name)))
+         (polymorphs (when (typep apf 'polymorphic-function)
+                       (polymorphic-function-polymorphs apf))))
+    (cond ((null (typep apf 'polymorphic-function))
+           (values nil nil))
+          (t
+           ;; FIXME: Use a type-list equality check, not EQUALP
+           (values
+            (loop :for polymorph :in polymorphs
+                  :when (accepts-argument-of-type-p (polymorph-parameters polymorph)
+                                                    type)
+                    :collect polymorph)
+            t)))))
+
 (cltl2:define-declaration type-like (vars env)
   ;; TODO: Allow type-like like types in type-lists and return-type
   (destructuring-bind (original &rest similar) vars

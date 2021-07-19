@@ -51,6 +51,7 @@
            #:notinline-pf
            #:pf-defined-before-use
            #:*compiler-macro-expanding-p*
+           #:polymorph-apropos-list-type
 
            #:*parametric-type-symbol-predicates*
            #:parametric-type-run-time-lambda-body

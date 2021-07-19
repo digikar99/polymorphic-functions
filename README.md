@@ -174,7 +174,7 @@ In addition to subtype-polymorphism described above (under [Basic Usage](#basic-
 
 - \*parametric-type-symbol-predicates\*
 - parametric-type-run-time-lambda-body
-- parametric-type-compilep-time-lambda-body
+- parametric-type-compile-time-lambda-body
 - upgrade-parametric-type
 
 An example for this is at [src/extended-types/parametric-types.lisp](src/extended-types/parametric-types.lisp#L126) and [src/misc-tests.lisp](src/misc-tests.lisp#L496).
