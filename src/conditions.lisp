@@ -32,21 +32,28 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
   ((name :initarg :name
          :initform (error "NAME not specified")
          :reader name)
-   (arg-list :initarg :arg-list
-             :initform (error "ARG-LIST not specified")
-             :reader arg-list)
+   (args :initarg :args
+         :initform (error "ARGS not specified")
+         :reader args)
+   (arg-types :initarg :arg-types
+              :reader arg-types)
    (effective-type-lists :initarg :effective-type-lists
-               :initform (error "EFFECTIVE-TYPE-LISTS not specified")
-               :reader effective-type-lists))
+                         :initform (error "EFFECTIVE-TYPE-LISTS not specified")
+                         :reader effective-type-lists))
   (:report (lambda (condition s)
              (pprint-logical-block (s nil)
                (format s "No applicable POLYMORPH discovered for polymorphic-function~%  ~S~%"
                        (name condition))
-               (format s "and ARG-LIST:~%~%")
-               ;; It is possible that arg-lists could be circular (?)
+               (format s "and ARGS:~%~%")
+               ;; It is possible that argss could be circular (?)
                ;; Or that they contain circular structures (?)
                (pprint-logical-block (s nil :per-line-prefix "  ")
-                 (format s "~S" (arg-list condition)))
+                 (format s "~S" (args condition)))
+               (format s "~%~%derived to be of TYPES:~%~%")
+               (pprint-logical-block (s nil :per-line-prefix "  ")
+                 (format s "~S" (if (slot-boundp condition 'arg-types)
+                                    (arg-types condition)
+                                    (mapcar #'type-of (args condition)))))
                ;; So, we only "improve" the printing for effective-type-lists
                (let ((*print-circle* nil))
                  (format s
@@ -61,17 +68,18 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
     (no-applicable-polymorph compiler-macro-notes:note)
   ())
 
-(defun no-applicable-polymorph (name arg-list &optional env)
+(defun no-applicable-polymorph (name env args &optional arg-types)
   (declare (ignore env))
   (if *compiler-macro-expanding-p*
       (signal 'no-applicable-polymorph/compiler-note
               :name name
-              :arg-list arg-list
+              :args args
+              :arg-types arg-types
               :effective-type-lists
               (polymorphic-function-effective-type-lists (fdefinition name)))
       (error 'no-applicable-polymorph/error
              :name name
-             :arg-list arg-list
+             :args args
              :effective-type-lists
              (polymorphic-function-effective-type-lists (fdefinition name)))))
 

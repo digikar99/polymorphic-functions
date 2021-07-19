@@ -40,7 +40,7 @@
                            (t
                             (return-from ,block-name
                               (funcall ,(polymorphic-function-default (fdefinition *name*))
-                                       ',*name* (list ,@untyped-lambda-list)))))))
+                                       ',*name* nil (list ,@untyped-lambda-list)))))))
                   ,@untyped-lambda-list)))))))
 
 (defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required))

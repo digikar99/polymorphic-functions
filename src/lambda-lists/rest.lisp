@@ -80,7 +80,7 @@
                         (t
                          (return-from ,block-name
                            (funcall ,(polymorphic-function-default (fdefinition *name*))
-                                    ',*name* (list* ,@required-parameters ,rest-args)))))))
+                                    ',*name* nil (list* ,@required-parameters ,rest-args)))))))
                ,@required-parameters ,rest-args))))))
 
 (defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'rest))

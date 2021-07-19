@@ -124,7 +124,7 @@
                             (t
                              (return-from ,block-name
                                (funcall ,(polymorphic-function-default (fdefinition *name*))
-                                        ',*name* ,args)))))))
+                                        ',*name* nil ,args)))))))
                   (cond ,@(loop :for (name default supplied-p) :in (reverse optional-parameters)
                                 :for optional-idx :downfrom (length optional-parameters) :above 0
                                 :for parameters := (append required-parameters

@@ -79,7 +79,7 @@
                    (or optim-speed optim-safety
                        (cltl2:declaration-information 'pf-defined-before-use env)))
           (funcall (polymorphic-function-default (fdefinition name))
-                   name arg-list env))
+                   name env arg-list arg-types))
         (when (or (null polymorph)
                   (not optim-speed))
           (return-from pf-compiler-macro original-form))
