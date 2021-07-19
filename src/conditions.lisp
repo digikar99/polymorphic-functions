@@ -55,10 +55,15 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                                     (arg-types condition)
                                     (mapcar #'type-of (args condition)))))
                ;; So, we only "improve" the printing for effective-type-lists
-               (let ((*print-circle* nil))
+               (let ((*print-circle* nil)
+                     (type-lists (effective-type-lists condition)))
                  (format s
                          "~%~%Available Effective-Type-Lists include:~%~{~^~%  ~S~}"
-                         (effective-type-lists condition)))))))
+                         (subseq type-lists
+                                 0 (min *print-length* (length type-lists))))
+                 (when (and *print-length*
+                            (nthcdr *print-length* type-lists))
+                   (format s "~%  ...")))))))
 
 (define-condition no-applicable-polymorph/error
     (no-applicable-polymorph error)
