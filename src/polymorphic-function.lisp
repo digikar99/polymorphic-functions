@@ -479,7 +479,7 @@ If it exists, the second value is T and the first value is a possibly empty
             t)))))
 
 (cltl2:define-declaration type-like (vars env)
-  ;; TODO: Allow type-like like types in type-lists and return-type
+  ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
   (destructuring-bind (original &rest similar) vars
     (values :variable
             (loop :with type

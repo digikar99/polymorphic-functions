@@ -23,6 +23,9 @@ in this list, returns non-NIL for at least one predicate")
          (traverse-tree type-specifier #'%parametric-type-symbol-p)
          nil)))
 
+(deftype parametric-type-specifier ()
+  `(satisfiers parametric-type-specifier-p))
+
 (defun parametric-type-parameters (parametric-type-spec)
   (remove-duplicates
    (remove-if-not
@@ -84,11 +87,17 @@ The expression will be compiled to a function and called with the appropriate
 *form-type* at run-time. The function should return the value of the TYPE-PARAMTER
 corresponding to the *form-type* and the parametric type."))
 
-(defgeneric upgrade-parametric-type (type-car type-cdr)
-  (:documentation
-   "Should return a regular aka non-parametric / non-extended type-specifier
-corresponding to the parametric-type (CONS TYPE-CAR TYPE-CDR). The returned-value
-is expected to be usable in (CL:DECLARE (TYPE ...)) contexts."))
+(defun deparameterize-type (type-specifier)
+  (etypecase type-specifier
+    (atom (if (parametric-type-symbol-p type-specifier)
+              t
+              type-specifier))
+    (list (traverse-tree type-specifier (lambda (node)
+                                          (etypecase node
+                                            (atom (if (parametric-type-symbol-p node)
+                                                      'cl:*
+                                                      node))
+                                            (list node)))))))
 
 (defun type-parameters-from-parametric-type (parametric-type-spec)
   "Returns a list oF TYPE-PARAMETERS"
@@ -166,6 +175,3 @@ is expected to be usable in (CL:DECLARE (TYPE ...)) contexts."))
                                      (t
                                       (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
                                              parameter (cons type-car type-cdr))))))))))))
-
-(defmethod upgrade-parametric-type ((type-car (eql 'array)) type-cdr)
-  'cl:array)

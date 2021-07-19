@@ -21,8 +21,11 @@
                (if (= 0 a)
                    ''zero
                    form))
+             ;; Fix ECL: 21.2.1 does not respect
+             ;;   (locally (declare (optimize ...))
+             ;;     ...)
              (defun my=-caller ()
-               (declare (optimize speed))
+               (declare (optimize speed (debug 1)))
                (my= 0 5)))))
   (eval `(let ((obj1 "hello")
                (obj2 "world")

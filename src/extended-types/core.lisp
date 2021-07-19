@@ -78,38 +78,29 @@ CL:UPGRADED-ARRAY-ELEMENT-TYPE."))
                                  node))
                        (t node))))))
 
-(define-condition illegal-parametric-type (error)
-  ()
-  (:report (lambda (c s)
-             (declare (ignore c))
-             (format s "Illegal use of parametric type"))))
-
 (defun subtypep (type1 type2 &optional environment)
-  "Like CL:SUBTYPEP but allows EXTENDED-TYPE-SPECIFIERs. COMPILER-MACROEXPANDs to
-CL:SUBTYPEP if both types are constant objects and neither is a EXTENDED-TYPE-SPECIFIER."
-  (assert (not (parametric-type-specifier-p type1)) () 'illegal-parametric-type)
-  (assert (not (parametric-type-specifier-p type2)) () 'illegal-parametric-type)
-  (if (and (type-specifier-p type1)
-           (type-specifier-p type2))
-      (cl:subtypep type1 type2 environment)
-      (ctype:subctypep (ctype:specifier-ctype type1 environment)
-                       (ctype:specifier-ctype type2 environment))))
+  "Like CL:SUBTYPEP but allows PARAMETRIC-TYPE-SPECIFIER as well as EXTENDED-TYPE-SPECIFIERs
+COMPILER-MACROEXPANDs to CL:SUBTYPEP if both types are constant objects and
+neither is a EXTENDED-TYPE-SPECIFIER."
+  (let ((type1 (deparameterize-type type1))
+        (type2 (deparameterize-type type2)))
+    (if (and (type-specifier-p type1)
+             (type-specifier-p type2))
+        (cl:subtypep type1 type2 environment)
+        (ctype:subctypep (ctype:specifier-ctype type1 environment)
+                         (ctype:specifier-ctype type2 environment)))))
 
 (define-compiler-macro subtypep (&whole form type1 type2 &optional env-form &environment env)
   (if (and (constantp type1 env) (constantp type2 env))
-      (cond ((parametric-type-specifier-p (constant-form-value type1 env))
-             (warn 'illegal-parametric-type)
-             form)
-            ((parametric-type-specifier-p (constant-form-value type2 env))
-             (warn 'illegal-parametric-type)
-             form)
-            ((and (type-specifier-p (constant-form-value type1 env))
-                  (type-specifier-p (constant-form-value type2 env)))
-             `(cl:subtypep ,type1 ,type2 ,env-form))
-            (t
-             (once-only (env-form)
-               `(ctype:subctypep (ctype:specifier-ctype ,type1 ,env-form)
-                                 (ctype:specifier-ctype ,type2 ,env-form)))))
+      (let ((type1 (deparameterize-type type1))
+            (type2 (deparameterize-type type2)))
+        (cond ((and (type-specifier-p (constant-form-value type1 env))
+                    (type-specifier-p (constant-form-value type2 env)))
+               `(cl:subtypep ,type1 ,type2 ,env-form))
+              (t
+               (once-only (env-form)
+                 `(ctype:subctypep (ctype:specifier-ctype ,type1 ,env-form)
+                                   (ctype:specifier-ctype ,type2 ,env-form))))))
       form))
 
 (defun supertypep (type1 type2 &optional environment)
@@ -121,22 +112,20 @@ CL:SUBTYPEP if both types are constant objects and neither is a EXTENDED-TYPE-SP
 ;;; TYPEP should return two values
 
 (defun typep (object type &optional environment)
-  "Like CL:TYPEP but allows TYPE to be a EXTENDED-TYPE-SPECIFIER.
+  "Like CL:TYPEP but allows TYPE to be a PARAMETRIC-TYPE-SPECIFIER or EXTENDED-TYPE-SPECIFIER.
 COMPILER-MACROEXPANDs to CL:TYPEP if TYPE is a constant object not a EXTENDED-TYPE-SPECIFIER."
-  (assert (not (parametric-type-specifier-p type)) () 'illegal-parametric-type)
-  (if (type-specifier-p type)
-      (cl:typep object type)
-      (ctype:ctypep object (ctype:specifier-ctype type environment))))
+  (let ((type (deparameterize-type type)))
+    (if (type-specifier-p type)
+        (cl:typep object type)
+        (ctype:ctypep object (ctype:specifier-ctype type environment)))))
 
 (define-compiler-macro typep (&whole form object type &optional env-form &environment env)
   (if (constantp type env)
-      (cond ((parametric-type-specifier-p (constant-form-value type env))
-             (warn 'illegal-parametric-type)
-             form)
-            ((type-specifier-p (constant-form-value type env))
-             `(cl:typep ,object ,type ,env-form))
-            (t
-             `(ctype:ctypep ,object (ctype:specifier-ctype ,type ,env-form))))
+      (let ((type (deparameterize-type type)))
+        (cond ((type-specifier-p (constant-form-value type env))
+               `(cl:typep ,object ,type ,env-form))
+              (t
+               `(ctype:ctypep ,object (ctype:specifier-ctype ,type ,env-form)))))
       form))
 
 (defun type= (type1 type2)

@@ -55,8 +55,7 @@
 
            #:*parametric-type-symbol-predicates*
            #:parametric-type-run-time-lambda-body
-           #:parametric-type-compile-time-lambda-body
-           #:upgrade-parametric-type))
+           #:parametric-type-compile-time-lambda-body))
 
 (defpackage #:polymorphic-functions.nonuser
   (:use)

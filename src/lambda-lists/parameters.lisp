@@ -401,18 +401,14 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
 (defun lambda-declarations (polymorph-parameters)
   (let ((type-parameter-names ()))
     (flet ((type-decl (pp)
-             (with-slots (local-name value-type type-parameters) pp
-               (cond (type-parameters
-                      (loop :for tp :in type-parameters
-                            :do (pushnew (type-parameter-name tp) type-parameter-names))
-                      `(type ,(if (atom value-type)
-                                  t
-                                  (upgrade-parametric-type (car value-type) (cdr value-type)))
-                             ,local-name))
-                     ((type-specifier-p value-type)
-                      `(type ,value-type ,local-name))
-                     (t
-                      `(type ,(upgrade-extended-type value-type) ,local-name))))))
+             (with-slots (local-name value-type) pp
+               (loop :for tp :in (pp-type-parameters pp)
+                     :do (pushnew (type-parameter-name tp) type-parameter-names))
+               (let ((value-type (deparameterize-type value-type)))
+                 (cond ((type-specifier-p value-type)
+                        `(type ,value-type ,local-name))
+                       (t
+                        `(type ,(upgrade-extended-type value-type) ,local-name)))))))
       `(declare ,@(set-difference (map-polymorph-parameters polymorph-parameters
                                                             :required #'type-decl
                                                             :optional #'type-decl
