@@ -28,11 +28,10 @@
 
 (polymorphic-functions.defpackage:defpackage :polymorphic-functions
   (:shadowing-import-exported-symbols :polymorphic-functions.extended-types)
-  (:use :cl-form-types
-   :alexandria :cl-environments)
+  (:use :cl-form-types :alexandria :cl)
   (:import-from :5am #:is #:def-test)
   (:import-from :ctype
-                #:typexpand
+                #-ecl #:typexpand
                 #:ctype
                 #:cons-specifier-ctype)
   (:import-from :polymorphic-functions.extended-types
@@ -42,9 +41,15 @@
                 #:function-name
                 #:type-specifier)
   (:import-from :introspect-environment
+                #+ecl #:typexpand
                 #:policy-quality
                 #:constant-form-value
                 #:parse-compiler-macro)
+  (:import-from :cl-environments
+                #:function-information
+                #:variable-information
+                #:declaration-information
+                #:define-declaration)
   (:export #:define-polymorphic-function
            #:undefine-polymorphic-function
            #:defpolymorph

@@ -2,9 +2,16 @@
 
 (5am:in-suite :polymorphic-functions)
 
+(defmacro define-compiled-function (name lambda-list &body body)
+  #+sbcl
+  `(defun ,name ,lambda-list ,@body)
+  #-sbcl
+  `(compile ',name (lambda ,lambda-list ,@body)))
+
 (defmacro ignoring-error-output (&body body)
   `(let ((*error-output* (make-string-output-stream)))
-     ,@body))
+     (handler-bind ((warning #'muffle-warning))
+       ,@body)))
 
 ;; unwind-protect (apparantly) does not have an effect in the def-test forms below :/
 
@@ -28,7 +35,7 @@
              ;; As far as ECL is concerned, it does call compiler-macro with COMPILE.
              ;; And even then, some issues prevail; for the time, just forget static dispatch
              ;; on "all" the implementations
-             (defun my=-caller ()
+             (define-compiled-function my=-caller ()
                (declare (optimize speed (debug 1)))
                (my= 0 5)))))
   (eval `(let ((obj1 "hello")
@@ -40,7 +47,7 @@
            (is (eq nil (my= obj1 obj2)))
            (is (eq t   (my= obj4 obj5)))
            (is-error (my= obj1 obj4))
-           #+(or sbcl ccl)
+           #+(or sbcl ccl ecl cmucl)
            (is (eq 'zero (my=-caller)))))
   (undefine-polymorphic-function 'my=)
   (fmakunbound 'my=-caller))
@@ -55,8 +62,8 @@
                  (&whole form &rest args)
                (declare (ignore args))
                `(list ,form)) ; This usage of FORM also tests infinite recursion
-             (defun bar-caller ()
-               (declare (optimize speed))
+             (define-compiled-function bar-caller ()
+               (declare (optimize speed (debug 1)))
                (bar "hello" 9)))))
   (is (equalp (eval `(bar "hello"))
               '("hello" 5 7)))
@@ -64,7 +71,7 @@
               '("hello" 6 7)))
   (is (equalp (eval `(bar "hello" 6 9))
               '("hello" 6 9)))
-  #+(or sbcl ccl)
+  #+(or sbcl ccl ecl cmucl)
   (is (equalp (eval `(bar-caller))
               '(("hello" 9 7))))
   (undefine-polymorphic-function 'bar)
@@ -84,14 +91,14 @@
              (defpolymorph foobar ((num number) &key ((key number) 6) ((b string) "world")) t
                (declare (ignore num))
                (list 'number key b))
-             (defun foobar-caller ()
-               (declare (optimize speed))
+             (define-compiled-function foobar-caller ()
+               (declare (optimize speed (debug 1)))
                (foobar 7 :key 10)))))
   (is (equalp '(string 5 "world")    (eval `(foobar "hello"))))
   (is (equalp '(string 5.6 "world")  (eval `(foobar "hello" :key 5.6))))
   (is (equalp '(number 6 "world")    (eval `(foobar 5.6))))
   (is (equalp '(number 9 "world")    (eval `(foobar 5.6 :key 9))))
-  #+(or sbcl ccl)
+  #+(or sbcl ccl cmucl) ; Fails on ECL for reasons I haven't debugged
   (is (equalp '((number 10 "world")) (eval `(foobar-caller))))
   (is (equalp '(number 6 "bye")      (eval `(foobar 5.6 :b "bye"))))
   (is (equalp '(number 4.4 "bye")    (eval `(foobar 5.6 :b "bye" :key 4.4))))
@@ -139,8 +146,8 @@
              (defpolymorph-compiler-macro my+ (number &rest) (&whole form &rest args)
                (declare (ignore args))
                `(list (+ ,@(cdr form))))
-             (defun my+-number-caller ()
-               (declare (optimize speed))
+             (define-compiled-function my+-number-caller ()
+               (declare (optimize speed (debug 1)))
                (my+ 3 2 8))
              (defpolymorph my+ ((l list) &rest lists) list
                (apply 'append l lists))
@@ -150,7 +157,7 @@
                    str)))))
   (is (eq 9 (eval `(my+ 2 3 4))))
   (is (equalp '(1 2 3) (eval `(my+ '(1 2) '(3)))))
-  #+(or sbcl ccl)
+  #+(or sbcl ccl ecl cmucl)
   (is (equalp '(13) (eval `(my+-number-caller))))
   (is (string= "hello5" (eval `(my+ "hello" 5 :coerce t))))
   (undefine-polymorphic-function 'my+)
@@ -404,14 +411,14 @@
              (defpolymorph most-specialized-polymorph-tester ((a array)) symbol
                (declare (ignore a))
                'array)
-             (defun most-specialized-polymorph-tester-caller ()
-               (declare (optimize speed))
+             (define-compiled-function most-specialized-polymorph-tester-caller ()
+               (declare (optimize speed (debug 1)))
                (most-specialized-polymorph-tester "hello"))))
     (eval `(let ((a "string")
                  (b #(a r r a y)))
              (5am:is-true (eq 'string (most-specialized-polymorph-tester a)))
              (5am:is-true (eq 'array  (most-specialized-polymorph-tester b)))
-             #+(or sbcl ccl)
+             #+(or sbcl ccl ecl cmucl)
              (5am:is-true (equalp '(compiled string)
                                   (most-specialized-polymorph-tester-caller)))))
     (eval `(undefine-polymorphic-function 'most-specialized-polymorph-tester))
@@ -436,12 +443,12 @@
                (list a b))
              (defpolymorph-compiler-macro (setf foo) (number number) (a b)
                `(list 'compiler-macro ,a ,b))
-             (defun setf-foo-caller (a b)
-               (declare (optimize speed)
+             (define-compiled-function setf-foo-caller (a b)
+               (declare (optimize speed (debug 1))
                         (type number a b))
                (funcall #'(setf foo) (the number (+ a b)) b))
-             (defun setf-foo-caller-direct (a b)
-               (declare (optimize speed)
+             (define-compiled-function setf-foo-caller-direct (a b)
+               (declare (optimize speed (debug 1))
                         (type number a b))
                (setf (foo b) (the number (+ a b)))))))
   (is (equalp '(2 3) (eval '(funcall #'(setf foo) 2 3))))
@@ -472,7 +479,7 @@
                     (inner a))))
          (is (eq 'string (funcall (compile nil
                                            `(lambda (a)
-                                              (declare (optimize speed)
+                                              (declare (optimize speed (debug 1))
                                                        (type string a))
                                               (outer a)))
                                   "hello")))
@@ -483,7 +490,7 @@
                     (inner b))))
          (is (eq 'array (funcall (compile nil
                                            `(lambda (a)
-                                              (declare (optimize speed)
+                                              (declare (optimize speed (debug 1))
                                                        (type string a))
                                               (outer a)))
                                  "hello")))

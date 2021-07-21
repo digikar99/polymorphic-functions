@@ -268,12 +268,14 @@ TODO (perhaps?): Ping/PR [gtype](https://github.com/numcl/gtype) for compile tim
 
 ### Limitations
 
-- For form-type-inference, polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [cl-form-types](https://github.com/alex-gutev/cl-form-types) does get pretty extensive. In cases wherein it does fail, we also rely on `sb-c:deftransform` on SBCL.
-- Integration with SLIME is yet to be thought about; etags could work, but this needs more thinking given the apparant non-extensibility of internals of `slime-edit-definition`. imenu is also another option.
-- ANSI is insufficient for our purposes: we need `introspect-environment:policy-quality` and CLTL2 and more for cl-form-types; if someone needs a reduced feature version within the bounds of ANSI standard, please raise an issue!
-- A [bug on CCL](https://github.com/Clozure/ccl/pull/369) may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
-- A `polymorphic-functions.extended-types` package (not system!) is also provided based on [ctype](https://github.com/s-expressionists/ctype). This allows one to extend the CL type system to define types beyond what `cl:deftype` can do to some extent. While these cannot be used inside an arbitrary CL form with `cl:declare`, these can be used in the type lists of polymorphs. See [src/extended-types/supertypep.lisp](src/extended-types/supertypep.lisp) for an example put to use in [trivial-coerce](https://github.com/digikar99/trivial-coerce).
-- Currently inlining uses the lexical environment of the call-site rather than the definition-site as is the usual case. To work around this, users should avoid shadowing global lexical elements.
+- For **form-type-inference**, polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [cl-form-types](https://github.com/alex-gutev/cl-form-types) does get pretty extensive. In cases wherein it does fail, we also rely on `sb-c:deftransform` on SBCL.
+- **Integration with SLIME** is yet to be thought about; etags could work, but this needs more thinking given the apparant non-extensibility of internals of `slime-edit-definition`. imenu is also another option.
+- **ANSI is insufficient** for our purposes: we need `introspect-environment:policy-quality` and CLTL2 and more for cl-form-types; if someone needs a reduced feature version within the bounds of ANSI standard, please raise an issue!
+  - Static dispatch relies on policy-quality working as expected, and compiler-macros being called. As a result, it may not work on all implementations.
+  - Some implementations produce interpreted functions some times while compiled functions other times; and accordingly differ if or not compiler-macros are called.
+- A [**bug on CCL**](https://github.com/Clozure/ccl/pull/369) may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
+- A `polymorphic-functions.extended-types` package (not system!) is also provided based on [ctype](https://github.com/s-expressionists/ctype). This allows one to extend the CL type system to define types beyond what `cl:deftype` can do to some extent. While these **cannot be used inside an arbitrary CL form** with `cl:declare`, these can be used in the type lists of polymorphs. See [src/extended-types/supertypep.lisp](src/extended-types/supertypep.lisp) for an example put to use in [trivial-coerce](https://github.com/digikar99/trivial-coerce).
+- Currently **inlining uses the lexical environment of the call-site** rather than the definition-site as is the usual case. To work around this, users should avoid shadowing global lexical elements.
 
 ## Rationale
 
