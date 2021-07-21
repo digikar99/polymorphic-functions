@@ -21,12 +21,18 @@
            #:typep
            #:type=))
 
+(defpackage #:polymorphic-functions.nonuser
+  (:use)
+  (:documentation
+   "Package for internal use by POLYMORPHIC-FUNCTIONS not intended for direct use by users."))
+
 (polymorphic-functions.defpackage:defpackage :polymorphic-functions
   (:shadowing-import-exported-symbols :polymorphic-functions.extended-types)
   (:use :cl-form-types
-   :alexandria :introspect-environment :cl)
+   :alexandria :cl-environments)
   (:import-from :5am #:is #:def-test)
   (:import-from :ctype
+                #:typexpand
                 #:ctype
                 #:cons-specifier-ctype)
   (:import-from :polymorphic-functions.extended-types
@@ -35,6 +41,10 @@
   (:import-from :trivial-types
                 #:function-name
                 #:type-specifier)
+  (:import-from :introspect-environment
+                #:policy-quality
+                #:constant-form-value
+                #:parse-compiler-macro)
   (:export #:define-polymorphic-function
            #:undefine-polymorphic-function
            #:defpolymorph
@@ -56,11 +66,6 @@
            #:*parametric-type-symbol-predicates*
            #:parametric-type-run-time-lambda-body
            #:parametric-type-compile-time-lambda-body))
-
-(defpackage #:polymorphic-functions.nonuser
-  (:use)
-  (:documentation
-   "Package for internal use by POLYMORPHIC-FUNCTIONS not intended for direct use by users."))
 
 (in-package :polymorphic-functions)
 
@@ -84,5 +89,3 @@
                                              (/= 3 (policy-quality 'speed env))
                                              (<= (policy-quality 'debug env)
                                                  (policy-quality 'speed env))))
-
-(trivial-package-local-nicknames:add-package-local-nickname :cltl2 :cl-environments.cltl2)

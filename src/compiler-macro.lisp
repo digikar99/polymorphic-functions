@@ -61,7 +61,7 @@
                                  name (mapcar #'cons (rest form) arg-types)))))
 
         (when (and optim-debug
-                   (not (cltl2:declaration-information 'pf-defined-before-use env)))
+                   (not (declaration-information 'pf-defined-before-use env)))
           (return-from pf-compiler-macro original-form))
         (cond ((and (null polymorph)
                     optim-speed
@@ -77,7 +77,7 @@
                (mapc #'compiler-macro-notes:muffle form-type-failures)))
         (when (and (null polymorph)
                    (or optim-speed optim-safety
-                       (cltl2:declaration-information 'pf-defined-before-use env)))
+                       (declaration-information 'pf-defined-before-use env)))
           (funcall (polymorphic-function-default (fdefinition name))
                    name env arg-list arg-types))
         (when (or (null polymorph)
@@ -125,7 +125,7 @@
                     (optim-speed
                      (let ((inline-pf
                              (assoc 'inline-pf
-                                    (nth-value 2 (cltl2:function-information name env)))))
+                                    (nth-value 2 (function-information name env)))))
                        (ecase inline-p
                          ((t)
                           (assert inline-lambda-body)

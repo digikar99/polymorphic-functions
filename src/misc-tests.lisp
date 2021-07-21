@@ -24,6 +24,10 @@
              ;; Fix ECL: 21.2.1 does not respect
              ;;   (locally (declare (optimize ...))
              ;;     ...)
+             ;; In addition, implementations are free to avoid calling compiler-macro.
+             ;; As far as ECL is concerned, it does call compiler-macro with COMPILE.
+             ;; And even then, some issues prevail; for the time, just forget static dispatch
+             ;; on "all" the implementations
              (defun my=-caller ()
                (declare (optimize speed (debug 1)))
                (my= 0 5)))))
@@ -36,6 +40,7 @@
            (is (eq nil (my= obj1 obj2)))
            (is (eq t   (my= obj4 obj5)))
            (is-error (my= obj1 obj4))
+           #+(or sbcl ccl)
            (is (eq 'zero (my=-caller)))))
   (undefine-polymorphic-function 'my=)
   (fmakunbound 'my=-caller))
@@ -59,6 +64,7 @@
               '("hello" 6 7)))
   (is (equalp (eval `(bar "hello" 6 9))
               '("hello" 6 9)))
+  #+(or sbcl ccl)
   (is (equalp (eval `(bar-caller))
               '(("hello" 9 7))))
   (undefine-polymorphic-function 'bar)
@@ -85,6 +91,7 @@
   (is (equalp '(string 5.6 "world")  (eval `(foobar "hello" :key 5.6))))
   (is (equalp '(number 6 "world")    (eval `(foobar 5.6))))
   (is (equalp '(number 9 "world")    (eval `(foobar 5.6 :key 9))))
+  #+(or sbcl ccl)
   (is (equalp '((number 10 "world")) (eval `(foobar-caller))))
   (is (equalp '(number 6 "bye")      (eval `(foobar 5.6 :b "bye"))))
   (is (equalp '(number 4.4 "bye")    (eval `(foobar 5.6 :b "bye" :key 4.4))))
@@ -143,6 +150,7 @@
                    str)))))
   (is (eq 9 (eval `(my+ 2 3 4))))
   (is (equalp '(1 2 3) (eval `(my+ '(1 2) '(3)))))
+  #+(or sbcl ccl)
   (is (equalp '(13) (eval `(my+-number-caller))))
   (is (string= "hello5" (eval `(my+ "hello" 5 :coerce t))))
   (undefine-polymorphic-function 'my+)
@@ -403,6 +411,7 @@
                  (b #(a r r a y)))
              (5am:is-true (eq 'string (most-specialized-polymorph-tester a)))
              (5am:is-true (eq 'array  (most-specialized-polymorph-tester b)))
+             #+(or sbcl ccl)
              (5am:is-true (equalp '(compiled string)
                                   (most-specialized-polymorph-tester-caller)))))
     (eval `(undefine-polymorphic-function 'most-specialized-polymorph-tester))
@@ -435,9 +444,12 @@
                (declare (optimize speed)
                         (type number a b))
                (setf (foo b) (the number (+ a b)))))))
+  (is (equalp '(2 3) (eval '(funcall #'(setf foo) 2 3))))
+  #+(or sbcl ccl)
   (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller 2 3))))
   ;; On SBCL this passed after incorporating compiler macro inside deftransform
   ;; > Don't ask me why it works
+  #+(or sbcl ccl)
   (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller-direct 2 3))))
   (fmakunbound 'setf-foo-caller)
   (undefine-polymorphic-function '(setf foo)))

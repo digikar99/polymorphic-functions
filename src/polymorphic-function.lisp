@@ -478,28 +478,28 @@ If it exists, the second value is T and the first value is a possibly empty
                     :collect polymorph)
             t)))))
 
-(cltl2:define-declaration type-like (vars env)
+(define-declaration type-like (vars env)
   ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
   (destructuring-bind (original &rest similar) vars
     (values :variable
             (loop :with type
                     := (rest (assoc 'cl:type
-                                    (nth-value 2 (cltl2:variable-information original env))))
+                                    (nth-value 2 (variable-information original env))))
                   :for var :in similar
                   :collect `(,var cl:type ,type)))))
 
-(cltl2:define-declaration inline-pf (vars env)
+(define-declaration inline-pf (vars env)
   (values :function
           (loop :for var :in vars
                 :collect `(,var inline-pf inline-pf))))
 
-(cltl2:define-declaration notinline-pf (vars env)
+(define-declaration notinline-pf (vars env)
   (values :function
           (loop :for var :in vars
                 :collect `(,var inline-pf notinline-pf))))
 
 ;;; TODO: Define a negative decl as well as a dynamic variable
-(cltl2:define-declaration pf-defined-before-use (args)
+(define-declaration pf-defined-before-use (args)
   (declare (ignore args))
   (values :declare
           ;; FIXME: Change the CDR to just T (and make appropriate changes)

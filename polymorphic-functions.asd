@@ -11,7 +11,6 @@
                "cl-form-types"
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
                "trivial-macroexpand-all"
-               "trivial-package-local-nicknames"
                "introspect-environment")
   :pathname #P"src/"
   :components ((:file "pre-package")
