@@ -503,10 +503,16 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                       nil)))))
 
           `(lambda ,lambda-list
-             (declare (optimize speed))
+             (declare (optimize speed)
+                      (ignorable ,@(mapcar (lambda (elt)
+                                             (etypecase elt
+                                               (atom elt)
+                                               (list (first elt))))
+                                           (set-difference lambda-list lambda-list-keywords))))
              (and ,@(set-difference lambda-body-forms lambda-list-keywords)
                   ,@(loop :for (param . forms) :in type-parameters-alist
-                          :collect `(and ,@(loop :for form :in (rest forms)
+                          :collect `(and ,@forms
+                                         ,@(loop :for form :in (rest forms)
                                                  :collect `(equalp ,(first forms)
                                                                    ,form)))))))))))
 

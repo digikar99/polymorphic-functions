@@ -204,13 +204,10 @@ Non-examples:
   #.+type-list-causes-ambiguous-call-p+
   (declare (type type-list type-list-1 type-list-2))
   (let ((*lambda-list-typed-p* nil))
-    (handler-case
-        (%type-list-causes-ambiguous-call-p (potential-type-of-lambda-list type-list-1)
-                                            (potential-type-of-lambda-list type-list-2)
-                                            type-list-1
-                                            type-list-2)
-      (illegal-parametric-type ()
-        t))))
+    (%type-list-causes-ambiguous-call-p (potential-type-of-lambda-list type-list-1)
+                                        (potential-type-of-lambda-list type-list-2)
+                                        type-list-1
+                                        type-list-2)))
 
 (defgeneric %type-list-causes-ambiguous-call-p
     (type-1 type-2 type-list-1 type-list-2)

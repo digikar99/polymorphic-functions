@@ -60,7 +60,9 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                  (format s
                          "~%~%Available Effective-Type-Lists include:~%~{~^~%  ~S~}"
                          (subseq type-lists
-                                 0 (min *print-length* (length type-lists))))
+                                 0 (if *print-length*
+                                       (min *print-length* (length type-lists))
+                                       nil)))
                  (when (and *print-length*
                             (nthcdr *print-length* type-lists))
                    (format s "~%  ...")))))))

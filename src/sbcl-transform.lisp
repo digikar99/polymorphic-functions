@@ -64,11 +64,13 @@
              (let ((,inline-lambda-body-sym
                      (destructuring-bind (,lambda ,param-list-sym ,declarations &body ,body)
                          ',inline-lambda-body
+                       (declare (ignore ,lambda ,param-list-sym))
                        `(lambda ,',param-list
                           ;; The source of parametric-polymorphism
                           ,(enhanced-lambda-declarations (polymorph-parameters
                                                           (find-polymorph ',name ',type-list))
                                                          ,arg-types)
+                          ,,declarations
                           ,@,body))))
 
                ,(if (eq 'rest lambda-list-type)

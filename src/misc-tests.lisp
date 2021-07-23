@@ -459,6 +459,7 @@
   #+(or sbcl ccl)
   (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller-direct 2 3))))
   (fmakunbound 'setf-foo-caller)
+  (fmakunbound 'setf-foo-caller-direct)
   (undefine-polymorphic-function '(setf foo)))
 
 (def-test subtype-polymorphism ()
@@ -564,5 +565,4 @@
                                (make-array 2 :element-type 'single-float)
                                1.0d0))))))
 
-    (fmakunbound 'element-type)
     (undefine-polymorphic-function 'foo)))
