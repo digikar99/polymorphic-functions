@@ -4,7 +4,7 @@ sudo: required
 env:
   matrix:
     - LISP=sbcl
-    - LISP=ccl
+    - LISP=ecl
 
 install:
   - bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
