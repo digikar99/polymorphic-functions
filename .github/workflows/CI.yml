@@ -1,21 +1,42 @@
-language: lisp
-sudo: required
+on: [push, pull_request]
 
-env:
-  matrix:
-    - LISP=sbcl
-    - LISP=ecl
+jobs:
 
-install:
-  - bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
-  - cd ~/
-  - ls -a ~/
-  - git clone --depth=3 https://github.com/digikar99/polymorphic-functions ~/polymorphic-functions
-  - mkdir -p ~/quicklisp/dists/digikar99
-  - ls -l ~/quicklisp/dists
-  
-script:
-  - cl --eval '(progn
+  test:
+
+    name: ${{ matrix.lisp }}
+
+    strategy:
+      matrix:
+        lisp: [sbcl, ecl]
+    runs-on: ubuntu-20.04
+
+    steps:
+
+    - uses: actions/checkout@v2
+
+    - name: Update $PATH
+      run: |
+        echo $PATH
+        echo "PATH=$HOME/bin:$PATH" >> $GITHUB_ENV
+    - name: Check $PATH
+      run: echo $PATH
+
+    - name: Download implementation
+      env:
+        LISP: ${{ matrix.lisp }}
+      run: |
+        pwd
+        ls -l
+        bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
+
+    - name: Install digikar99/specialized-array-dispatch
+      run: |
+        mkdir -p ~/quicklisp/dists/digikar99
+        ls -l ~/quicklisp/dists
+
+    - name: Compile Tests
+      run: cl --eval '(progn
                  (defun ql-dist::dist-name-pathname (name)
                    "Return the pathname that would be used for an installed dist with
                     the given NAME."
@@ -38,7 +59,11 @@ script:
                  (print (ql:where-is-system "polymorphic-functions"))
                  (ql:quickload "polymorphic-functions")
                  (uiop:quit 0))'
-  - cl --eval '(progn
+
+    # Testing it on the second load confirms that functionalities do not
+    # solely eval-when compile-toplevel, and that they persist across multiple loads.
+    - name: Run Tests
+      run: cl --eval '(progn
                  (defun ql-dist::dist-name-pathname (name)
                    "Return the pathname that would be used for an installed dist with
                     the given NAME."
@@ -58,5 +83,3 @@ script:
                  (asdf:test-system :polymorphic-functions)
                  (uiop:quit 0))'
 
-notifications:
-  email: false
