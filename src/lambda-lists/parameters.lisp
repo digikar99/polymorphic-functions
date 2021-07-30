@@ -214,7 +214,8 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                                                      :value-effective-type type))
                      (setq untyped-lambda-list (cdr untyped-lambda-list))))
                   (&optional
-                   (destructuring-bind ((name type) &optional default) parameter-specifier
+                   (destructuring-bind ((name type) &optional default supplied-p-name)
+                       parameter-specifier
                      (setq parameter
                            (make-polymorph-parameter :local-name name
                                                      :form-in-pf (car untyped-lambda-list)
@@ -223,7 +224,8 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                                                      :value-effective-type
                                                      (if default
                                                          `(or null ,type)
-                                                         type)))
+                                                         type)
+                                                     :supplied-p-name supplied-p-name))
                      (setq untyped-lambda-list (cdr untyped-lambda-list))))
                   (&rest
                    (if (symbolp parameter-specifier)
@@ -235,7 +237,7 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                          (incf rest-idx))
                        (if (listp (car parameter-specifier))
                            ;; LIST for &KEY parameter-specifier
-                           (destructuring-bind ((name type) &optional default)
+                           (destructuring-bind ((name type) &optional default supplied-p-name)
                                parameter-specifier
                              (setq parameter
                                    (make-polymorph-parameter :local-name name
@@ -251,7 +253,8 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                                                              :value-effective-type
                                                              (if default
                                                                  `(or null ,type)
-                                                                 type))))
+                                                                 type)
+                                                             :supplied-p-name supplied-p-name)))
                            (destructuring-bind (name type) parameter-specifier
                              (setq parameter
                                    (make-polymorph-parameter :local-name name
@@ -263,7 +266,8 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                              (incf rest-idx))))
                    (setq untyped-lambda-list (cdr untyped-lambda-list)))
                   (&key
-                   (destructuring-bind ((name type) &optional default) parameter-specifier
+                   (destructuring-bind ((name type) &optional default supplied-p-name)
+                       parameter-specifier
                      (setq parameter
                            (make-polymorph-parameter :local-name name
                                                      :form-in-pf (car untyped-lambda-list)
@@ -272,7 +276,8 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                                                      :value-effective-type
                                                      (if default
                                                          `(or null ,type)
-                                                         type)))
+                                                         type)
+                                                     :supplied-p-name supplied-p-name))
                      (setq untyped-lambda-list (cdr untyped-lambda-list)))))
 
                 (setf (pp-type-parameters parameter)
