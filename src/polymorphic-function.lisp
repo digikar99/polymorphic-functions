@@ -463,20 +463,46 @@ If it exists, the second value is T and the first value is a possibly empty
                          (values polymorph t))))
            (values nil t)))))
 
-(defun polymorph-apropos-list-type (name type)
-  (let* ((apf        (and (fboundp name) (fdefinition name)))
-         (polymorphs (when (typep apf 'polymorphic-function)
-                       (polymorphic-function-polymorphs apf))))
-    (cond ((null (typep apf 'polymorphic-function))
-           (values nil nil))
+(defun polymorph-apropos-list-type (type &key (name nil namep)
+                                           (package nil packagep))
+  (assert (not (and namep packagep))
+          ()
+          "NAME and PACKAGE must not be supplied together!")
+  (flet ((apropos-pf (name)
+           (let* ((apf        (and (fboundp name) (fdefinition name)))
+                  (polymorphs (when (typep apf 'polymorphic-function)
+                                (polymorphic-function-polymorphs apf))))
+             (cond ((null (typep apf 'polymorphic-function))
+                    (values nil nil))
+                   (t
+                    ;; FIXME: Use a type-list equality check, not EQUALP
+                    (values
+                     (loop :for polymorph :in polymorphs
+                           :when (accepts-argument-of-type-p
+                                  (polymorph-parameters polymorph)
+                                  type)
+                             :collect polymorph)
+                     t))))))
+    (cond (namep
+           (apropos-pf name))
+          (packagep
+           (let ((names
+                   (let (l)
+                     (do-symbols (s package)
+                       (when (and (fboundp s)
+                                  (typep (fdefinition s) 'polymorphic-function))
+                         (push s l)))
+                     l)))
+             (mappend #'apropos-pf names)))
           (t
-           ;; FIXME: Use a type-list equality check, not EQUALP
-           (values
-            (loop :for polymorph :in polymorphs
-                  :when (accepts-argument-of-type-p (polymorph-parameters polymorph)
-                                                    type)
-                    :collect polymorph)
-            t)))))
+           (let ((names
+                   (let (l)
+                     (do-all-symbols (s)
+                       (when (and (fboundp s)
+                                  (typep (fdefinition s) 'polymorphic-function))
+                         (push s l)))
+                     l)))
+             (mappend #'apropos-pf names))))))
 
 (define-declaration type-like (vars env)
   ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
