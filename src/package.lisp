@@ -64,6 +64,7 @@
            #:inline-pf
            #:notinline-pf
            #:pf-defined-before-use
+           #:not-pf-defined-before-use
            #:*compiler-macro-expanding-p*
            #:polymorph-apropos-list-type
 

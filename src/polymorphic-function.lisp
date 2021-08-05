@@ -524,10 +524,12 @@ If it exists, the second value is T and the first value is a possibly empty
           (loop :for var :in vars
                 :collect `(,var inline-pf notinline-pf))))
 
-;;; TODO: Define a negative decl as well as a dynamic variable
 (define-declaration pf-defined-before-use (args)
   (declare (ignore args))
   (values :declare
-          ;; FIXME: Change the CDR to just T (and make appropriate changes)
-          ;; when a potential SBCL bug pertaining to this gets fixed
-          (cons 'pf-defined-before-use (list 'pf-defined-before-use t))))
+          (cons 'pf-defined-before-use t)))
+
+(define-declaration not-pf-defined-before-use (args)
+  (declare (ignore args))
+  (values :declare
+          (cons 'pf-defined-before-use nil)))
