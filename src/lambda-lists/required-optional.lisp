@@ -17,14 +17,16 @@
         (&optional (cond ((and *lambda-list-typed-p*   (listp elt)
                                (let ((elt (first elt)))
                                  (and (listp elt)
-                                      (valid-parameter-name-p (first  elt))))
+                                      (valid-parameter-name-p (first elt))))
                                (if (null (third elt))
                                    t
                                    (valid-parameter-name-p (third elt)))
                                (null (fourth elt)))
                           t)
                          ((and (not *lambda-list-typed-p*)
-                               (valid-parameter-name-p elt))
+                               (or (valid-parameter-name-p elt)
+                                   (and (listp elt)
+                                        (valid-parameter-name-p (first elt)))))
                           t)
                          (t
                           (return-from %lambda-list-type nil))))))

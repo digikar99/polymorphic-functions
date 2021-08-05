@@ -157,21 +157,37 @@ corresponding to the *form-type* and the parametric type."))
     ((type-car (eql 'array)) type-cdr parameter)
   (destructuring-bind (&optional (elt-type 'cl:*) (rank/dimensions 'cl:*)) type-cdr
     `(lambda (type)
-       (if (and (listp type)
-                (or (eq 'array (first type))
-                    (eq 'simple-array (first type)))
-                (not (eq 'cl:* (second type))))
-           ,(cond ((eq parameter elt-type)
-                   `(second type))
-                  ((symbolp rank/dimensions)
-                   `(third type))
-                  (t
-                   (block loop-block
-                     (loop :for s :in rank/dimensions
-                           :for i :from 0
-                           :do (cond ((eq parameter s)
-                                      (return-from loop-block
-                                        `(nth ,i (third type))))
-                                     (t
-                                      (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
-                                             parameter (cons type-car type-cdr))))))))))))
+       ,(cond ((eq parameter elt-type)
+               `(if (and (listp type)
+                         (or (eq 'array (first type))
+                             (eq 'simple-array (first type)))
+                         (not (eq 'cl:* (second type)))
+                         (nthcdr 1 type))
+                    (second type)
+                    nil))
+              (t
+               `(if (and (listp type)
+                         (or (eq 'array (first type))
+                             (eq 'simple-array (first type)))
+                         (not (eq 'cl:* (third type)))
+                         (nthcdr 2 type))
+                    ,(if (symbolp rank/dimensions)
+                         `(cond ((eq 'cl:* (third type))
+                                 nil)
+                                ((listp (third type))
+                                 (length (third type)))
+                                (t
+                                 (third type)))
+                         (block loop-block
+                           (loop :for s :in rank/dimensions
+                                 :for i :from 0
+                                 :do (cond ((eq parameter s)
+                                            (return-from loop-block
+                                              `(if (and (listp (third type))
+                                                        (eq 'cl:* (nth ,i (third type))))
+                                                   nil
+                                                   (nth ,i (third type)))))
+                                           (t
+                                            (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
+                                                   parameter (cons type-car type-cdr)))))))
+                    nil))))))

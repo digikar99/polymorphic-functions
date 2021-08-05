@@ -395,9 +395,9 @@ An example for this is the =(supertypep TYPE)= type at
 
 - In essence, =(supertypep TYPE)= is the set of all type-specifiers that
   are a supertype of =TYPE=.
-- Thus, =(typep array '(supertypep vector))= holds.
+- Thus, =(typep 'array '(supertypep vector))= holds.
 - In addition, if one were to =(deftype 1d-array () 'vector)= then
-  =(typep 1d-array () '(supertypep vector))= would also hold.
+  =(typep '1d-array '(supertypep vector))= would also hold.
 
 However, these types can only be used inside the type-lists of
 polymorphs or with the shadowed symbols in the

@@ -163,6 +163,14 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
 
 (defun make-polymorph-parameters-from-lambda-lists (polymorphic-function-lambda-list
                                                     polymorph-lambda-list)
+  (declare (optimize debug))
+  (assert (let ((lambda-list-type (lambda-list-type polymorphic-function-lambda-list :typed nil)))
+            (if (eq 'rest lambda-list-type)
+                t
+                (eq lambda-list-type
+                    (lambda-list-type polymorph-lambda-list :typed t))))
+          (polymorphic-function-lambda-list polymorph-lambda-list)
+          "Incompatible-lambda-lists")
   (let ((untyped-lambda-list polymorphic-function-lambda-list)
         (typed-lambda-list   polymorph-lambda-list)
         (untyped-state       :required)

@@ -41,8 +41,9 @@
                ((and (car intersection) (null (cdr intersection)) ; length is 1
                      (member '&optional intersection))
                 'required-optional)
-               ((and (car intersection) (null (cdr intersection)) ; length is 1
-                     (member '&key intersection))
+               ((and (car intersection) (null (cddr intersection)) ; length is at most 2
+                     (or (set-equal intersection '(&key))
+                         (set-equal intersection '(&key &rest))))
                 'required-key)
                ((member '&rest intersection) ; don't check the lengths
                 'rest)
@@ -77,20 +78,20 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
              (*lambda-list-typed-p* typed))
          (if (%lambda-list-type *potential-type* lambda-list)
              (progn ,@action-form)
-             (error "LAMBDA-LIST ~A is neither of ~%  ~A" lambda-list +lambda-list-types+))))
+             (error "LAMBDA-LIST ~S is neither of ~%  ~S" lambda-list +lambda-list-types+))))
      (defgeneric ,inner-name (potential-lambda-list-type lambda-list)
        (:documentation ,inner-documentation))
      ;; For better error reporting
      (defmethod ,inner-name ((type t) (lambda-list t))
        (assert (typep type 'lambda-list-type)
                ()
-               "Expected POTENTIAL-LAMBDA-LIST-TYPE to be one of ~%  ~A~%but is ~A"
+               "Expected POTENTIAL-LAMBDA-LIST-TYPE to be one of ~%  ~S~%but is ~S"
                +lambda-list-types+ type)
        (assert (typep lambda-list 'list)
                ()
-               "Expected LAMBDA-LIST to be a LIST but is ~A"
+               "Expected LAMBDA-LIST to be a LIST but is ~S"
                lambda-list)
-       (error "No potential type found for LAMBDA-LIST ~A from amongst ~%  ~A"
+       (error "No potential type found for LAMBDA-LIST ~S from amongst ~%  ~S"
               lambda-list +lambda-list-types+))))
 
 ;; LAMBDA-LIST-TYPE ============================================================
