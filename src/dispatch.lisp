@@ -158,9 +158,9 @@ Proceed at your own risk."
                                                   (polymorph-static-dispatch-name p-old))))
                                          (if old-name
                                              old-name
-                                             (gentemp (write-to-string
+                                             (intern (write-to-string
                                                        `(polymorph ,name ,type-list))
-                                                      '#:polymorphic-functions.nonuser))))
+                                                     '#:polymorphic-functions.nonuser))))
                  (lambda-body `(list-named-lambda (polymorph ,name ,type-list)
                                    ,(symbol-package block-name)
                                    ,param-list
