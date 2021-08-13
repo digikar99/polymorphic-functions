@@ -83,7 +83,8 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
 (defun null-env-compilation-warnings (lambda-form)
   (let* ((warnings))
     (with-output-to-string (*error-output*)
-      (let (#+sbcl (sb-c::*in-compilation-unit* nil))
+      (let (#+sbcl (sb-c::*in-compilation-unit* nil)
+            (*compile-verbose* nil))
         (#+sbcl progn
          #-sbcl with-compilation-unit #-sbcl (:override t)
          ;; TODO: Improve error reporting on other systems
@@ -160,23 +161,9 @@ Proceed at your own risk."
                                              (gentemp (write-to-string
                                                        `(polymorph ,name ,type-list))
                                                       '#:polymorphic-functions.nonuser))))
-                 (lambda-body #+sbcl
-                              `(sb-int:named-lambda (polymorph ,name ,type-list) ,param-list
-                                 ,(lambda-declarations parameters)
-                                 ,declarations
-                                 (block ,block-name
-                                   ,@(butlast body)
-                                   ,(ensure-type-form return-type (lastcar body))))
-                              #+ccl
-                              `(ccl:nfunction (polymorph ,name ,type-list)
-                                              (lambda ,param-list
-                                                ,(lambda-declarations parameters)
-                                                ,declarations
-                                                (block ,block-name
-                                                  ,@(butlast body)
-                                                  ,(ensure-type-form return-type (lastcar body)))))
-                              #-(or ccl sbcl)
-                              `(lambda ,param-list
+                 (lambda-body `(list-named-lambda (polymorph ,name ,type-list)
+                                   ,(symbol-package block-name)
+                                   ,param-list
                                  ,(lambda-declarations parameters)
                                  ,declarations
                                  (block ,block-name
@@ -186,9 +173,7 @@ Proceed at your own risk."
                  ;; below for DEFTRANSFORM
                  ;; FIXME: Do away with this use even
                  (inline-lambda-body (when inline
-                                       #-(or ccl sbcl) lambda-body
-                                       #+ccl (nth 2 lambda-body)
-                                       #+sbcl `(lambda ,@(nthcdr 2 lambda-body))))
+                                       `(lambda ,@(nthcdr 3 lambda-body))))
                  #+sbcl
                  (sbcl-transform-body (make-sbcl-transform-body name
                                                                 typed-lambda-list

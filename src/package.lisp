@@ -83,6 +83,20 @@
 (defmacro is-error (form)
   `(5am:signals error ,form))
 
+(defmacro list-named-lambda (name package lambda-list &body body)
+  (declare (type list name))
+  #+sbcl
+  `(sb-int:named-lambda ,name ,lambda-list
+     ,@body)
+  #+ccl
+  `(ccl:nfunction ,name
+                  (lambda ,lambda-list
+                    ,@body))
+  #-(or sbcl ccl)
+  (let ((function-name (intern (write-to-string name) package)))
+    `(flet ((,function-name ,lambda-list ,@body))
+       #',function-name)))
+
 (define-symbol-macro optim-safety (= 3 (policy-quality 'safety env)))
 
 (define-symbol-macro optim-debug (or (= 3 (policy-quality 'debug env))

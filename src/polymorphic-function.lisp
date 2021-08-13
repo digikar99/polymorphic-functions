@@ -205,12 +205,12 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                           (compute-polymorphic-function-lambda-body lambda-list-type
                                                                     effective-lambda-list))))
     (closer-mop:set-funcallable-instance-function
-     apf #+sbcl (compile nil `(sb-int:named-lambda (polymorphic-function ,*name*)
-                                ,effective-lambda-list ,@lambda-body))
-         ;; FIXME: https://github.com/Clozure/ccl/issues/361
-     #+ccl (eval `(ccl:nfunction (polymorphic-function ,*name*)
-                                 (lambda ,effective-lambda-list ,@lambda-body)))
-     #-(or ccl sbcl) (compile nil `(lambda ,effective-lambda-list ,@lambda-body)))
+     ;; A potentially relevant issue: https://github.com/Clozure/ccl/issues/361
+     ;; FIXME: Should we COMPILE this?
+     apf (eval `(list-named-lambda (polymorphic-function ,*name*)
+                    ,(symbol-package (if (atom *name*) *name* (second *name*)))
+                    ,effective-lambda-list
+                  ,@lambda-body)))
     (setf (polymorphic-function-invalidated-p apf) invalidate)
     apf))
 
@@ -291,9 +291,6 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      :return-type      return-type
                                      :lambda-list-type lambda-list-type
                                      :effective-type-list effective-type-list
-                                     ;; FIXME: COMPILE should be resulting in a heavy load time
-                                     ;; Avoid its use, since it's no longer of optimal use
-                                     ;; Perhaps, as before, resort to TYPE-LIST-APPLICABLE-P
                                      :compiler-applicable-p-lambda
                                      compiler-applicable-p-lambda
                                      :runtime-applicable-p-form
