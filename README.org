@@ -185,13 +185,12 @@ See [[file:src/misc-tests.lisp]] for some more examples.
     :CUSTOM_ID: libraries-projects-currently-using-polymorphic-functions
     :END:
 
-- [[https://github.com/digikar99/abstract-arrays][abstract-arrays]] and
-  [[https://github.com/digikar99/dense-numericals/][dense-arrays]]
-- [[https://github.com/digikar99/dense-numericals/][dense-numericals]]:
+- [[https://github.com/digikar99/abstract-arrays][abstract-arrays]] and [[https://github.com/digikar99/dense-numericals/][dense-arrays]]
+- [[https://github.com/digikar99/numericals/][numericals]]:
   this makes extensive use of subtype polymorphism to avoid code
   repetition in the /packaged/ provided code, cutting down on initial
   compile times.
-- lisp-polymorph with currently working
+- [[https://github.com/lisp-polymorph/][lisp-polymorph]] with currently working
 
   - [[https://github.com/lisp-polymorph/polymorph.maths][polymorph.maths]]
   - [[https://github.com/lisp-polymorph/polymorph.access][polymorph.access]]
@@ -283,7 +282,7 @@ In addition to subtype-polymorphism described above (under
 parametric-polymorphism. The interface for this is through the following
 symbols:
 
-- *parametric-type-symbol-predicates*
+- \*parametric-type-symbol-predicates\*
 - parametric-type-run-time-lambda-body
 - parametric-type-compile-time-lambda-body
 

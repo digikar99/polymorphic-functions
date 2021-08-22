@@ -90,30 +90,32 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
              :effective-type-lists
              (polymorphic-function-effective-type-lists (fdefinition name)))))
 
+(define-condition defpolymorph-note (compiler-macro-notes:note)
+  ((datum :initarg :datum :reader condition-datum))
+  (:report (lambda (c s) (write-string (condition-datum c) s))))
+
 (defun note-null-env (form datum &rest arguments)
   (let ((*print-pretty* t))
-    (pprint-logical-block (*error-output* nil :per-line-prefix "; " :suffix (string #\newline))
-      (format *error-output* "~%Inlining~%")
-      (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-        (format *error-output* "~S" form))
-      (format *error-output* "~&in null environment is not without warnings:~%")
-      (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-        (format *error-output* "~A"
-                (handler-case (apply #'signal datum arguments)
-                  (condition (c) c)))))))
+    (format *error-output* "~%Inlining~%")
+    (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+      (format *error-output* "~S" form))
+    (format *error-output* "~&in null environment is not without warnings:~%")
+    (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+      (format *error-output* "~A"
+              (handler-case (apply #'signal datum arguments)
+                (condition (c) c))))))
 
 (defun note-no-inline (form datum &rest arguments)
   (let ((*print-pretty* t))
-    (pprint-logical-block (*error-output* nil :per-line-prefix "; " :suffix (string #\newline))
-      (format *error-output* "Will not inline~%~A~%because ~A"
-              (with-output-to-string (*error-output*)
-                (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
-                  (format *error-output* "~S" form)))
-              (if (string= "" datum)
-                  ""
-                  (format nil "~&~A"
-                          (handler-case (apply #'signal datum arguments)
-                            (condition (c) c))))))))
+    (format *error-output* "Will not inline~%~A~%because ~A"
+            (with-output-to-string (*error-output*)
+              (pprint-logical-block (*error-output* nil :per-line-prefix "  ")
+                (format *error-output* "~S" form)))
+            (if (string= "" datum)
+                ""
+                (format nil "~&~A"
+                        (handler-case (apply #'signal datum arguments)
+                          (condition (c) c)))))))
 
 (define-condition form-type-failure (compiler-macro-notes:optimization-failure-note)
   ((form :initarg :form

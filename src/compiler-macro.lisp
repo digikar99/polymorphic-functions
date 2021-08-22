@@ -129,26 +129,31 @@
                     (optim-speed
                      (let ((inline-pf
                              (assoc 'inline-pf
-                                    (nth-value 2 (function-information name env)))))
+                                    (nth-value 2 (function-information name env))))
+                           (inline-dispatch-form
+                             `(the ,return-type (,inline-lambda-body ,@arg-list)))
+                           (non-inline-dispatch-form
+                             `(the ,return-type (,static-dispatch-name
+                                                 ,@arg-list))))
                        (ecase inline-p
                          ((t)
                           (assert inline-lambda-body)
                           (if (eq 'notinline-pf (cdr inline-pf))
-                              `(the ,return-type (,static-dispatch-name ,@arg-list))
-                              `(the ,return-type (,inline-lambda-body ,@arg-list))))
+                              non-inline-dispatch-form
+                              inline-dispatch-form))
                          ((nil)
                           (when (eq 'inline-pf (cdr inline-pf))
                             (signal 'polymorph-has-no-inline-lambda-body
                                     :name name :type-list type-list))
-                          `(the ,return-type (,static-dispatch-name ,@arg-list)))
+                          non-inline-dispatch-form)
                          ((:maybe)
                           (cond ((null inline-pf)
-                                 `(the ,return-type (,static-dispatch-name ,@arg-list)))
+                                 non-inline-dispatch-form)
                                 ((eq 'inline-pf (cdr inline-pf))
                                  (assert inline-lambda-body)
-                                 `(the ,return-type (,inline-lambda-body ,@arg-list)))
+                                 inline-dispatch-form)
                                 ((eq 'notinline-pf (cdr inline-pf))
-                                 `(the ,return-type (,static-dispatch-name ,@arg-list)))
+                                 non-inline-dispatch-form)
                                 (t
                                  (error "Unexpected case in pf-compiler-macro!")))))))
                     (t form)))))))))

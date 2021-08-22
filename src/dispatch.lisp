@@ -80,19 +80,24 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
                      existing-effective-type-list)
               (return))))
 
+(defmacro with-muffled-compilation-warnings (&body body)
+  `(locally (declare #+sbcl (sb-ext:muffle-conditions warning))
+     (let ((*error-output* (make-string-output-stream)))
+       (let (#+sbcl (sb-c::*in-compilation-unit* nil)
+             (*compile-verbose* nil))
+         (#+sbcl progn
+          #-sbcl with-compilation-unit #-sbcl (:override t)
+          ;; TODO: Improve error reporting on other systems
+          ;; This works on SBCL and CCL
+          ,@body)))))
+
 (defun null-env-compilation-warnings (lambda-form)
   (let* ((warnings))
-    (with-output-to-string (*error-output*)
-      (let (#+sbcl (sb-c::*in-compilation-unit* nil)
-            (*compile-verbose* nil))
-        (#+sbcl progn
-         #-sbcl with-compilation-unit #-sbcl (:override t)
-         ;; TODO: Improve error reporting on other systems
-         ;; This works on SBCL and CCL
-         (handler-bind ((warning (lambda (c)
-                                   (push c warnings)
-                                   (muffle-warning c))))
-           (compile nil lambda-form)))))
+    (with-muffled-compilation-warnings
+      (handler-bind ((warning (lambda (c)
+                                (push c warnings)
+                                (muffle-warning c))))
+        (compile nil lambda-form)))
     (if warnings
         (format nil "~{~A~^~%~}" (nreverse warnings))
         nil)))
@@ -149,6 +154,22 @@ Proceed at your own risk."
       (multiple-value-bind (param-list type-list effective-type-list)
           (polymorph-effective-lambda-list parameters)
         (multiple-value-bind (declarations body) (extract-declarations body)
+          ;; USE OF INTERN BELOW:
+          ;;   We do want STATIC-DISPATCH-NAME symbol collision to actually take place
+          ;; when type lists of two polymorphs are "equivalent".
+          ;;   (Credits to phoe for pointing out in the issue at
+          ;;   https://github.com/digikar99/polymorphic-functions/issues/3)
+          ;;   Consider a file A to be
+          ;; compiled before restarting a lisp image, and file B after the
+          ;; restart. The use of GENTEMP meant that two "separate" compilations of
+          ;; the same polymorph in the two files, could result in different
+          ;; STATIC-DISPATCH-NAMEs. If the two files were then loaded
+          ;; simultaneously, and the polymorphs static-dispatched at some point,
+          ;; then there remained the possibility that different static-dispatches
+          ;; could be using "different versions" of the polymorph.
+          ;;   Thus, we actually do want collisions to take place so that a same
+          ;; deterministic/latest version of the polymorph is called; therefore we
+          ;; use INTERN.
           (let* ((static-dispatch-name (let* ((p-old (and (fboundp name)
                                                           (typep (fdefinition name)
                                                                  'polymorphic-function)
@@ -159,7 +180,7 @@ Proceed at your own risk."
                                          (if old-name
                                              old-name
                                              (intern (write-to-string
-                                                       `(polymorph ,name ,type-list))
+                                                      `(polymorph ,name ,type-list))
                                                      '#:polymorphic-functions.nonuser))))
                  (lambda-body `(list-named-lambda (polymorph ,name ,type-list)
                                    ,(symbol-package block-name)
@@ -200,10 +221,12 @@ Proceed at your own risk."
                                 (null-env-compilation-warnings inline-lambda-body))
                          (values nil
                                  (with-output-to-string (*error-output*)
-                                   (note-no-inline form "")
-                                   (note-null-env inline-lambda-body
-                                                  null-env-compilation-warnings)
-                                   (format *error-output* "~&; PROCEED AT YOUR OWN RISK!~%~%")))
+                                   (note-no-inline form "~%")
+                                   (pprint-logical-block (*error-output* nil
+                                                                         :per-line-prefix "  ")
+                                     (note-null-env inline-lambda-body
+                                                    null-env-compilation-warnings))
+                                   (format *error-output* "~&PROCEED AT YOUR OWN RISK!~%~%")))
                          (values inline-lambda-body
                                  nil))))
               (setq inline (case inline
@@ -230,12 +253,18 @@ Proceed at your own risk."
                  ;;    `(when (or (= 3 (introspect-environment:policy-quality 'debug))
                  ;;               (= 3 (introspect-environment:policy-quality 'safety)))
                  ;;       (write-string ,inline-note *error-output*)))
-                 ,(when inline-note `(write-string ,inline-note *error-output*))
+                 ,(when inline-note
+                    `(compiler-macro-notes:with-notes (',form nil :unwind-on-signal nil)
+                       (signal 'defpolymorph-note :datum ,inline-note)
+                       t))
                  (eval-when (:compile-toplevel :load-toplevel :execute)
                    ;; We are not "fixing inlining" using DEFUN made functions
                    ;; because we need to take parametric polymorphism into account
                    ;; while inlining.
-                   (setf (fdefinition ',static-dispatch-name) ,lambda-body)
+                   ,(if inline-note
+                        `(with-muffled-compilation-warnings
+                           (setf (fdefinition ',static-dispatch-name) ,lambda-body))
+                        `(setf (fdefinition ',static-dispatch-name) ,lambda-body))
                    (register-polymorph ',name ',inline
                                        ',typed-lambda-list
                                        ',type-list
