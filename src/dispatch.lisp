@@ -73,12 +73,13 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
         :do (when (and (type-list-causes-ambiguous-call-p effective-type-list
                                                           existing-effective-type-list)
                        (not (equalp type-list existing-type-list)))
-              (error "The given TYPE-LIST ~%  ~S~%effectively~%  ~S~%will cause ambiguous call with an existing polymorph with type list ~%  ~S~%and effective type list~%  ~S~%"
+              (cerror "Undefine existing polymorph"
+                      "The given TYPE-LIST ~%  ~S~%effectively~%  ~S~%will cause ambiguous call with an existing polymorph with type list ~%  ~S~%and effective type list~%  ~S~%"
                      type-list
                      effective-type-list
                      existing-type-list
                      existing-effective-type-list)
-              (return))))
+              (undefpolymorph name existing-type-list))))
 
 (defmacro with-muffled-compilation-warnings (&body body)
   `(locally (declare #+sbcl (sb-ext:muffle-conditions warning))
@@ -299,6 +300,9 @@ Proceed at your own risk."
 
 (defun undefpolymorph (name type-list)
   "Remove the POLYMORPH associated with NAME with TYPE-LIST"
+  ;; FIXME: Undefining polymorphs can also lead to polymorph call ambiguity.
+  ;; One (expensive) solution is to insert afresh the type lists of all polymorphs
+  ;; to resolve it.
   #+sbcl
   (unless (extended-type-list-p type-list)
     (let ((info  (sb-c::fun-info-or-lose name))
