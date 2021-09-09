@@ -161,6 +161,8 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
   compile-time-deparameterizer-lambda
   compile-time-deparameterizer-lambda-body)
 
+(declaim (ftype (function (list list) polymorph-parameters)
+                make-polymorph-parameters-from-lambda-lists))
 (defun make-polymorph-parameters-from-lambda-lists (polymorphic-function-lambda-list
                                                     polymorph-lambda-list)
   (declare (optimize debug))
