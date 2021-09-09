@@ -594,7 +594,10 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                  (let ((arg-type (car arg-types)))
                    (setq arg-types (cdr arg-types))
                    (populate-deparameterizer-alist pp arg-type)
-                   `(type ,(or arg-type (pp-value-type pp))
+                   `(type ,(or arg-type (let ((type (pp-value-type pp)))
+                                          (if (type-specifier-p type)
+                                              type
+                                              (upgrade-extended-type type))))
                           ,(pp-local-name pp))))
                :keyword
                (lambda (pp)
@@ -619,7 +622,10 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                  (let ((arg-type (getf arg-types
                                        (intern (symbol-name (pp-local-name pp)) :keyword))))
                    (populate-deparameterizer-alist pp arg-type)
-                   `(type ,(or arg-type (pp-value-type pp))
+                   `(type ,(or arg-type (let ((type (pp-value-type pp)))
+                                          (if (type-specifier-p type)
+                                              type
+                                              (upgrade-extended-type type))))
                           ,(pp-local-name pp))))
                :rest
                (lambda (pp)
