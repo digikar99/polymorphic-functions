@@ -84,13 +84,13 @@
              (defpolymorph foobar ((str string) &key ((key number) 5) ((b string) "world")) t
                (declare (ignore str))
                (list 'string key b))
+             (defpolymorph foobar ((num number) &key ((key number) 6) ((b string) "world")) t
+               (declare (ignore num))
+               (list 'number key b))
              (defpolymorph-compiler-macro foobar (number &key (:key number) (:b string))
                  (&whole form &rest args)
                (declare (ignore args))
                `(list ,form))
-             (defpolymorph foobar ((num number) &key ((key number) 6) ((b string) "world")) t
-               (declare (ignore num))
-               (list 'number key b))
              (define-compiled-function foobar-caller ()
                (declare (optimize speed (debug 1)))
                (foobar 7 :key 10)))))

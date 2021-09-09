@@ -65,6 +65,13 @@
 
 (deftype type-list () `(satisfies type-list-p))
 
+(defun type-list-order-keywords (type-list)
+  (let ((key-position (position '&key type-list)))
+    (if key-position
+        (append (subseq type-list 0 (1+ key-position))
+                (sort (copy-list (subseq type-list (1+ key-position))) #'string< :key #'first))
+        type-list)))
+
 (defstruct polymorph
   "
 - If RUNTIME-APPLICABLE-P-FORM returns true when evaluated inside the lexical environment
@@ -377,21 +384,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (let* ((apf              (fdefinition name))
          (lambda-list      (polymorphic-function-effective-lambda-list apf))
          (lambda-list-type (polymorphic-function-lambda-list-type apf))
-         (polymorph-lambda-list-type
-           (eswitch ((intersection type-list lambda-list-keywords) :test #'equal)
-             ('(&rest)     'rest)
-             ('(&key)      'required-key)
-             ('(&optional) 'required-optional)
-             ('()          'required)))
-         (type-list   (let ((key-position (position '&key type-list)))
-                        (if key-position
-                            (append (subseq type-list 0 key-position)
-                                    '(&key)
-                                    (sort (subseq type-list (1+ key-position))
-                                          #'string< :key #'first))
-                            ;; This sorting allows things to work even though
-                            ;; we use EQUALP instead of TYPE-LIST-=
-                            type-list))))
+         (type-list   (type-list-order-keywords type-list)))
     (if (eq lambda-list-type 'rest)
         ;; required-optional can simply be split up into multiple required or required-key
         (assert (not (member '&optional type-list))
@@ -404,17 +397,10 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                 type-list lambda-list name))
     ;; FIXME: How should we account for EFFECTIVE-TYPE-LIST here?
     (ensure-unambiguous-call name type-list type-list)
-    (with-slots (polymorphs) apf
-      (if-let (polymorph (find type-list polymorphs :test #'equalp
-                                                    :key #'polymorph-type-list))
-        (setf (polymorph-compiler-macro-lambda polymorph) lambda)
-        ;; Need below instead of error-ing to define the compiler macro simultaneously
-        (add-or-update-polymorph
-         apf
-         (make-polymorph :name name
-                         :type-list type-list
-                         :lambda-list-type polymorph-lambda-list-type
-                         :compiler-macro-lambda lambda))))))
+    (let ((polymorph (find type-list (polymorphic-function-polymorphs apf)
+                           :test #'equalp
+                           :key #'polymorph-type-list)))
+      (setf (polymorph-compiler-macro-lambda polymorph) lambda))))
 
 (defun retrieve-polymorph-compiler-macro (name &rest arg-list)
   (declare (type function-name name))
@@ -451,11 +437,11 @@ If it exists, the second value is T and the first value is a possibly empty
   (declare (type function-name name))
   (let* ((apf        (and (fboundp name) (fdefinition name)))
          (polymorphs (when (typep apf 'polymorphic-function)
-                       (polymorphic-function-polymorphs apf))))
+                       (polymorphic-function-polymorphs apf)))
+         (type-list  (type-list-order-keywords type-list)))
     (cond ((null (typep apf 'polymorphic-function))
            (values nil nil))
           (t
-           ;; FIXME: Use a type-list equality check, not EQUALP
            (loop :for polymorph :in polymorphs
                  :do (when (equalp type-list
                                    (polymorph-type-list polymorph))
