@@ -10,7 +10,6 @@
                "fiveam" ;; just keep things together!
                "cl-form-types"
                "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
-               "trivial-macroexpand-all"
                "introspect-environment")
   :pathname #P"src/"
   :components ((:file "pre-package")
@@ -48,7 +47,8 @@
                (:file "misc-tests"                 :depends-on ("dispatch"))
                (:file "benchmark"                  :depends-on ("misc-tests")))
   :perform (test-op (o c)
-                    (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
-                                                   (5AM:*ON-ERROR* :DEBUG)
-                                                   (CL:*COMPILE-VERBOSE* NIL))
-                                               (FIVEAM:RUN! :POLYMORPHIC-FUNCTIONS))"))))
+             (with-standard-io-syntax
+               (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
+                                              (5AM:*ON-ERROR* :DEBUG)
+                                              (CL:*COMPILE-VERBOSE* NIL))
+                                          (FIVEAM:RUN! :POLYMORPHIC-FUNCTIONS))")))))

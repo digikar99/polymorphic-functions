@@ -111,3 +111,10 @@
 
 (defun policy-quality (quality &optional env)
   (second (assoc quality (declaration-information 'optimize env))))
+
+(defun macroexpand-all (form &optional env)
+  (cl-form-types.walker:walk-form (lambda (form env)
+                                    (declare (ignore env))
+                                    form)
+                                  form
+                                  env))

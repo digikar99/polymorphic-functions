@@ -95,32 +95,38 @@
           (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph)))
             (when inline-lambda-body
               (setq inline-lambda-body
-                    ;; Yes we are expanding it in null env
+                    ;; Yes, we are expanding it in null env
                     ;; because the POLYMORPH was originally expected to be defined in
                     ;; null env
-                    (trivial-macroexpand-all:macroexpand-all
-                     ;; The source of compile-time subtype-polymorphism
-                     (destructuring-bind (lambda args declarations
-                                           more-decl (block block-name &body body))
-                         inline-lambda-body
-                       (declare (ignore block declarations))
-                       `(,lambda ,args
-                          ;; The source of compile-time subtype-polymorphism
-                          ,@(multiple-value-bind (enhanced-decl deparameterized-return-type)
-                                (enhanced-lambda-declarations parameters
-                                                              arg-types
-                                                              return-type)
-                              (if (equalp return-type deparameterized-return-type)
-                                  `(,enhanced-decl
-                                    ,more-decl
-                                    (block ,block-name ,@body))
-                                  (progn
-                                    (setq return-type deparameterized-return-type)
-                                    `(,enhanced-decl
-                                      ,more-decl
-                                      (block ,block-name
-                                        ,@(butlast body)
-                                        ,(car (cdaadr (lastcar body)))))))))))))
+                    (let ((macroexpanded-form
+                            (macroexpand-all
+                             ;; The source of compile-time subtype-polymorphism
+                             (destructuring-bind (lambda args declarations
+                                                   more-decl (block block-name &body body))
+                                 inline-lambda-body
+                               (declare (ignore block declarations))
+                               `(,lambda ,args
+                                  ;; The source of compile-time subtype-polymorphism
+                                  ,@(multiple-value-bind (enhanced-decl deparameterized-return-type)
+                                        (enhanced-lambda-declarations parameters
+                                                                      arg-types
+                                                                      return-type)
+                                      (if (equalp return-type deparameterized-return-type)
+                                          `(,enhanced-decl
+                                            ,more-decl
+                                            (block ,block-name ,@body))
+                                          (progn
+                                            (setq return-type deparameterized-return-type)
+                                            `(,enhanced-decl
+                                              ,more-decl
+                                              (block ,block-name
+                                                ,@(butlast body)
+                                                ,(car (cdaadr (lastcar body)))))))))))))
+                      ;; Some macroexpand-all can produce a (function (lambda ...)) from (lambda ...)
+                      ;; Some others do not
+                      (if (eq 'function (first macroexpanded-form))
+                          (second macroexpanded-form)
+                          macroexpanded-form))))
             (return-from pf-compiler-macro
               (cond (compiler-macro-lambda
                      (funcall compiler-macro-lambda
