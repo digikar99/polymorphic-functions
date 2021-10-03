@@ -80,7 +80,7 @@
                                    (polymorph-compiler-macro-lambda
                                     (find-polymorph ',name ',type-list)))
                                   (,env (sb-c::node-lexenv ,node)))
-                           (translate-body (trivial-macroexpand-all:macroexpand-all
+                           (translate-body (macroexpand-all
                                             (funcall ,compiler-macro-lambda
                                                      (cons ,inline-lambda-body-sym ,lvars)
                                                      ,env))
@@ -92,7 +92,7 @@
                                (polymorph-compiler-macro-lambda
                                 (find-polymorph ',name ',type-list)))
                               (,env (sb-c::node-lexenv ,node)))
-                       (translate-body (trivial-macroexpand-all:macroexpand-all
+                       (translate-body (macroexpand-all
                                         (funcall ,compiler-macro-lambda
                                                  (cons ,inline-lambda-body-sym
                                                        ,lvars)
