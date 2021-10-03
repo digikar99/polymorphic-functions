@@ -508,11 +508,8 @@
                                   "hello"))))
 
     (undefine-polymorphic-function 'inner)
-    (unintern 'inner)
     (undefine-polymorphic-function 'outer)
-    (unintern 'outer)
-    (fmakunbound 'outer-caller)
-    (unintern 'outer-caller)))
+    (fmakunbound 'outer-caller)))
 
 
 
