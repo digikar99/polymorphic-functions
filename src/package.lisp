@@ -37,9 +37,6 @@
   (:import-from :polymorphic-functions.extended-types
                 #:*extended-type-specifiers*
                 #:upgraded-extended-type)
-  (:import-from :trivial-types
-                #:function-name
-                #:type-specifier)
   (:import-from :introspect-environment
                 #:compiler-macroexpand
                 #:constant-form-value
@@ -118,3 +115,27 @@
                                     form)
                                   form
                                   env))
+
+(defun type-specifier-p (type-specifier)
+  "Returns true if TYPE-SPECIFIER is a valid type specfiier."
+  (or (when (symbolp type-specifier)
+        (documentation type-specifier 'type))
+      (block nil
+        #+sbcl (return (sb-ext:valid-type-specifier-p type-specifier))
+        #+openmcl (return (ccl:type-specifier-p type-specifier))
+        #+ecl (return (c::valid-type-specifier type-specifier))
+        #+clisp (return (null
+                         (nth-value 1 (ignore-errors
+                                       (ext:type-expand type-specifier)))))
+        (error "TYPE-SPECIFIER-P not available for this implementation"))))
+
+(defun setf-function-name-p (object)
+  (and (listp object)
+       (null (cddr object))
+       (eq 'setf (car object))
+       (symbolp (cadr object))))
+
+(deftype function-name ()
+  ;; Doesn't work great with subtypep
+  "Ref: http://www.lispworks.com/documentation/HyperSpec/Body/26_glo_f.htm#function_name"
+  `(or symbol (satisfies setf-function-name-p)))

@@ -9,7 +9,6 @@
                "ctype"
                "fiveam" ;; just keep things together!
                "cl-form-types"
-               "trivial-types" ; some updates at https://github.com/digikar99/trivial-types
                "introspect-environment")
   :pathname #P"src/"
   :components ((:file "pre-package")
