@@ -46,8 +46,8 @@
                (:file "misc-tests"                 :depends-on ("dispatch"))
                (:file "benchmark"                  :depends-on ("misc-tests")))
   :perform (test-op (o c)
-             (with-standard-io-syntax
-               (eval (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
+             (eval (with-standard-io-syntax
+                     (read-from-string "(LET ((5AM:*ON-FAILURE* :DEBUG)
                                               (5AM:*ON-ERROR* :DEBUG)
                                               (CL:*COMPILE-VERBOSE* NIL))
                                           (FIVEAM:RUN! :POLYMORPHIC-FUNCTIONS))")))))
