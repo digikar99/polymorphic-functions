@@ -237,17 +237,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
     ;; FIXME: Use a type-list equality check, not EQUALP
     ;; FIXME: A trivial fix for &key args is to sort them lexically
     (cond ((and p-old (numberp p-pos))
-           (flet ((merge-slot (slot-name)
-                    (setf (slot-value p-new slot-name)
-                          (or (slot-value p-new slot-name)
-                              (slot-value p-old slot-name)))))
-             (merge-slot 'inline-p)
-             (merge-slot 'return-type)
-             (merge-slot 'effective-type-list)
-             (merge-slot 'compiler-applicable-p-lambda)
-             (merge-slot 'runtime-applicable-p-form)
-             (merge-slot 'inline-lambda-body)
-             (merge-slot 'compiler-macro-lambda))
+           (setf (slot-value p-new 'compiler-macro-lambda)
+                 (or (slot-value p-new 'compiler-macro-lambda)
+                     (slot-value p-old 'compiler-macro-lambda)))
+           ;; We replace p-old with p-new in the list POLYMORPHS
+           ;; In doing so, the only thing we might need to preserve is the COMPILER-MACRO-LAMBDA
            (setf (nth p-pos polymorphs) p-new)
            (setf (polymorphic-function-polymorphs apf) polymorphs) ; do we need this?
            t)
@@ -378,6 +372,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (declare (type function-name name)
            (type type-list type-list)
            (type function lambda))
+  ;; TODO: Comment why this became impossible
   (assert (find-polymorph name type-list)
           ()
           "Illegal to have a POLYMORPH-COMPILER-MACRO without a corresponding POLYMORPH")
