@@ -225,6 +225,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
   (update-polymorphic-function-lambda polymorphic-function t))
 
 (defun add-or-update-polymorph (polymorphic-function polymorph)
+  "Returns T if the POLYMOMRPH with identical effective-type-list existed, otherwise returns NIL."
   (declare (type polymorphic-function polymorphic-function)
            (type polymorph polymorph))
   (let* ((apf   polymorphic-function)
@@ -244,7 +245,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            ;; In doing so, the only thing we might need to preserve is the COMPILER-MACRO-LAMBDA
            (setf (nth p-pos polymorphs) p-new)
            (setf (polymorphic-function-polymorphs apf) polymorphs) ; do we need this?
-           t)
+           (equalp (slot-value p-new 'effective-type-list)
+                   (slot-value p-old 'effective-type-list)))
           (t
            (labels ((add-polymorph (polymorph polymorphs)
                       (cond ((null polymorphs)
@@ -302,8 +304,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      :parameters
                                      (make-polymorph-parameters-from-lambda-lists
                                       untyped-lambda-list typed-lambda-list))))
-      (add-or-update-polymorph apf polymorph)
-      (invalidate-polymorphic-function-lambda apf)
+      (unless (add-or-update-polymorph apf polymorph)
+        (invalidate-polymorphic-function-lambda apf))
       polymorph)))
 
 (defvar *compiler-macro-expanding-p* nil
