@@ -45,7 +45,8 @@
                 #:function-information
                 #:variable-information
                 #:declaration-information
-                #:define-declaration)
+                #:define-declaration
+                #:augment-environment)
   (:export #:define-polymorphic-function
            #:undefine-polymorphic-function
            #:defpolymorph

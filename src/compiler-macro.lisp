@@ -95,12 +95,19 @@
           (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph)))
             (when inline-lambda-body
               (setq inline-lambda-body
-                    ;; Yes, we are expanding it in null env
+                    ;; The only thing we want to preserve from the ENV are the OPTIMIZE
+                    ;; declarations.
+                    ;; Otherwise, the other information must be excluded
                     ;; because the POLYMORPH was originally expected to be defined in
                     ;; null env
-                    (let ((macroexpanded-form
-                            (macroexpand-all
-                             ;; The source of compile-time subtype-polymorphism
+                    (let* ((augmented-env (augment-environment
+                                           env
+                                           :declare (list
+                                                     (cons 'optimize
+                                                           (declaration-information 'optimize env)))))
+                           (notes nil)
+                           ;; The source of compile-time subtype-polymorphism
+                           (lambda-with-enhanced-declarations
                              (destructuring-bind (lambda args declarations
                                                    more-decl (block block-name &body body))
                                  inline-lambda-body
@@ -121,18 +128,27 @@
                                               ,more-decl
                                               (block ,block-name
                                                 ,@(butlast body)
-                                                ,(car (cdaadr (lastcar body)))))))))))))
+                                                ,(car (cdaadr (lastcar body)))))))))))
+                           (macroexpanded-form
+                             (handler-bind ((form-type-failure
+                                              (lambda (note)
+                                                (push note notes))))
+                               (macroexpand-all
+                                lambda-with-enhanced-declarations augmented-env))))
+                      ;; MUFFLE because they would already have been reported!
+                      (mapc #'compiler-macro-notes:muffle notes)
                       ;; Some macroexpand-all can produce a (function (lambda ...)) from (lambda ...)
                       ;; Some others do not
                       (if (eq 'function (first macroexpanded-form))
                           (second macroexpanded-form)
                           macroexpanded-form))))
-            (return-from pf-compiler-macro
-              (cond (compiler-macro-lambda
+            (cond (compiler-macro-lambda
+                   (return-from compiler-macro-notes:with-notes
                      (funcall compiler-macro-lambda
                               (cons inline-lambda-body (rest form))
-                              env))
-                    (optim-speed
+                              env)))
+                  (optim-speed
+                   (return-from compiler-macro-notes:with-notes
                      (let ((inline-pf
                              (assoc 'inline-pf
                                     (nth-value 2 (function-information name env))))
@@ -161,5 +177,6 @@
                                 ((eq 'notinline-pf (cdr inline-pf))
                                  non-inline-dispatch-form)
                                 (t
-                                 (error "Unexpected case in pf-compiler-macro!")))))))
-                    (t form)))))))))
+                                 (error "Unexpected case in pf-compiler-macro!"))))))))
+                  (t
+                   (return-from pf-compiler-macro form)))))))))
