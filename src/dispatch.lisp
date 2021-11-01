@@ -194,50 +194,86 @@ Proceed at your own risk."
                  ;; Currently we only need INLINE-LAMBDA-BODY and the checks in M-V-B
                  ;; below for DEFTRANSFORM
                  ;; FIXME: Do away with this use even
-                 (inline-lambda-body `(lambda ,@(nthcdr 3 lambda-body)))
+                 (inline-lambda-body (when inline
+                                       `(lambda ,@(nthcdr 3 lambda-body))))
                  #+sbcl
                  (sbcl-transform-body (make-sbcl-transform-body name
                                                                 typed-lambda-list
                                                                 inline-lambda-body
                                                                 parameters)))
-            (when (and (recursive-function-p name inline-lambda-body)
-                       (not ip))
-              (setq inline nil)
-              (simple-style-warning
-               "Not inlining~%  ~S~%because inlining is suspected to result in infinite recursive expansion~%  Supply :INLINE T option to override and proceed at your own risk"
-               form))
-            ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
-            ;; and "objects of type FUNCTION can't be dumped into fasl files"
-            `(progn
-               (eval-when (:compile-toplevel :load-toplevel :execute)
-                 (unless (and (fboundp ',name)
-                              (typep (function ,name) 'polymorphic-function))
-                   #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-                   (register-polymorphic-function ',name ',untyped-lambda-list nil
-                                                  (function no-applicable-polymorph))
-                   (setf (compiler-macro-function ',name) #'pf-compiler-macro)))
-               #+sbcl ,(when inline-lambda-body
-                         (if optim-debug
-                             sbcl-transform-body
-                             `(locally (declare (sb-ext:muffle-conditions style-warning))
-                                (handler-bind ((style-warning #'muffle-warning))
-                                  ,sbcl-transform-body))))
-               ;; We are not "fixing inlining" using DEFUN made functions
-               ;; because we need to take parametric polymorphism into account
-               ;; while inlining.
-               (defun ,static-dispatch-name ,@(cdr inline-lambda-body))
-               (eval-when (:compile-toplevel :load-toplevel :execute)
-                 (register-polymorph ',name ',inline
-                                     ',typed-lambda-list
-                                     ',type-list
-                                     ',effective-type-list
-                                     ',return-type
-                                     ',(when inline inline-lambda-body)
-                                     ',static-dispatch-name
-                                     ',lambda-list-type
-                                     ',(run-time-applicable-p-form parameters)
-                                     ,(compiler-applicable-p-lambda-body parameters))
-                 ',name))))))))
+            (multiple-value-bind (inline-safe-lambda-body inline-note)
+                (cond ((and ip inline)
+                       (values inline-lambda-body
+                               (if-let (null-env-compilation-warnings
+                                        (null-env-compilation-warnings inline-lambda-body))
+                                 (with-output-to-string (*error-output*)
+                                   (note-null-env inline-lambda-body
+                                                  null-env-compilation-warnings))
+                                 nil)))
+                      ((and ip (not inline))
+                       (values nil nil))
+                      ((and (not ip)
+                            (recursive-function-p name inline-lambda-body))
+                       (values nil
+                               (with-output-to-string (*error-output*)
+                                 (note-no-inline form "it is suspected to result in infinite recursive expansion;~%  supply :INLINE T option to override and proceed at your own risk"))))
+                      (t
+                       (if-let (null-env-compilation-warnings
+                                (null-env-compilation-warnings inline-lambda-body))
+                         (values nil
+                                 (with-output-to-string (*error-output*)
+                                   (note-no-inline form "~%")
+                                   (pprint-logical-block (*error-output* nil
+                                                                         :per-line-prefix "  ")
+                                     (note-null-env inline-lambda-body
+                                                    null-env-compilation-warnings))
+                                   (format *error-output* "~&PROCEED AT YOUR OWN RISK!~%~%")))
+                         (values inline-lambda-body
+                                 nil))))
+              (setq inline (case inline
+                             ((t) (if inline-note nil t))
+                             (otherwise inline)))
+              ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
+              ;; and "objects of type FUNCTION can't be dumped into fasl files"
+              `(progn
+                 (eval-when (:compile-toplevel :load-toplevel :execute)
+                   (unless (and (fboundp ',name)
+                                (typep (function ,name) 'polymorphic-function))
+                     #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
+                     (register-polymorphic-function ',name ',untyped-lambda-list nil
+                                                    (function no-applicable-polymorph))
+                     (setf (compiler-macro-function ',name) #'pf-compiler-macro)))
+                 #+sbcl ,(when inline-safe-lambda-body
+                           (if optim-debug
+                               sbcl-transform-body
+                               `(locally (declare (sb-ext:muffle-conditions style-warning))
+                                  (handler-bind ((style-warning #'muffle-warning))
+                                    ,sbcl-transform-body))))
+                 ,(when inline-note
+                    ;; Even STYLE-WARNING isn't appropriate to this, because we want to
+                    ;; inform the user of the warnings even when INLINE option is supplied.
+                    `(compiler-macro-notes:with-notes (',form nil :unwind-on-signal nil)
+                       (signal 'defpolymorph-note :datum ,inline-note)
+                       t))
+                 (eval-when (:compile-toplevel :load-toplevel :execute)
+                   ;; We are not "fixing inlining" using DEFUN made functions
+                   ;; because we need to take parametric polymorphism into account
+                   ;; while inlining.
+                   ,(if inline-note
+                        `(with-muffled-compilation-warnings
+                           (setf (fdefinition ',static-dispatch-name) ,lambda-body))
+                        `(setf (fdefinition ',static-dispatch-name) ,lambda-body))
+                   (register-polymorph ',name ',inline
+                                       ',typed-lambda-list
+                                       ',type-list
+                                       ',effective-type-list
+                                       ',return-type
+                                       ',inline-safe-lambda-body
+                                       ',static-dispatch-name
+                                       ',lambda-list-type
+                                       ',(run-time-applicable-p-form parameters)
+                                       ,(compiler-applicable-p-lambda-body parameters))
+                   ',name)))))))))
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list
                                        &body body)
