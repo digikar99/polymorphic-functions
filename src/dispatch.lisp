@@ -70,15 +70,17 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
   (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition name))
         :for existing-type-list := (polymorph-type-list polymorph)
         :for existing-effective-type-list := (polymorph-effective-type-list polymorph)
-        :do (when (and (type-list-causes-ambiguous-call-p effective-type-list
+        :do (when (and (not (type-list-subtype-p existing-effective-type-list effective-type-list))
+                       (not (type-list-subtype-p effective-type-list existing-effective-type-list))
+                       (type-list-causes-ambiguous-call-p effective-type-list
                                                           existing-effective-type-list)
                        (not (equalp type-list existing-type-list)))
               (cerror "Undefine existing polymorph"
                       "The given TYPE-LIST ~%  ~S~%effectively~%  ~S~%will cause ambiguous call with an existing polymorph with type list ~%  ~S~%and effective type list~%  ~S~%"
-                     type-list
-                     effective-type-list
-                     existing-type-list
-                     existing-effective-type-list)
+                      type-list
+                      effective-type-list
+                      existing-type-list
+                      existing-effective-type-list)
               (undefpolymorph name existing-type-list))))
 
 (defmacro with-muffled-compilation-warnings (&body body)
