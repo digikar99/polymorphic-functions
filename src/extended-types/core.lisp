@@ -38,8 +38,9 @@ to a tree containing a list starting with an element in *EXTENDED-TYPE-SPECIFIER
         (traverse-tree specifier
                        (lambda (node)
                          (typecase node
-                           (list (when (member (car specifier) *extended-type-specifiers*)
-                                   (return-from extended-type-specifier-p t)))
+                           (list (if (member (car node) *extended-type-specifiers*)
+                                     (return-from extended-type-specifier-p t)
+                                     node))
                            (t node))))
         nil)))
 

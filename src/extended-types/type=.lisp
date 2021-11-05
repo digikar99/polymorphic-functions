@@ -27,7 +27,17 @@
                 (ctype=-type ct2)))
 
 (defmethod subctypep ((ct1 ctype=) (ct2 ctype=))
-  (subctypep (ctype=-type ct1) (ctype=-type ct2)))
+  (ctype:ctype= (ctype=-type ct1) (ctype=-type ct2)))
+
+(defmethod conjoin/2 ((ct1 ctype=) (ct2 ctype=))
+  (if (ctype:ctype= ct1 ct2)
+      ct1
+      (ctype:specifier-ctype nil)))
+
+(defmethod subctypep ((ct1 ctype=) (ct2 ctype:disjunction))
+  (if (null (ctype:junction-ctypes ct2))
+      (values nil t)
+      (error "Unhandled case!")))
 
 (defmethod subctypep ((ct1 cmember) (ct2 ctype=))
   (let ((specifier (ctype=-type ct2)))
