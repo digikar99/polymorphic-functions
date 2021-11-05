@@ -379,11 +379,11 @@
   (ignoring-error-output
     (eval `(progn
              (undefine-polymorphic-function 'ambiguous-type-lists-tester)
-             (define-polymorphic-function ambiguous-type-lists-tester (&key a))
+             (define-polymorphic-function ambiguous-type-lists-tester (&key a) :overwrite t)
              (defpolymorph ambiguous-type-lists-tester (&key ((a string) "")) t
                (declare (ignore a)))))
-    (is-error (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a array) #())) t
-                       (declare (ignore a)))))
+    (is-error (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a (or simple-string number)) 5)) t
+                          (declare (ignore a)))))
     (is-error (eval `(defpolymorph ambiguous-type-lists-tester
                          (&key ((a (and array (not string))) #())) t
                        (declare (ignore a)))))
@@ -391,7 +391,7 @@
                            '(&key (:a (and array (not string))))))
     (eval `(undefpolymorph 'ambiguous-type-lists-tester
                            '(&key (:a string))))
-    (5am:is-true (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a array))) t
+    (5am:is-true (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a array) #())) t
                           (declare (ignore a)))))
     (5am:is-true (eval `(defpolymorph ambiguous-type-lists-tester (&key ((a string) "")) t
                           (declare (ignore a)))))

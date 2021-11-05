@@ -82,33 +82,46 @@
   (5am:is-false (type-list-subtype-p '(string string) '(string)))
   (5am:is-false (type-list-subtype-p '((or string number) string) '((or string symbol) array))))
 
-(defmethod %type-list-causes-ambiguous-call-p
+(defmethod %type-list-intersection-null-p
     ((type-1 (eql 'required)) (type-2 (eql 'required)) list-1 list-2)
   (declare (optimize speed)
            (type list list-1 list-2))
-  (and (length= list-1 list-2)
-       (loop :for type-1 :in list-1
-             :for type-2 :in list-2
-             ;; Return T the moment we have a non-null intersection
-             ;; without a definite direction of SUBTYPEP
-             :do (cond ((type= nil `(and ,type-1 ,type-2))
-                        (return-from %type-list-causes-ambiguous-call-p nil))
-                       ((type= type-1 type-2)
-                        t)
-                       ((or (subtypep type-1 type-2)
-                            (subtypep type-2 type-1))
-                        (return-from %type-list-causes-ambiguous-call-p nil))
-                       (t
-                        (return-from %type-list-causes-ambiguous-call-p t)))
-             :finally (return t))))
+  (or (/= (length list-1) (length list-2))
+      (loop :for type-1 :in list-1
+            :for type-2 :in list-2
 
-(def-test type-list-causes-ambiguous-call-required
-    (:suite type-list-causes-ambiguous-call-p)
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string array)  '(string (array))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string) '(string)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string) '(number array)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string) '(string array)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(array string)  '(string array)))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '((or string number) string)
-                                                   '((or string symbol) array)))
+            ;; Return T the moment we have a non-null intersection
+            ;; without a definite direction of SUBTYPEP
+
+            ;; While going from left to right,
+            ;; because the CALLER has previously checked that
+            ;; none of the two type-lists are more specific than the other,
+            ;; it must mean that the first time the types are different,
+            ;; their intersection be NIL; if not, there would be ambiguity
+
+            :do (if (type= type-1 type-2)
+                    t
+                    (multiple-value-bind (intersection-null-p knownp)
+                        (subtypep `(and ,type-1 ,type-2) nil)
+                      (if knownp
+                          (if intersection-null-p
+                              (return-from %type-list-intersection-null-p t)
+                              t)
+                          (progn
+                            (warn "Assuming intersection of types ~S and ~S is NIL" type-1 type-2)
+                            (return-from %type-list-intersection-null-p t)))))
+            :finally (return nil))))
+
+(def-test type-list-intersection-null-required
+    (:suite type-list-intersection-null-p)
+  (5am:is-false (type-list-intersection-null-p '(string) '(string)))
+  (5am:is-true  (type-list-intersection-null-p '(string string) '(string)))
+  (5am:is-true  (type-list-intersection-null-p '(string string) '(t)))
+  (5am:is-true  (type-list-intersection-null-p '(string string) '(number array)))
+  (5am:is-false (type-list-intersection-null-p '(string string) '(string array)))
+  (5am:is-false (type-list-intersection-null-p '(array string)  '(string array)))
+  (5am:is-false (type-list-intersection-null-p '((or string number) string)
+                                               '((or string symbol) array)))
+  (5am:is-true  (type-list-intersection-null-p '((or string number) string)
+                                               '((or string symbol) number)))
   )

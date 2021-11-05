@@ -110,9 +110,9 @@
     ((type-1 (eql 'rest)) (type-2 (eql 'rest)) list-1 list-2)
   (let ((rest-position-1 (position '&rest list-1))
         (rest-position-2 (position '&rest list-2)))
-    (every #'subtypep
-           (subseq list-1 0 (min rest-position-1 rest-position-2))
-           (subseq list-2 0 (min rest-position-1 rest-position-2)))))
+    (%type-list-subtype-p 'required 'required
+                          (subseq list-1 0 (min rest-position-1 rest-position-2))
+                          (subseq list-2 0 (min rest-position-1 rest-position-2)))))
 
 (def-test type-list-subtype-rest-&-rest (:suite type-list-subtype-rest)
   (5am:is-true  (type-list-subtype-p '(string string &rest) '(string array &rest)))
@@ -141,7 +141,7 @@
     (cond ((< list-1-length rest-position)
            nil)
           ((= list-1-length rest-position)
-           (every #'subtypep
+           (%type-list-subtype-p 'required 'required
                   (subseq list-1 0 list-1-length)
                   (subseq list-2 0 list-1-length)))
           (t nil))))
@@ -310,114 +310,114 @@
 
 
 
-(5am:def-suite type-list-causes-ambiguous-call-rest :in type-list-causes-ambiguous-call-p)
+(5am:def-suite type-list-intersection-null-rest :in type-list-intersection-null-p)
 
-(defmethod %type-list-causes-ambiguous-call-p
+(defmethod %type-list-intersection-null-p
     ((type-1 (eql 'rest)) (type-2 (eql 'rest)) list-1 list-2)
   (let ((rest-position-1 (position '&rest list-1))
         (rest-position-2 (position '&rest list-2)))
-    (every #'type=
-           (subseq list-1 0 (min rest-position-1 rest-position-2))
-           (subseq list-2 0 (min rest-position-1 rest-position-2)))))
+    (%type-list-intersection-null-p 'required 'required
+                                    (subseq list-1 0 (min rest-position-1 rest-position-2))
+                                    (subseq list-2 0 (min rest-position-1 rest-position-2)))))
 
-(def-test type-list-causes-ambiguous-call-rest-&-rest
-    (:suite type-list-causes-ambiguous-call-rest)
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string string &rest) '(string &rest)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string &rest) '(string array &rest)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string &rest) '(string number &rest))))
+(def-test type-list-intersection-null-rest-&-rest
+    (:suite type-list-intersection-null-rest)
+  (5am:is-false (type-list-intersection-null-p '(string string &rest) '(string &rest)))
+  (5am:is-false (type-list-intersection-null-p '(string string &rest) '(string array &rest)))
+  (5am:is-true  (type-list-intersection-null-p '(string string &rest) '(string number &rest))))
 
-(defmethod %type-list-causes-ambiguous-call-p
+(defmethod %type-list-intersection-null-p
     ((type-1 (eql 'rest)) (type-2 (eql 'required)) list-1 list-2)
   (let ((rest-position (position '&rest  list-1))
         (list-2-length (length list-2)))
     (if (< list-2-length rest-position)
-        nil
-        (every #'type=
-               (subseq list-1 0 rest-position)
-               (subseq list-2 0 rest-position)))))
+        t
+        (%type-list-intersection-null-p 'required 'required
+                                        (subseq list-1 0 rest-position)
+                                        (subseq list-2 0 rest-position)))))
 
-(def-test type-list-causes-ambiguous-call-rest-&-required
-    (:suite type-list-causes-ambiguous-call-rest)
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string &rest) '(string array)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string &rest) '(string)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string &rest) '(string array)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string &rest) '(string number))))
+(def-test type-list-intersection-null-rest-&-required
+    (:suite type-list-intersection-null-rest)
+  (5am:is-false (type-list-intersection-null-p '(string &rest) '(string array)))
+  (5am:is-true  (type-list-intersection-null-p '(string string &rest) '(string)))
+  (5am:is-false (type-list-intersection-null-p '(string string &rest) '(string array)))
+  (5am:is-true  (type-list-intersection-null-p '(string string &rest) '(string number))))
 
-;;; Ignore the case of required-optional against all others
-
-(defmethod %type-list-causes-ambiguous-call-p
+(defmethod %type-list-intersection-null-p
     ((type-1 (eql 'rest)) (type-2 (eql 'required-key)) list-1 list-2)
   (declare (optimize debug))
   (let ((rest-position (position '&rest list-1))
         (key-position  (position '&key  list-2)))
-    (if (< key-position rest-position)
-        (and (every #'type=
-                    (subseq list-1 0 key-position)
-                    (subseq list-2 0 key-position))
-             ;; Odd positions in the remaining are always occupied by KEYWORD-supertypes
-             (let ((rest (subseq list-1 key-position rest-position)))
-               (loop :for (name type) :in (subseq list-2 (1+ key-position))
-                     :while rest
-                     :for type-1 := (first rest)
-                     :for type-2 := (second rest)
-                     :always (typep name type-1)
-                     :do (setq rest (cddr rest))))
-             ;; And even the EVEN positions are such that they be either of the two type-lists
-             (let ((rest                  (subseq list-1 key-position rest-position))
-                   (causes-ambiguous-call nil))
-               (loop :for (name type) :in (subseq list-2 (1+ key-position))
-                     :while (and rest (not causes-ambiguous-call))
-                     :for type-1 := (first rest)
-                     :for type-2 := (second rest)
-                     :do (if (or (and (rest rest) ; we haven't exhausted REST yet
-                                      (typep name type-1)
-                                      (type= type type-2))
-                                 (and (null (rest rest)) ; we exhausted REST at the type-2
-                                      (typep name type-1)))
-                             (setq causes-ambiguous-call t)))
-               causes-ambiguous-call))
-        (every #'type=
-               (subseq list-1 0 rest-position)
-               (subseq list-2 0 rest-position)))))
+    (if (>= key-position rest-position)
+        (%type-list-intersection-null-p 'required 'required
+                                        (subseq list-1 0 rest-position)
+                                        (subseq list-2 0 rest-position))
+        (or (%type-list-intersection-null-p 'required 'required
+                                            (subseq list-1 0 key-position)
+                                            (subseq list-2 0 key-position))
+            ;; FIXME: This is not known to be looking correct
+            ;; Odd positions in the remaining are always occupied by KEYWORD-supertypes
+            (not (let ((rest (subseq list-1 key-position rest-position)))
+                   (loop :for (name type) :in (subseq list-2 (1+ key-position))
+                         :while rest
+                         :for type-1 := (first rest)
+                         :for type-2 := (second rest)
+                         :always (typep name type-1)
+                         :do (setq rest (cddr rest)))))
+            ;; And even the EVEN positions are such that they be either of the two type-lists
+            (let ((rest (subseq list-1 key-position rest-position))
+                  (intersection-null t))
+              (loop :for (name type) :in (subseq list-2 (1+ key-position))
+                    :while (and rest intersection-null)
+                    :for type-1 := (first rest)
+                    :for type-2 := (second rest)
+                    :do (if (or (and (rest rest) ; we haven't exhausted REST yet
+                                     (typep name type-1)
+                                     (type= type type-2))
+                                (and (null (rest rest)) ; we exhausted REST at the type-2
+                                     (typep name type-1)))
+                            (setq intersection-null nil)))
+              intersection-null)))))
 
-(def-test type-list-causes-ambiguous-call-rest-&-required-key
-    (:suite type-list-causes-ambiguous-call-rest)
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string &rest) '(string array &key)))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string keyword  &rest)
-                                                   '(string &key (:a string))))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string keyword string  &rest)
-                                                   '(string &key (:a string))))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string keyword string  &rest)
-                                                   '(string &key (:a number) (:b string))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string &rest) '(string array &key)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword string number &rest)
-                                                   '(string &key (:a number) (:b string))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword string  &rest)
-                                                   '(string &key (:a number) (:b number))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword string  &rest)
-                                                   '(string &key (:a number))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword string number &rest)
-                                                   '(string &key (:a number) (:b string))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword &rest) '(string &key)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string  &rest) '(string &key)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string  &rest)
-                                                   '(string &key (:a string)))))
+;;; Ignore the case of required-optional against all others
 
-(defmethod %type-list-causes-ambiguous-call-p
+(def-test type-list-intersection-null-rest-&-required-key
+    (:suite type-list-intersection-null-p)
+  (5am:is-false (type-list-intersection-null-p '(string &rest) '(string array &key)))
+  (5am:is-false (type-list-intersection-null-p '(string keyword  &rest)
+                                               '(string &key (:a string))))
+  (5am:is-false (type-list-intersection-null-p '(string keyword string  &rest)
+                                               '(string &key (:a string))))
+  (5am:is-false (type-list-intersection-null-p '(string keyword string  &rest)
+                                               '(string &key (:a number) (:b string))))
+  (5am:is-false (type-list-intersection-null-p '(string string &rest) '(string array &key)))
+  (5am:is-true  (type-list-intersection-null-p '(string keyword string  &rest)
+                                               '(string &key (:a number) (:b number))))
+  (5am:is-true  (type-list-intersection-null-p '(string keyword string  &rest)
+                                               '(string &key (:a number))))
+  (5am:is-true  (type-list-intersection-null-p '(string keyword string number &rest)
+                                               '(string &key (:a number) (:b string))))
+  (5am:is-true  (type-list-intersection-null-p '(string keyword &rest) '(string &key)))
+  (5am:is-true  (type-list-intersection-null-p '(string string  &rest) '(string &key)))
+  (5am:is-true  (type-list-intersection-null-p '(string string  &rest)
+                                               '(string &key (:a string)))))
+
+(defmethod %type-list-intersection-null-p
     ((type-1 (eql 'required)) (type-2 (eql 'required-key)) list-1 list-2)
   (let ((list-1-length (length list-1))
         (key-position  (position '&key  list-2)))
     (cond ((= key-position list-1-length)
-           (every #'type=
-                  (subseq list-1 0 list-1-length)
-                  (subseq list-2 0 list-1-length)))
+           (%type-list-intersection-null-p 'required 'required
+                                            (subseq list-1 0 list-1-length)
+                                            (subseq list-2 0 list-1-length)))
           ((< list-1-length key-position)
-           nil)
+           t)
           ((< key-position list-1-length)
-           (and (evenp (- list-1-length key-position))
-                (every #'type=
-                       (subseq list-1 0 key-position)
-                       (subseq list-2 0 key-position))
+           (or (not (evenp (- list-1-length key-position)))
+               (%type-list-intersection-null-p 'required 'required
+                                               (subseq list-1 0 key-position)
+                                               (subseq list-2 0 key-position))
+               (not
                 ;; Odd positions in the remaining are always occupied by KEYWORD-supertypes
                 (let ((rest (subseq list-1 key-position list-1-length)))
                   (loop :for (name type) :in (subseq list-2 (1+ key-position))
@@ -425,53 +425,52 @@
                         :for type-1 := (first rest)
                         :for type-2 := (second rest)
                         :always (typep name type-1)
-                        :do (setq rest (cddr rest))))
-                ;; And even the EVEN positions are such that they be either of the two type-lists
-                (let ((rest                  (subseq list-1 key-position))
-                      (causes-ambiguous-call nil))
-                  (loop :for (name type) :in (subseq list-2 (1+ key-position))
-                        :while (and rest (not causes-ambiguous-call))
-                        :for type-1 := (first rest)
-                        :for type-2 := (second rest)
-                        :do (if (or (and (rest rest) ; we haven't exhausted REST yet
-                                         (typep name type-1)
-                                         (type= type type-2))
-                                    (and (null (rest rest)) ; we exhausted REST at the type-2
-                                         (typep name type-1)))
-                                (setq causes-ambiguous-call t)))
-                  causes-ambiguous-call))))))
+                        :do (setq rest (cddr rest)))))
+               ;; And even the EVEN positions are such that they be either of the two type-lists
+               (let ((rest (subseq list-1 key-position))
+                     (intersection-null t))
+                 (loop :for (name type) :in (subseq list-2 (1+ key-position))
+                       :while (and rest intersection-null)
+                       :for type-1 := (first rest)
+                       :for type-2 := (second rest)
+                       :do (if (or (and (rest rest) ; we haven't exhausted REST yet
+                                        (typep name type-1)
+                                        (type= type type-2))
+                                   (and (null (rest rest)) ; we exhausted REST at the type-2
+                                        (typep name type-1)))
+                               (setq intersection-null nil)))
+                 intersection-null))))))
 
-(def-test type-list-causes-ambiguous-call-required-&-required-key
-    (:suite type-list-causes-ambiguous-call-rest)
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string (eql :a) string)
-                                                   '(string &key (:a string))))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string keyword string)
-                                                   '(string &key (:a string))))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string keyword string)
-                                                   '(string &key (:a number) (:b string))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string (eql :b) string)
-                                                   '(string &key (:a string) (:b number))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string) '(string array &key)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword) '(string &key)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string) '(string array &key)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword) '(string &key (:a string))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword string number)
-                                                   '(string &key (:a number) (:b string))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string keyword string)
-                                                   '(string &key (:a number))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string) '(string &key)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string string) '(string &key (:a string)))))
+(def-test type-list-intersection-null-required-&-required-key
+    (:suite type-list-intersection-null-rest)
+  (5am:is-false (type-list-intersection-null-p '(string (eql :a) string)
+                                               '(string &key (:a string))))
+  (5am:is-false (type-list-intersection-null-p '(string keyword string)
+                                               '(string &key (:a string))))
+  (5am:is-false (type-list-intersection-null-p '(string keyword string)
+                                               '(string &key (:a (or null number)) (:b string))))
+  (5am:is-true  (type-list-intersection-null-p '(string (eql :b) string)
+                                               '(string &key (:a string) (:b number))))
+  (5am:is-false (type-list-intersection-null-p '(string string) '(string array &key)))
+  (5am:is-true  (type-list-intersection-null-p '(string keyword) '(string &key)))
+  (5am:is-true  (type-list-intersection-null-p '(string) '(string array &key)))
+  (5am:is-true  (type-list-intersection-null-p '(string keyword) '(string &key (:a string))))
+  (5am:is-true  (type-list-intersection-null-p '(string keyword string number)
+                                               '(string &key (:a number) (:b string))))
+  (5am:is-true  (type-list-intersection-null-p '(string keyword string)
+                                               '(string &key (:a number))))
+  (5am:is-true  (type-list-intersection-null-p '(string string) '(string &key)))
+  (5am:is-true  (type-list-intersection-null-p '(string string) '(string &key (:a string)))))
 
-(defmethod %type-list-causes-ambiguous-call-p ((type-1 (eql 'required)) (type-2 (eql 'rest)) list-1 list-2)
-  (%type-list-causes-ambiguous-call-p type-2 type-1 list-2 list-1))
+(defmethod %type-list-intersection-null-p ((type-1 (eql 'required)) (type-2 (eql 'rest)) list-1 list-2)
+  (%type-list-intersection-null-p type-2 type-1 list-2 list-1))
 
-(defmethod %type-list-causes-ambiguous-call-p ((type-1 (eql 'required-key))
+(defmethod %type-list-intersection-null-p ((type-1 (eql 'required-key))
                                                (type-2 (eql 'rest))
                                                list-1 list-2)
-  (%type-list-causes-ambiguous-call-p type-2 type-1 list-2 list-1))
+  (%type-list-intersection-null-p type-2 type-1 list-2 list-1))
 
-(defmethod %type-list-causes-ambiguous-call-p ((type-1 (eql 'required-key))
+(defmethod %type-list-intersection-null-p ((type-1 (eql 'required-key))
                                                (type-2 (eql 'required))
                                                list-1 list-2)
-  (%type-list-causes-ambiguous-call-p type-2 type-1 list-2 list-1))
-
+  (%type-list-intersection-null-p type-2 type-1 list-2 list-1))

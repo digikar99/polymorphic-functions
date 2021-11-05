@@ -164,17 +164,23 @@
 (defmethod %type-list-subtype-p ((type-1 (eql 'required-optional))
                                  (type-2 (eql 'required-optional))
                                  list-1 list-2)
-  (declare (optimize speed)
-           (type list list-1 list-2))
+  (declare (type list list-1 list-2))
   (let ((optional-position-1 (position '&optional list-1))
         (optional-position-2 (position '&optional list-2)))
     (if (= optional-position-1 optional-position-2)
-        (and (every #'subtypep
-                    (subseq list-1 0 optional-position-1)
-                    (subseq list-2 0 optional-position-2))
-             (every #'subtypep
-                    (subseq list-1 (1+ optional-position-1))
-                    (subseq list-2 (1+ optional-position-2))))
+        (loop :for type-1 :in list-1
+              :for type-2 :in list-2
+              ;; Return T the moment we find a SUBTYPEP with not TYPE=
+              ;; The ones before this point should be TYPE=
+              :do (cond ((eq '&optional type-1)
+                         t)
+                        ((type= type-1 type-2)
+                         t)
+                        ((subtypep type-1 type-2)
+                         (return-from %type-list-subtype-p t))
+                        (t
+                         (return-from %type-list-subtype-p nil)))
+              :finally (return t))
         ;; Let's hope that this case will be caught by the ambiguous-call-p
         ;; functionality. Let's have this hope for the second part of and above
         ;; as well.
@@ -190,27 +196,43 @@
   (5am:is-false (type-list-subtype-p '(string &optional string)
                                      '(number &optional string))))
 
-(defmethod %type-list-causes-ambiguous-call-p
+(defmethod %type-list-intersection-null-p
     ((type-1 (eql 'required-optional))
      (type-2 (eql 'required-optional))
      list-1 list-2)
   (let ((optional-position-1 (position '&optional list-1))
         (optional-position-2 (position '&optional list-2)))
-    ;; What if position of optional arguments is not same? Or if lengths are different?
-    ;; Eg. '(&optional string) and '(&optional string number) cause an ambiguous call
-    ;; Well, yes, but then, any type-list with 0 required arguments would cause an ambiguity.
-    (and (= optional-position-1 optional-position-2)
-         (every #'type=
-                (subseq list-1 0 optional-position-1)
-                (subseq list-2 0 optional-position-2)))))
+    ;; FIXME: What if position of optional arguments is not same? Or if lengths are different?
+    ;; Eg. '(&optional string) and '(&optional string number) have a non-NULL intersection
+    ;; Well, yes, but then, any type-list with 0 required arguments would cause a "non-NULL" intersection
+    (or (/= optional-position-1 optional-position-2)
+        (loop :for type-1 :in list-1
+              :for type-2 :in list-2
+              ;; Return T the moment we have a non-null intersection
+              ;; without a definite direction of SUBTYPEP
+              :do (unless (and (eq type-1 '&optional)
+                               (eq type-2 '&optional))
+                    (if (type= type-1 type-2)
+                        t
+                        (multiple-value-bind (subtypep knownp)
+                            (subtypep `(and ,type-1 ,type-2) nil)
+                          (if knownp
+                              (return-from %type-list-intersection-null-p subtypep)
+                              (progn
+                                (warn "Assuming intersection of types ~S and ~S is NIL" type-1 type-2)
+                                (return-from %type-list-intersection-null-p t))))))
+              :finally (return t)))))
 
-(def-test type-list-causes-ambiguous-call-optional
-    (:suite type-list-causes-ambiguous-call-p)
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string &optional string)
-                                                   '(string &optional array)))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(&optional string)
-                                                   '(&optional string number)))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string &optional string)
-                                                   '(string &optional number)))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string &optional string)
-                                                   '(number &optional string))))
+(def-test type-list-intersection-null-optional
+    (:suite type-list-intersection-null-p)
+  (5am:is-false (type-list-intersection-null-p '(string &optional string)
+                                               '(string &optional array)))
+  (5am:is-true  (type-list-intersection-null-p '(&optional string)
+                                               '(&optional string number)))
+  (5am:is-true  (type-list-intersection-null-p '(string &optional string)
+                                               '(string &optional number)))
+  (5am:is-true  (type-list-intersection-null-p '(string &optional string)
+                                               '(number &optional string)))
+  (5am:is-false (type-list-intersection-null-p '(string array &optional string)
+                                               '(array string &optional number)))
+  )

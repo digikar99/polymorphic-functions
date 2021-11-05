@@ -40,7 +40,14 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
            (type untyped-lambda-list untyped-lambda-list))
   (when docp (check-type documentation string))
   (let ((*name*        name)
-        (*environment*  env))
+        (*environment*  env)
+        (untyped-lambda-list (if (member '&key untyped-lambda-list)
+                                 (let ((key-position (position '&key untyped-lambda-list)))
+                                   (append (subseq untyped-lambda-list 0 key-position)
+                                           '(&key)
+                                           (sort (subseq untyped-lambda-list (1+ key-position))
+                                                 #'string<)))
+                                 untyped-lambda-list)))
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
          ,(when overwrite
@@ -70,11 +77,15 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
   (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition name))
         :for existing-type-list := (polymorph-type-list polymorph)
         :for existing-effective-type-list := (polymorph-effective-type-list polymorph)
-        :do (when (and (not (type-list-subtype-p existing-effective-type-list effective-type-list))
-                       (not (type-list-subtype-p effective-type-list existing-effective-type-list))
-                       (type-list-causes-ambiguous-call-p effective-type-list
-                                                          existing-effective-type-list)
-                       (not (equalp type-list existing-type-list)))
+        :for new-specific-p := (type-list-subtype-p effective-type-list existing-effective-type-list)
+        :for existing-specific-p := (type-list-subtype-p existing-effective-type-list effective-type-list)
+        :do (when (or (and new-specific-p
+                           existing-specific-p
+                           (not (equalp type-list existing-type-list)))
+                      (and (not new-specific-p)
+                           (not existing-specific-p)
+                           (not (type-list-intersection-null-p effective-type-list
+                                                               existing-effective-type-list))))
               (cerror "Undefine existing polymorph"
                       "The given TYPE-LIST ~%  ~S~%effectively~%  ~S~%will cause ambiguous call with an existing polymorph with type list ~%  ~S~%and effective type list~%  ~S~%"
                       type-list
@@ -141,7 +152,15 @@ Proceed at your own risk."
     (declare (type function-name name))
     (let* ((block-name       (blockify-name name))
            (*environment*    env)
-           (typed-lambda-list   (normalize-typed-lambda-list typed-lambda-list))
+           (unsorted-typed-lambda-list (normalize-typed-lambda-list typed-lambda-list))
+           (typed-lambda-list (if (member '&key unsorted-typed-lambda-list)
+                                  (let ((key-position (position '&key unsorted-typed-lambda-list)))
+                                    (append (subseq unsorted-typed-lambda-list 0 key-position)
+                                            '(&key)
+                                            (sort (subseq unsorted-typed-lambda-list (1+ key-position))
+                                                  #'string<
+                                                  :key #'caar)))
+                                  unsorted-typed-lambda-list))
            (untyped-lambda-list (untyped-lambda-list typed-lambda-list))
            (pf-lambda-list      (if (and (fboundp name)
                                          (typep (fdefinition name) 'polymorphic-function))

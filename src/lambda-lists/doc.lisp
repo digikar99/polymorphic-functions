@@ -57,9 +57,9 @@ be a TYPED-LAMBDA-LIST"
 
 ;; TYPE-LIST-CAUSES-AMBIGUOUS-CALL-P ===========================================
 
-(define-constant +type-list-causes-ambiguous-call-p+
-  "Returns T if the presence of both TYPE-LIST-1 and TYPE-LIST-2 results in
-ambiguous calls"
+(define-constant +type-list-intersection-null-p+
+  "Returns T if there exist argument lists that are compatible with both
+TYPE-LIST-1 and TYPE-LIST-2"
   :test 'string=)
 
 

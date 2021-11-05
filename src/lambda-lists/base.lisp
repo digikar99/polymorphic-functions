@@ -199,20 +199,26 @@ Non-examples:
 
 (5am:def-suite type-list-subtype-p :in lambda-list)
 
-;; TYPE-LIST-CAUSES-AMBIGUOUS-CALL-P ===========================================
+;; TYPE-LIST-INTERSECTION-NULL-P ===============================================
 
-(defun type-list-causes-ambiguous-call-p (type-list-1 type-list-2)
-  #.+type-list-causes-ambiguous-call-p+
+(defun type-list-intersection-null-p (type-list-1 type-list-2)
+  #.+type-list-intersection-null-p+
   (declare (type type-list type-list-1 type-list-2))
   (let ((*lambda-list-typed-p* nil))
-    (%type-list-causes-ambiguous-call-p (potential-type-of-lambda-list type-list-1)
-                                        (potential-type-of-lambda-list type-list-2)
-                                        type-list-1
-                                        type-list-2)))
+    (%type-list-intersection-null-p (potential-type-of-lambda-list type-list-1)
+                                    (potential-type-of-lambda-list type-list-2)
+                                    type-list-1
+                                    type-list-2)))
 
-(defgeneric %type-list-causes-ambiguous-call-p
+(defgeneric %type-list-intersection-null-p
     (type-1 type-2 type-list-1 type-list-2)
-  (:documentation #.+type-list-causes-ambiguous-call-p+))
+  (:documentation #.+type-list-intersection-null-p+))
 
-(5am:def-suite type-list-causes-ambiguous-call-p :in lambda-list)
+(5am:def-suite type-list-intersection-null-p :in lambda-list)
+
+
+
+
+
+
 

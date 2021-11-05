@@ -168,12 +168,29 @@
   (let ((key-position-1 (position '&key list-1))
         (key-position-2 (position '&key list-2)))
     (if (= key-position-1 key-position-2)
-        (and (every #'subtypep
-                    (subseq list-1 0 key-position-1)
-                    (subseq list-2 0 key-position-2))
-             (loop :for (param type) :in (subseq list-1 (1+ key-position-1))
-                   :always (subtypep type (second (assoc (the symbol param)
-                                                         (subseq list-2 (1+ key-position-2)))))))
+        (and (loop :for type-1 :in (subseq list-1 0 key-position-1)
+                   :for type-2 :in (subseq list-2 0 key-position-2)
+                   ;; Return T the moment we find a SUBTYPEP with not TYPE=
+                   ;; The ones before this point should be TYPE=
+                   :do (cond ((type= type-1 type-2)
+                              t)
+                             ((subtypep type-1 type-2)
+                              (return-from %type-list-subtype-p t))
+                             (t
+                              (return nil)))
+                   :finally (return t))
+             ;; Assume the type-lists are ordered in the lexical order
+             (loop :for (param-1 type-1) :in (subseq list-1 (1+ key-position-1))
+                   :for (param-2 type-2) :in (subseq list-2 (1+ key-position-2))
+                   :do (cond ((not (eq param-1 param-2))
+                              (return-from %type-list-subtype-p nil))
+                             ((type= type-1 type-2)
+                              t)
+                             ((subtypep type-1 type-2)
+                              (return-from %type-list-subtype-p t))
+                             (t
+                              (return nil)))
+                   :finally (return t)))
         nil)))
 
 (def-test type-list-subtype-key (:suite type-list-subtype-p)
@@ -190,7 +207,7 @@
   (5am:is-false (type-list-subtype-p '(&key (:a string) (:b number))
                                      '(string &key (:a string) (:b number)))))
 
-(defmethod %type-list-causes-ambiguous-call-p
+(defmethod %type-list-intersection-null-p
     ((type-1 (eql 'required-key))
      (type-2 (eql 'required-key))
      list-1 list-2)
@@ -198,40 +215,91 @@
            (type list list-1 list-2))
   (let ((key-position-1 (position '&key list-1))
         (key-position-2 (position '&key list-2)))
-    (and (= key-position-1 key-position-2)
-         (every #'type=
-                (subseq list-1 0 key-position-1)
-                (subseq list-2 0 key-position-2))
-         (let ((list-1 (subseq list-1 (1+ key-position-1)))
-               (list-2 (subseq list-2 (1+ key-position-2))))
-           (multiple-value-bind (shorter-alist longer-alist)
-               (if (<= (length list-1) (length list-2))
-                   (values list-1 list-2)
-                   (values list-2 list-1))
-             (and (loop :for (key type) :in shorter-alist
-                        :always (if-let (type-2 (second (assoc key longer-alist)))
-                                  (or (type= type type-2)
-                                      (and (typep nil type)
-                                           (typep nil type-2)))
-                                  (return-from %type-list-causes-ambiguous-call-p nil)))
-                  (loop :for (key type) :in (set-difference longer-alist shorter-alist
-                                                            :key #'first)
-                        :always (typep nil type))))))))
+    (or (/= key-position-1 key-position-2)
+        (loop :for type-1 :in (subseq list-1 0 key-position-1)
+              :for type-2 :in (subseq list-2 0 key-position-2)
+              ;; Return T the moment we have a non-null intersection
+              ;; without a definite direction of SUBTYPEP
+              :do (if (type= type-1 type-2)
+                      t
+                      (multiple-value-bind (subtypep knownp)
+                          (subtypep `(and ,type-1 ,type-2) nil)
+                        (if knownp
+                            (return-from %type-list-intersection-null-p subtypep)
+                            (progn
+                              (warn "Assuming intersection of types ~S and ~S is NIL" type-1 type-2)
+                              (return-from %type-list-intersection-null-p t)))))
+              :finally (return nil))
+        (let ((list-1 (subseq list-1 (1+ key-position-1)))
+              (list-2 (subseq list-2 (1+ key-position-2))))
+          (loop :while (and list-1 list-2)
+                :for (key-1 type-1) := (first list-1)
+                :for (key-2 type-2) := (first list-2)
+                :do (cond ((not (eq key-1 key-2))
+                           ;; FIXME: This might not be correct
+                           (return-from %type-list-intersection-null-p t))
+                          ((type= type-1 type-2)
+                           t)
+                          (t
+                           (multiple-value-bind (subtypep knownp)
+                               (subtypep 'null `(and ,type-1 ,type-2))
+                             (if knownp
+                                 (if subtypep
+                                     ;; Both can accept NIL; the arguments are optional
+                                     ()
+                                     ;; At least one argument is compulsory
+                                     (multiple-value-bind (subtypep knownp)
+                                         (subtypep `(and ,type-1 ,type-2) nil)
+                                       ;; If there exist at least one &KEY argument which need
+                                       ;; to be compulsorily supplied, and both types are different,
+                                       ;; then there intersection is NULL
+                                       (if knownp
+                                           (return-from %type-list-intersection-null-p subtypep)
+                                           (progn
+                                             (warn "Assuming intersection of types ~S and ~S is NIL"
+                                                   type-1 type-2)
+                                             (return-from %type-list-intersection-null-p t)))))
+                                 (progn
+                                   (warn "Assuming intersection of types ~S and ~S is NIL" type-1 type-2)
+                                   (return-from %type-list-intersection-null-p t))))))
+                    (setq list-1 (rest list-1)
+                          list-2 (rest list-2))
+                :finally
+                   (return
+                     (cond ((and (null list-1)
+                                 (null list-2))
+                            nil)
+                           (list-1
+                            ;; All accept a NIL => intersection is non-NULL
+                            (not (loop :for (key type) :in list-1
+                                       :always (typep nil type))))
+                           (list-2
+                            (not (loop :for (key type) :in list-2
+                                       :always (typep nil type))))
+                           (t
+                            (error "Unhandled case!")))))))))
 
-(def-test type-list-causes-ambiguous-call-key
-    (:suite type-list-causes-ambiguous-call-p)
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string &key (:a (or null string)))
-                                                   '(string &key (:a (or null array)))))
-  (5am:is-true  (type-list-causes-ambiguous-call-p '(string &key (:a string))
-                                                   `(string &key (:a string)
-                                                            (:b (or null number)))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string &key (:a string))
-                                                   '(string &key (:a string) (:b number))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string &key (:a string))
-                                                   '(string &key (:a number))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string &key (:a string))
-                                                   '(string &key (:a array))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(string &key (:a string))
-                                                   '(number &key (:a string))))
-  (5am:is-false (type-list-causes-ambiguous-call-p '(&key (:a string) (:b number))
-                                                   '(string &key (:a string) (:b number)))))
+(def-test type-list-intersection-null-key
+    (:suite type-list-intersection-null-p)
+  (5am:is-false (type-list-intersection-null-p '(string &key (:a (or null string)))
+                                               '(string &key (:a (or null array)))))
+  (5am:is-false (type-list-intersection-null-p '(string &key (:a string))
+                                               `(string &key (:a string)
+                                                        (:b (or null number)))))
+  (5am:is-true  (type-list-intersection-null-p '(string &key (:a string))
+                                               '(string &key (:a string) (:b number))))
+  (5am:is-true  (type-list-intersection-null-p '(string &key (:a string))
+                                               '(string &key (:a number))))
+  (5am:is-false (type-list-intersection-null-p '(string &key (:a string))
+                                               '(string &key (:a array))))
+  (5am:is-true  (type-list-intersection-null-p '(string &key (:a string))
+                                               '(number &key (:a string))))
+  (5am:is-true  (type-list-intersection-null-p '(&key (:a string) (:b number))
+                                               '(string &key (:a string) (:b number))))
+  (5am:is-false (type-list-intersection-null-p '(string array &key (:a string))
+                                               '(array string &key (:a string))))
+  (5am:is-false (type-list-intersection-null-p '(string string &key (:a string))
+                                               '(array array &key (:a string))))
+  (5am:is-false (type-list-intersection-null-p '((or string number) &key (:a string))
+                                               '((or string symbol) &key (:a string))))
+  )
