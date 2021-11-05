@@ -10,14 +10,15 @@
   qlot!)
 
   If you would like at least a few grams (or ounce :p) of stability,
-  stick to the following symbols: 
-  
+  stick to the following symbols:
+
   - define-polymorphic-function
   - undefine-polymorphic-function
   - defpolymorph
   - defpolymorph-compiler-macro
   - undefpolymorph
-  - find-polymorph
+- find-polymorph
+- polymorph-apropos-list-type
 #+END_QUOTE
 
 The library provides all of
@@ -26,9 +27,11 @@ The library provides all of
   polymorphism]] and
 - [[https://en.wikipedia.org/wiki/Subtyping][Subtype Polymorphism]]
 - [[https://en.wikipedia.org/wiki/Parametric_polymorphism][Parametric
-  Polymorphism]]
+  Polymorphism]] (but see [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]]!)
 
-to dispatch and/or optimize on the basis of types rather than classes.
+to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#extended-types][extended-types]] are also provided through [[[[*** Extended Types]\]]are also provided through [[https://github.com/s-expressionists/ctype/][ctype]].
+
+The library was primarily made to dispatch on specialized-arrays for use in [[https://github.com/digikar99/numericals][numericals]], since CLHS does not enable generic-functions for specialized-arrays. But has also been put to use in [[https://github.com/lisp-polymorph/][lisp-polymorph]].
 
 * Table of Contents
 :PROPERTIES:
@@ -43,17 +46,21 @@ to dispatch and/or optimize on the basis of types rather than classes.
     - [[#examples][Examples]]
   - [[#libraries--projects-currently-using-polymorphic-functions][Libraries / Projects currently using polymorphic-functions]]
   - [[#static-dispatch--inline-optimizations][Static Dispatch / Inline Optimizations]]
-  - [[#advanced-usage][Advanced Usage]]
-    - [[#parametric-polymorphism][Parametric Polymorphism]]
-    - [[#extended-types][Extended Types]]
-  - [[#limitations][Limitations]]
-- [[#rationale][Rationale]]
+  - [[#discussion-and-advanced-usage][Discussion and Advanced Usage]]
+    - [[#wait-doesnt-pfs-use-of-aot-imply-2500-specialized-variants-as-sf-says][Wait, doesn't pf's use of AOT imply 2500 specialized variants as sf says?]]
+    - [[#but-what-about-inline-induced-code-bloat][But, what about inline induced code-bloat?]]
+    - [[#that-sounds-bad-isnt-there-a-best-of-both-worlds][That sounds bad; isn't there a "best of both worlds"?]]
+    - [[#well-thats-awesome-what-else-can-you-do-with-polymorphic-functions][Well, that's awesome! What else can you do with polymorphic-functions?]]
+    - [[#could-you-elaborate-on-parametric-polymorphism][Could you elaborate on parametric-polymorphism?]]
+    - [[#and-about-extended-types][And about extended types?]]
+    - [[#erm-about-the-polymorphs-themselves-is-there-a-notion-of-specificity-of-type-lists--polymorphs][Erm, about the polymorphs themselves, is there a notion of specificity of type-lists / polymorphs?]]
+    - [[#that-looks-cool-is-there-more-comparison-against-generic-functions-and-specialization-store][That looks cool. Is there more comparison against generic-functions and specialization-store?]]
+    - [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-while-using-pf][Thank you so much! Are there any pitfalls I need to be aware of while using pf?]]
 - [[#dependencies-outside-quicklisp][Dependencies outside quicklisp]]
   - [[#getting-it-from-ultralisp][Getting it from ultralisp]]
   - [[#getting-it-from-clpm][Getting it from clpm]]
 - [[#tests][Tests]]
 - [[#related-projects][Related Projects]]
-- [[#feature-parity][Feature Parity]]
 - [[#acknowledgements][Acknowledgements]]
 :END:
 
@@ -68,30 +75,12 @@ to dispatch and/or optimize on the basis of types rather than classes.
     :CUSTOM_ID: basic-usage
     :END:
 
-- Users are expected to define a =polymorphic-function= (analogous to
-  =cl:generic-function=) with one or more =polymorph= (similar to
-  =cl:method=). These may be dispatched at runtime or at compile time if
-  optimization policy is =(and (= speed 3) (/= debug 3))= abbreviated as
-  =optim-speed=.
-- Adhoc Polymorphism is supported in the sense that different polymorphs
-  can have different implementations.
-- Subtype Polymorphism is supported in the sense that once a polymorph
-  is defined, then when a call to it is being compiled, then the type
-  declarations inside the lambda-body of the polymorph are enhanced
-  using the more specific type declarations in the environment. Thus, a
-  polymorph that was defined for =vector= when compiled with arguments
-  declared to be =simple-string=, then the body is made aware at
-  /compiler/macroexpansion time/ that the arguments are actually
-  =simple-string= rather than just =vector=. Code further in the
-  succeeding compiler/macroexpansion phases can then make use of this
-  information.
-- Individual polymorphs may also additionally have compiler macros.
-  However, the policy under which these may be invoked is undefined. In
-  essence, user code must not rely on compiler macros for /correctness/.
-- See [[#advanced-usage-aka-parametric-polymorphism][Advanced Usage]]
-  for parametric polymorphism. Adhoc and Subtype polymorphisms should
-  suffice in most cases for optimization; parametric polymorphism can
-  aid in further type safety.
+- Users are expected to define a =polymorphic-function= (analogous to =cl:generic-function=) with one or more =polymorph= (similar to =cl:method=). These may be dispatched at runtime or at compile time if optimization policy is ~(and (= speed 3) (/= debug 3))~ abbreviated as  =optim-speed=.
+- Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
+- Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a
+  polymorph that was defined for =vector= when compiled with arguments declared to be =simple-string=, then the body is made aware at /compiler/macroexpansion time/ that the arguments are actually =simple-string= rather than just =vector=. Code further in the succeeding compiler/macroexpansion phases can then make use of this information.
+- Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for /correctness/.
+- See [[#discussion-and-advanced-usage][Discussion and Advanced Usage]] for parametric polymorphism. Adhoc and Subtype polymorphisms should suffice in most cases for optimization; parametric polymorphism can aid in further type safety.
 
 *** Examples
      :PROPERTIES:
@@ -108,7 +97,7 @@ See [[file:src/misc-tests.lisp]] for some more examples.
   (defpolymorph my= ((a character) (b character)) boolean
     (char= a b))
   (defpolymorph my= ((a (simple-array single-float))
-                    (b (simple-array single-float))) symbol
+                     (b (simple-array single-float))) symbol
     ;; possible here; not possible with cl:defmethod without some MOP-fu
     ;; do something
     'hello)
@@ -170,6 +159,10 @@ See [[file:src/misc-tests.lisp]] for some more examples.
   ;
   ;       (A B)
   ;
+  ;     derived to be of TYPES:
+  ;     
+  ;       (STRING INTEGER)
+  ;
   ;     Available Effective-Type-Lists include:
   ;
   ;       (STRING STRING)
@@ -179,6 +172,7 @@ See [[file:src/misc-tests.lisp]] for some more examples.
   CL-USER> (my= 5 "hello")
   ; Evaluation aborted on #<POLYMORPHIC-FUNCTIONS::NO-APPLICABLE-POLYMORPH/ERROR {103A713D13}>.
 #+END_SRC
+
 
 ** Libraries / Projects currently using polymorphic-functions
     :PROPERTIES:
@@ -191,7 +185,6 @@ See [[file:src/misc-tests.lisp]] for some more examples.
   repetition in the /packaged/ provided code, cutting down on initial
   compile times.
 - [[https://github.com/lisp-polymorph/][lisp-polymorph]] with currently working
-
   - [[https://github.com/lisp-polymorph/polymorph.maths][polymorph.maths]]
   - [[https://github.com/lisp-polymorph/polymorph.access][polymorph.access]]
   - [[https://github.com/lisp-polymorph/polymorph.copy-cast][polymorph.copy-cast]]
@@ -202,20 +195,12 @@ See [[file:src/misc-tests.lisp]] for some more examples.
     :CUSTOM_ID: static-dispatch-inline-optimizations
     :END:
 
-A compiler-note-providing compiler-macro has also been provided for
-compile-time optimization guidelines.
+A compiler-note-providing compiler-macro has also been provided for compile-time optimization guidelines.
 
-- A speed=3 optimization coupled with debug<3 optimization results in
-  (attempts to) static-dispatch. This is done using by f-binding
-  gentemps to appropriate function objects.
-- Inline optimization may also be provided by
-  =(declare (inline-pf my-polymorph))= or supplying =:inline t=
-  (default) or =:inline :maybe= option in the =name= field of
-  =defpolymorph= form.
+- A speed=3 optimization coupled with debug<3 optimization results in (attempts to) static-dispatch. This is done using by f-binding gentemps to appropriate function objects.
+- Inline optimization may also be provided by =(declare (inline-pf my-polymorph))= or supplying =:inline t= (default) or =:inline :maybe= option in the =name= field of =defpolymorph= form.
 
-It is up to the user to ensure that a polymorph that specializes (or
-generalizes) another polymorph should have the same behavior, under the
-appropriate definition of same-ness.
+It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under the appropriate definition of same-ness.
 
 For instance, consider
 
@@ -246,49 +231,209 @@ Then, the behavior of =my-type-caller= depends on optimization policies:
   (my-type-caller "hello") ;=> VECTOR
 #+END_SRC
 
-The mistake here is polymorph with type list =(vector)= produces a
-different behavior as compared to polymorph with type list =(string)=.
-(The behavior is "same" in the sense that ="hello"= is indeed a
-=vector=; perspective matters?)
+The mistake here is polymorph with type list =(vector)= produces a different behavior as compared to polymorph with type list =(string)=. (The behavior is "same" in the sense that ="hello"= is indeed a =vector=; perspective matters?)
 
-This problem also arises with
-[[https://github.com/alex-gutev/static-dispatch][static-dispatch]] and
-[[https://github.com/guicho271828/inlined-generic-function][inlined-generic-functions]].
-The way to avoid it is to either maintain discipline on the part of the
-user (the way polymorphic-functions [currently] assumes) or to seal
-domains (the way of fast-generic-functions and sealable-metaobjects).
+This problem also arises with [[https://github.com/alex-gutev/static-dispatch][static-dispatch]] and [[https://github.com/guicho271828/inlined-generic-function][inlined-generic-functions]]. The way to avoid it is to either maintain discipline on the part of the user (the way polymorphic-functions [currently] assumes) or to seal domains (the way of fast-generic-functions and sealable-metaobjects).
 
-Inlining especially becomes necessary for mathematical operations,
-wherein a call to =generic-+= on SBCL can be a 3-10 times slower than
-the optimized calls to =fixnum += or =single-float += etc. =generic-cl=
-(since =static-dispatch= version 0.5) overcomes this on SBCL by using
-=sb-c:deftransform=; for portable projects, one could use
-=inlined-generic-functions= [superseded by =fast-generic-functions=]
-subject to the limitation that there are no separate classes for (array
-single-float) and (array double-float) at least until SBCL 2.1.1.
+Inlining especially becomes necessary for mathematical operations, wherein a call to =generic-+= on SBCL can be a 3-10 times slower than the optimized calls to =fixnum += or =single-float += etc. =generic-cl= (since =static-dispatch= version 0.5) overcomes this on SBCL by using =sb-c:deftransform=; for portable projects, one could use =inlined-generic-functions= [superseded by =fast-generic-functions=] subject to the limitation that there are no separate classes for (array single-float) and (array double-float) at least until SBCL 2.1.1.
 
-** Advanced Usage
+** Discussion and Advanced Usage
     :PROPERTIES:
     :CUSTOM_ID: advanced-usage
     :END:
 
-*** Parametric Polymorphism
-     :PROPERTIES:
-     :CUSTOM_ID: parametric-polymorphism
-     :END:
+The library was primarily made to dispatch on specialized-arrays for use in [[https://github.com/digikar99/numericals][numericals]], since CLHS does not enable generic-functions for specialized-arrays. Compile-time static-dispatch is provided through the use of compiler-macros and CLTL2 environment API in conjunction with [[https://github.com/alex-gutev/cl-form-types][cl-form-types]].
 
-In addition to subtype-polymorphism described above (under
-[[#basic-usage][Basic Usage]]), PF also provides support for
-parametric-polymorphism. The interface for this is through the following
+TODO: Answer What's wrong with typecase? if anything other than non-extensibility.
+
+The closest pre-existing library to polymorphic-functions at the time of writing is
+- [[https://github.com/numcl/specialized-function][specialized-function]]: sf has a JIT philosophy, while pf has a AOT philosophy
+- [[https://github.com/cosmos72/cl-parametric-types][cl-parametric-types]]: I'm not a fan of the calling syntax for cl-parametric-types
+
+*** Wait, doesn't pf's use of AOT imply 2500 specialized variants as sf says?
+
+Thanks to [[https://en.wikipedia.org/wiki/Subtyping][Subtype Polymorphism]], pf's use of AOT can handle this without so many variants.
+
+#+BEGIN_SRC lisp
+  (defun dot-original (a b c)
+    (declare (optimize (speed 3) (debug 0)))
+    (loop
+      for i below (array-total-size a)
+      do (incf c (* (aref a i) (aref b i))))
+    c)
+
+  (defun dot-user ()
+    (let ((a (make-array 1000000 :element-type 'single-float))
+          (b (make-array 1000000 :element-type 'single-float))
+          (c 0.0))
+      (time (loop repeat 100 do (dot-original a b c)))))
+
+  (defun sf-dot-original (a b c)
+    (declare (optimize (speed 3) (debug 0)))
+    (specialized-function:specializing (a b c) ()
+      (loop
+        for i below (array-total-size a)
+        do (incf c (* (aref a i) (aref b i))))
+      c))
+
+  (defun sf-dot-user ()
+    (let ((a (make-array 1000000 :element-type 'single-float))
+          (b (make-array 1000000 :element-type 'single-float))
+          (c 0.0))
+      (time (loop repeat 100 do (sf-dot-original a b c)))))
+
+  (defpolymorph (pf-dot-original :inline t) (a b c) t
+    (loop
+      for i below (array-total-size a)
+      do (incf c (* (aref a i) (aref b i))))
+    c)
+
+  (defun pf-dot-user-undeclared ()
+    (let ((a (make-array 1000000 :element-type 'single-float))
+          (b (make-array 1000000 :element-type 'single-float))
+          (c 0.0))
+      (time (loop repeat 100 do (pf-dot-original a b c)))))
+
+  (defun pf-dot-user ()
+    (let ((a (make-array 1000000 :element-type 'single-float))
+          (b (make-array 1000000 :element-type 'single-float))
+          (c 0.0))
+      (declare (optimize speed)
+               (type (simple-array single-float) a b)
+               (type single-float c))
+      (time (loop repeat 100 do (pf-dot-original a b c)))))
+
+  (defun pf-dot-user-df ()
+    (let ((a (make-array 1000000 :element-type 'double-float))
+          (b (make-array 1000000 :element-type 'double-float))
+          (c 0.0d0))
+      (declare (optimize speed)
+               (type (simple-array double-float) a b)
+               (type double-float c))
+      (time (loop repeat 100 do (pf-dot-original a b c)))))
+#+END_SRC
+
+And the results:
+
+#+begin_src lisp
+POLYMORPHIC-FUNCTIONS> (dot-user)
+Evaluation took:
+  3.108 seconds of real time
+  0 bytes consed
+POLYMORPHIC-FUNCTIONS> (sf-dot-user)
+Evaluation took:
+  0.192 seconds of real time
+  392,832 bytes consed
+POLYMORPHIC-FUNCTIONS> (sf-dot-user)
+Evaluation took:
+  0.236 seconds of real time
+  0 bytes consed
+POLYMORPHIC-FUNCTIONS> (pf-dot-user-undeclared)
+Evaluation took:
+  3.248 seconds of real time
+  0 bytes consed
+POLYMORPHIC-FUNCTIONS> (pf-dot-user)
+Evaluation took:
+  0.236 seconds of real time
+  0 bytes consed
+POLYMORPHIC-FUNCTIONS> (pf-dot-user-df)
+Evaluation took:
+  0.248 seconds of real time
+  0 bytes consed
+#+end_src
+
+*** But, what about =inline= induced code-bloat?
+
+Unfortunately, that is a thing. However, consider this. (And correct me if I'm wrong!) If sf is enclosed inside a non-inline function, then there is always going to be a runtime dispatch overhead associated with it. An illustration:
+
+#+BEGIN_SRC lisp
+  (defun sf-dot-user-small ()
+    (let ((a (make-array 1000 :element-type 'single-float))
+          (b (make-array 1000 :element-type 'single-float))
+          (c 0.0))
+      (time (loop repeat 100000 do (sf-dot-original a b c)))))
+
+  (defun pf-dot-user-small ()
+    (let ((a (make-array 1000 :element-type 'single-float))
+          (b (make-array 1000 :element-type 'single-float))
+          (c 0.0))
+      (declare (optimize speed)
+               (type (simple-array single-float) a b)
+               (type single-float c))
+      (time (loop repeat 100000 do (pf-dot-original a b c)))))
+
+  POLYMORPHIC-FUNCTIONS> (sf-dot-user-small)
+  Evaluation took:
+    0.247 seconds of real time
+    0 bytes consed
+  POLYMORPHIC-FUNCTIONS> (pf-dot-user-small)
+  Evaluation took:
+    0.183 seconds of real time
+    0 bytes consed
+#+END_SRC
+
+In essence: if you enclose, you will have runtime dispatch overhead.
+
+*** That sounds bad; isn't there a "best of both worlds"?
+
+One observation that might sound useful is the following: the faster the code, the costlier the runtime dispatch. Indeed, no one has forced you to use sf /exor/ pf. You can use both. pf works best for faster/smaller code when dispatch is costly. While sf works best with slower/larger code, when runtime dispatch overhead is insignificant. Thus, what you can have is the following:
+
+#+BEGIN_SRC lisp
+  (defun sf-pf-dot-original-100 (a b c)
+    (specialized-function:specializing (a b c) ()            
+      (declare (optimize speed))
+      (loop repeat 100 do (pf-dot-original a b c))
+      c))
+
+  (defun sf-pf-dot-original-100000 (a b c)
+    (specialized-function:specializing (a b c) ()            
+      (declare (optimize speed))
+      (loop repeat 100000 do (pf-dot-original a b c))
+      c))
+
+  (defun sf-pf-dot-user ()
+    (let ((a (make-array 1000000 :element-type 'single-float))
+          (b (make-array 1000000 :element-type 'single-float))
+          (c 0.0))
+      (time (sf-pf-dot-original-100 a b c))))
+
+  (defun sf-pf-dot-user-small ()
+    (let ((a (make-array 1000 :element-type 'single-float))
+          (b (make-array 1000 :element-type 'single-float))
+          (c 0.0))
+      (time (sf-pf-dot-original-100000 a b c))))
+
+  ;; After initial few runs when JIT overhead is taken care of
+  POLYMORPHIC-FUNCTIONS> (sf-pf-dot-user)
+  Evaluation took:
+    0.236 seconds of real time
+    0 bytes consed
+  POLYMORPHIC-FUNCTIONS> (sf-pf-dot-user-small)
+  Evaluation took:
+    0.180 seconds of real time
+    0 bytes consed
+#+END_SRC
+
+*** Well, that's awesome! What else can you do with polymorphic-functions?
+
+In addition to [[https://en.wikipedia.org/wiki/Subtyping][Subtype Polymorphism]], [[https://en.wikipedia.org/wiki/Parametric_polymorphism][Parametric Polymorphism]] is provided as well. While subtype polymorphism helps with performance, parametric-polymorphism helps with type-safety, in addition to performance. However, given the limitations of CL, this can be a fair bit limited. See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][u/stylewarning's comments here]].
+
+Support for extended-types is also provided through [[https://github.com/s-expressionists/ctype][ctype]].
+
+Note that both these are declared to be much more experimental than polymorphic-functions themselves; and it seems they will be that way for a while.
+
+*** Could you elaborate on parametric-polymorphism?
+
+Sure!
+ 
+In addition to subtype-polymorphism described above (under [[#basic-usage][Basic Usage]]), PF also provides support for parametric-polymorphism. The interface for this is through the following
 symbols:
 
 - \*parametric-type-symbol-predicates\*
 - parametric-type-run-time-lambda-body
 - parametric-type-compile-time-lambda-body
 
-An example for this is at
-[[file:src/extended-types/parametric-types.lisp#L135][src/extended-types/parametric-types.lisp]]
-and [[file:src/misc-tests.lisp#L496][src/misc-tests.lisp]].
+An example for this is at [[file:src/extended-types/parametric-types.lisp#L135][src/extended-types/parametric-types.lisp]] and [[file:src/misc-tests.lisp#L496][src/misc-tests.lisp]].
 
 #+BEGIN_SRC lisp
   CL-USER> (use-package :polymorphic-functions)
@@ -378,35 +523,118 @@ and [[file:src/misc-tests.lisp#L496][src/misc-tests.lisp]].
 TODO (perhaps?): Ping/PR [[https://github.com/numcl/gtype][gtype]] for
 compile time optimization.
 
-*** Extended Types
-     :PROPERTIES:
-     :CUSTOM_ID: extended-types
-     :END:
+*** And about extended types?
 
-=polymorphic-functions.extended-types= package (not system!) provides
-types based on [[https://github.com/s-expressionists/ctype][ctype]].
-This allows one to extend the CL type system beyond what is possible
-with =cl:deftype=.
+There is a =polymorphic-functions.extended-types= package (not system!) that provides types based on [[https://github.com/s-expressionists/ctype][ctype]]. This allows one to extend the CL type system beyond what is possible with =cl:deftype=.
 
-An example for this is the =(supertypep TYPE)= type at
-[[file:src/extended-types/supertypep.lisp]] used in
-[[https://github.com/digikar99/trivial-coerce][trivial-coerce]].
+An example for this is the =(supertypep TYPE)= type at 
+[[file:src/extended-types/supertypep.lisp]].
 
-- In essence, =(supertypep TYPE)= is the set of all type-specifiers that
-  are a supertype of =TYPE=.
+- In essence, =(supertypep TYPE)= is the set of all type-specifiers that are a supertype of =TYPE=.
 - Thus, =(typep 'array '(supertypep vector))= holds.
-- In addition, if one were to =(deftype 1d-array () 'vector)= then
-  =(typep '1d-array '(supertypep vector))= would also hold.
+- In addition, if one were to =(deftype 1d-array () 'vector)= then =(typep '1d-array '(supertypep vector))= would also hold.
 
-However, these types can only be used inside the type-lists of
-polymorphs or with the shadowed symbols in the
-=polymorphic-functions.extended-types= package; they *cannot be used
+Another example of the usage for this is ~(type= TYPE)~ at [[file:src/extended-types/type=.lisp]] put to use in [[https://github.com/digikar99/trivial-coerce][trivial-coerce]].
+
+However, these types can only be used inside the type-lists of polymorphs or with the shadowed symbols in the =polymorphic-functions.extended-types= package; they *cannot be used
 inside arbitrary CL forms* with =cl:declare=.
 
-** Limitations
+*** Erm, about the polymorphs themselves, is there a notion of specificity of type-lists / polymorphs?
+
+In the case of CLOS generic-functions, [[http://clhs.lisp.se/Body/07_ffab.htm][the specificity of methods is determined by the ordering of classes in the class-precedence-list]]. However, an equivalent notion of type-precedence-lists does not make sense. The closest is the subtype relation.
+
+Thus, considering two /applicable/ polymorphs, from left to right, each of the corresponding type-specifier pair has a non-NIL intersection*, or one of them is a subtype of another. The former case is inherently ambiguous in the absence of type-precedence lists, and is detected at compilation time. A continuable error is signalled to help the user handle this case. In the latter case, the polymorph corresponding to the more specialized type in the pair is awarded a higher specificity.
+
+*A trivial example of non-NIL intersection are the types =(or string number)= and =(or string symbol)=.
+
+Thus, for two-argument polymorphs with type-lists containing =array= and =string= have the most-specific-first ordering given by:
+
+#+BEGIN_SRC
+(string string)
+(string array)
+(array  string)
+(array  array)
+#+END_SRC
+
+The arguments are ordered in the order they are specified in the case of required and optional arguments. For keyword arguments, they are reordered in lexical order.
+
+*** That looks cool. Is there more comparison against generic-functions and specialization-store?
+
+Here we go: so, =polymorphic-function= are implemented using the metaclass =closer-mop:funcallable-standard-class= and =closer-mop:set-funcallable-instance-function=.
+
+As per [[http://www.lispworks.com/documentation/HyperSpec/Body/t_generi.htm#generic-function][CLHS]],
+
+#+BEGIN_QUOTE
+  A generic function is a function whose behavior depends on the classes
+  or identities of the arguments supplied to it.
+#+END_QUOTE
+
+By contrast, polymorphic-functions dispatch on the types of the
+arguments supplied to it. This helps dispatching on specialized arrays
+as well as user-defined types. Further, the intention of
+polymorphic-functions is to provide multiple implementations of a
+high-level operation* corresponding to different specializations, the
+behavior is supposed to be the "same". "Overriding behavior" makes
+more sense for generic functions than with polymorphic-functions.
+
+In contrast to [[https://github.com/marcoheisig/sealable-metaobjects][sealable-metaobjects]] and [[https://github.com/marcoheisig/fast-generic-functions][fast-generic-functions]],
+polymorphic-functions does not make any assumptions about the
+sealedness of a domain for purposes of inlining. Thus, users are
+expected to abide by the same precautions for inline optimizations
+here as they do while inlining normal functions. In particular, users
+are expected to recompile their code after additional polymorphs are
+defined, and also accordingly manage the compilation order of their
+files and systems.
+
+IIUC, [[https://github.com/numcl/specialized-function][specialized-function]] provides a JIT variant of parametric
+polymorphism. By contrast, PF provides an AOT variant.
+
+A related project [[https://github.com/markcox80/specialization-store][specialization-store]] also provides support for
+type-based dispatch:
+
+#+BEGIN_QUOTE
+  A premise of specialization store is that all specializations should
+  perform the same task. Specializations should only differ in how the
+  task is performed. This premise resolves ambiguities that arise when
+  using types, rather than classes, to select the most specific
+  specialization to apply.
+#+END_QUOTE
+
+However, the implications of this assumption are that individual
+specializations in each store-object of specialization-store [[https://github.com/markcox80/specialization-store/wiki/Tutorial-2:-Optional,-Keyword-and-Rest-Arguments][do not
+have initializer forms for optional or keyword arguments]].
+
+By contrast, like usual generic-functions, PF does allow initializer
+forms for optional and keywords arguments for individual polymorphs.
+
+In addition to being dispatched on types, PF also provides the ability
+to install compiler-macros for individual =polymorphs=.
+
+The runtime dispatch performance of all the three of
+polymorphic-functions, cl:generic-function and specialization-store is
+comparable at least for a small number of
+polymorphs/methods/specializations.
+
+| Feature                         | cl:generic-function | specialization-store | polymorphic-functions |
+|                                 |                     |                      |                       |
+|---------------------------------+---------------------+----------------------+-----------------------|
+| Method combination              | Yes                 | No                   | No                    |
+| Precedence                      | Yes                 | Partial^             | Yes                   |
+| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                  |
+| Run-time Speed                  | Fast                | Fast                 | Fast                  |
+| Compile-time support            | Partial**           | Yes                  | Yes                   |
+| Parametric Polymorphism         | No                  | No                   | Yes                   |
+
+^This is the point about specialization-store having a single common initialization form for all the specializations.
+
+**Using [[https://github.com/marcoheisig/fast-generic-functions][fast-generic-functions]] - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries. But, there's also [[https://github.com/alex-gutev/static-dispatch][static-dispatch]].
+
+*** Thank you so much! Are there any pitfalls I need to be aware of while using pf?
     :PROPERTIES:
     :CUSTOM_ID: limitations
     :END:
+
+Yes, there are quite a few:
 
 - For *form-type-inference*, polymorphic-functions depends on
   cl-form-types. Thus, this works as long as cl-form-types succeeds, and
@@ -432,77 +660,12 @@ inside arbitrary CL forms* with =cl:declare=.
   let PF work as correctly on CCL; subjectively dirty workarounds are
   possible until it gets fixed.
 - A =polymorphic-functions.extended-types= package (not system!) is also
-  provided based on
-  [[https://github.com/s-expressionists/ctype][ctype]]. This allows one
-  to extend the CL type system to define types beyond what =cl:deftype=
-  can do to some extent. While these *cannot be used inside an arbitrary
-  CL form* with =cl:declare=, these can be used in the type lists of
-  polymorphs. See [[file:src/extended-types/supertypep.lisp]] for an
-  example put to use in
-  [[https://github.com/digikar99/trivial-coerce][trivial-coerce]].
+  provided based on [[https://github.com/s-expressionists/ctype][ctype]]. This allows one to extend the CL type system to define types beyond what =cl:deftype= can do to some extent. While these *cannot be used inside an arbitrary
+  CL form* with =cl:declare=, these can be used in the type lists of polymorphs. See [[file:src/extended-types/type=.lisp]] for an example put to use in [[https://github.com/digikar99/trivial-coerce][trivial-coerce]].
 - Currently *inlining uses the lexical environment of the call-site*
   rather than the definition-site as is the usual case. To work around
   this, users should avoid shadowing global lexical elements.
-
-* Rationale
-   :PROPERTIES:
-   :CUSTOM_ID: rationale
-   :END:
-
-=polymorphic-function= are implemented using the metaclass
-=closer-mop:funcallable-standard-class= and
-=closer-mop:set-funcallable-instance-function=.
-
-As per
-[[http://www.lispworks.com/documentation/HyperSpec/Body/t_generi.htm#generic-function][CLHS]],
-
-#+BEGIN_QUOTE
-  A generic function is a function whose behavior depends on the classes
-  or identities of the arguments supplied to it.
-#+END_QUOTE
-
-By contrast, polymorphic-functions dispatch on the types of the
-arguments supplied to it. This helps dispatching on specialized arrays
-as well as user-defined types.
-
-In contrast to
-[[https://github.com/marcoheisig/sealable-metaobjects][sealable-metaobjects]]
-and
-[[https://github.com/marcoheisig/fast-generic-functions][fast-generic-functions]],
-polymorphic-functions does not make any assumptions about the sealedness
-of a domain for purposes of inlining. Thus, users are expected to abide
-by the same precautions for inline optimizations here as they do while
-inlining normal functions. In particular, users are expected to
-recompile their code after additional polymorphs are defined, and also
-accordingly manage the compilation order of their files and systems.
-
-IIUC,
-[[https://github.com/numcl/specialized-function][specialized-function]]
-provides a JIT variant of parametric polymorphism. By contrast, PF
-provides an AOT variant.
-
-A related project
-[[https://github.com/markcox80/specialization-store][specialization-store]]
-also provides support for type-based dispatch:
-
-#+BEGIN_QUOTE
-  A premise of specialization store is that all specializations should
-  perform the same task. Specializations should only differ in how the
-  task is performed. This premise resolves ambiguities that arise when
-  using types, rather than classes, to select the most specific
-  specialization to apply.
-#+END_QUOTE
-
-However, the implications of this assumption are that individual
-specializations in each store-object of specialization-store
-[[https://github.com/markcox80/specialization-store/wiki/Tutorial-2:-Optional,-Keyword-and-Rest-Arguments][do
-not have initializer forms for optional or keyword arguments]].
-
-By contrast, like usual generic-functions, PF does allow initializer
-forms for optional and keywords arguments for individual polymorphs.
-
-In addition to being dispatched on types, PF also provides the ability
-to install compiler-macros for individual =polymorphs=.
+- See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]] for parametric-types.
 
 * Dependencies outside quicklisp
    :PROPERTIES:
@@ -510,11 +673,8 @@ to install compiler-macros for individual =polymorphs=.
    :END:
 
 - SBCL 2.0.9+
-- [[https://github.com/digikar99/trivial-types][trivial-types:function-name]]
 - [[https://github.com/alex-gutev/cl-form-types][cl-form-types]]
-
   - [[https://github.com/alex-gutev/cl-environments][cl-environments]]
-
 - [[https://github.com/digikar99/compiler-macro-notes][compiler-macro-notes]]
 - and more... better use ultralisp until then!
 
@@ -563,7 +723,6 @@ Once the function is pushed, install the dist:
   (asdf:test-system "polymorphic-functions")
 #+END_SRC
 
-
 ** Getting it from clpm
 
 Recently, clpm support was also added.
@@ -588,43 +747,13 @@ Tests are distributed throughout the system. Run
 - [[https://github.com/guicho271828/inlined-generic-function][inlined-generic-functions]]
 - [[https://github.com/numcl/specialized-function][specialized-function]]
 - [[https://github.com/numcl/gtype][gtype]]
-
-* Feature Parity
-   :PROPERTIES:
-   :CUSTOM_ID: feature-parity
-   :END:
-
-The runtime dispatch performance of all the three of
-polymorphic-functions, cl:generic-function and specialization-store is
-comparable at least for a small number of
-polymorphs/methods/specializations.
-
-| Feature                         | cl:generic-function | specialization-store | polymorphic-functions |
-|---------------------------------+---------------------+----------------------+-----------------------|
-| Method combination              | Yes                 | No                   | No                    |
-| Precedence                      | Yes                 | Partial*             | Yes                   |
-| &optional, &key, &rest dispatch | No                  | Yes                  | Yes^                  |
-| Run-time Speed                  | Fast                | Fast                 | Fast                  |
-| Compile-time support            | Partial**           | Yes                  | Yes                   |
-| Parametric Polymorphism         | No                  | No                   | Yes                   |
-
-^See [[#comparison-with-specialization-store]]. Well...
-
-**Using
-[[https://github.com/marcoheisig/fast-generic-functions][fast-generic-functions]] -
-but this apparantly has a few limitations like requiring
-non-builtin-classes to have an additional metaclass. This effectively
-renders it impossible to use for the classes in already existing
-libraries. But, there's also
-[[https://github.com/alex-gutev/static-dispatch][static-dispatch]].
+- [[https://github.com/cosmos72/cl-parametric-types][cl-parametric-types]]
 
 * Acknowledgements
    :PROPERTIES:
    :CUSTOM_ID: acknowledgements
    :END:
 
-- [[https://github.com/alex-gutev/][Alex Gutev]] for an extensive
-  [[https://github.com/alex-gutev/cl-form-types][cl-form-types]]!
-- [[https://github.com/commander-trashdin/][Andrew]] for extensively
-  putting polymorphic-functions to test at a brewing project on
+- [[https://github.com/alex-gutev/][Alex Gutev]] for an extensive [[https://github.com/alex-gutev/cl-form-types][cl-form-types]]!
+- [[https://github.com/commander-trashdin/][Andrew]] for extensively putting polymorphic-functions to test at a brewing project on
   [[https://github.com/lisp-polymorph/][lisp-polymorph]]!
