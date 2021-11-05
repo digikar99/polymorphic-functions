@@ -129,6 +129,19 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
 ;;; demand a user supplied value for INLINE. We put the same to use and avoid
 ;;; depending on the code-walker altogether.
 
+;;; The BODY of the DEFPOLYMORPH FORM may contain macro calls referenced to the
+;;; null lexenv. When this BODY gets substituted in order to INLINE the PF,
+;;; we want to avoid MACROLET (and FLET, LABELS) from overriding the elements
+;;; of the null lexenv. That is what the behavior of INLINE-d functions defined
+;;; by DEFUN is. (Does the spec say that?)
+;;;   The MACROLET can be taken care of by MACROEXPAND-ALL. However, because
+;;; compiling to support SUBTYPE and PARAMETRIC polymorphism requires type
+;;; information that is only available at the call-compilation site rather than
+;;; at the defpolymorph-definition site. Thus, the MACROEXPAND-ALL must happen
+;;; within the pf-compiler-macro rather than DEFPOLYMORPH below.
+;;;   That still leaves FLET and LABELS though. And that does form a limitation
+;;; of polymorphic functions at the time of this writing.
+
 ;;; Do minimal work at macro-expansion time?
 ;;; 1. Well, to be able to handle closures, the compilation phase of the lambda
 ;;;    needs the env. However, env objects cannot be dumped; nor does it seem like

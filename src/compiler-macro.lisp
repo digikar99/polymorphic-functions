@@ -99,7 +99,8 @@
                     ;; declarations.
                     ;; Otherwise, the other information must be excluded
                     ;; because the POLYMORPH was originally expected to be defined in
-                    ;; null env
+                    ;; null env; see the discussion preceding DEFPOLYMORPH macro for
+                    ;; more details
                     (let* ((augmented-env (augment-environment
                                            env
                                            :declare (list

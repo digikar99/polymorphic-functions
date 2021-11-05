@@ -41,7 +41,7 @@
                 #:compiler-macroexpand
                 #:constant-form-value
                 #:parse-compiler-macro)
-  (:import-from :cl-environments
+  (:import-from :cl-environments.cltl2
                 #:function-information
                 #:variable-information
                 #:declaration-information

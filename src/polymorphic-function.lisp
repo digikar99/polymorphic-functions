@@ -285,7 +285,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
               untyped-lambda-list name))
     (assert (type-list-compatible-p apf-lambda-list-type type-list untyped-lambda-list)
             nil
-            "TYPE-LIST ~S is not compatible with the LAMBDA-LIST ~S of the POLYMORPHs associated with ~S"
+            "TYPE-LIST~%  ~S~%is not compatible with the LAMBDA-LIST~%  ~S~%of the POLYMORPHs associated with ~S"
             type-list untyped-lambda-list name)
     (ensure-unambiguous-call name type-list effective-type-list)
     (let ((polymorph (make-polymorph :name name

@@ -117,6 +117,7 @@
   (is (equalp '(&optional c)   (untyped-lambda-list '(&optional ((c string))))))
   (is (equalp '(a &optional c) (untyped-lambda-list '((a number) &optional ((c string))))))
   (is (equalp '(&key c)   (untyped-lambda-list '(&key ((c string))))))
+  (is (equalp '(&key c d)   (untyped-lambda-list '(&key ((c string)) ((d number))))))
   (is (equalp '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
   (is (equalp '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
 
