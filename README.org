@@ -10,26 +10,24 @@
   qlot!)
 
   If you would like at least a few grams (or ounce :p) of stability,
-  stick to the following symbols:
+  stick to the following symbols, and avoid non-trivial uses of &rest type-lists:
 
   - define-polymorphic-function
   - undefine-polymorphic-function
   - defpolymorph
   - defpolymorph-compiler-macro
   - undefpolymorph
-- find-polymorph
-- polymorph-apropos-list-type
+  - find-polymorph
+  - polymorph-apropos-list-type
 #+END_QUOTE
 
 The library provides all of
 
-- [[https://en.wikipedia.org/wiki/Ad_hoc_polymorphism][Ad hoc
-  polymorphism]] and
+- [[https://en.wikipedia.org/wiki/Ad_hoc_polymorphism][Ad hoc polymorphism]] and
 - [[https://en.wikipedia.org/wiki/Subtyping][Subtype Polymorphism]]
-- [[https://en.wikipedia.org/wiki/Parametric_polymorphism][Parametric
-  Polymorphism]] (but see [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]]!)
+- [[https://en.wikipedia.org/wiki/Parametric_polymorphism][Parametric Polymorphism]] (but see [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]]!)
 
-to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#extended-types][extended-types]] are also provided through [[[[*** Extended Types]\]]are also provided through [[https://github.com/s-expressionists/ctype/][ctype]].
+to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#and-about-extended-types][extended types]] are also provided through [[[[*** Extended Types]\]]are also provided through [[https://github.com/s-expressionists/ctype/][ctype]].
 
 The library was primarily made to dispatch on specialized-arrays for use in [[https://github.com/digikar99/numericals][numericals]], since CLHS does not enable generic-functions for specialized-arrays. But has also been put to use in [[https://github.com/lisp-polymorph/][lisp-polymorph]].
 
@@ -63,7 +61,6 @@ The library was primarily made to dispatch on specialized-arrays for use in [[ht
 - [[#related-projects][Related Projects]]
 - [[#acknowledgements][Acknowledgements]]
 :END:
-
 
 * Usage
    :PROPERTIES:
@@ -172,7 +169,6 @@ See [[file:src/misc-tests.lisp]] for some more examples.
   CL-USER> (my= 5 "hello")
   ; Evaluation aborted on #<POLYMORPHIC-FUNCTIONS::NO-APPLICABLE-POLYMORPH/ERROR {103A713D13}>.
 #+END_SRC
-
 
 ** Libraries / Projects currently using polymorphic-functions
     :PROPERTIES:
@@ -666,6 +662,7 @@ Yes, there are quite a few:
   rather than the definition-site as is the usual case. To work around
   this, users should avoid shadowing global lexical elements.
 - See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]] for parametric-types.
+- Avoid using =&rest= lambda-lists if you are aiming for stability. The algorithms for heterogeneous-type-lists methods for specialization and ambiguity detection implemented at file:src/lambda-lists/rest.lisp are non-trivial; PRs with more simplistic algorithms would be much welcome :D!
 
 * Dependencies outside quicklisp
    :PROPERTIES:

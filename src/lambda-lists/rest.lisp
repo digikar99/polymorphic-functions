@@ -115,6 +115,7 @@
                           (subseq list-2 0 (min rest-position-1 rest-position-2)))))
 
 (def-test type-list-subtype-rest-&-rest (:suite type-list-subtype-rest)
+  (5am:is-true  (type-list-subtype-p '(string array &rest)  '(array string &rest)))
   (5am:is-true  (type-list-subtype-p '(string string &rest) '(string array &rest)))
   (5am:is-true  (type-list-subtype-p '(string string &rest) '(string &rest)))
   (5am:is-false (type-list-subtype-p '(string string &rest) '(string number &rest))))
@@ -147,6 +148,7 @@
           (t nil))))
 
 (def-test type-list-subtype-required-&-rest (:suite type-list-subtype-rest)
+  (5am:is-true  (type-list-subtype-p '(string array)  '(array string &rest)))
   (5am:is-true  (type-list-subtype-p '(string string) '(string string &rest)))
   (5am:is-true  (type-list-subtype-p '(string string) '(string array &rest)))
   (5am:is-true  (type-list-subtype-p '(string)        '(string &rest)))
@@ -184,18 +186,20 @@
   (let ((key-position  (position '&key  list-1))
         (rest-position (position '&rest list-2)))
     (cond ((= key-position rest-position)
-           (every #'subtypep
-                  (subseq list-1 0 key-position)
-                  (subseq list-2 0 key-position)))
+           (%type-list-subtype-p 'required 'required
+                                 (subseq list-1 0 key-position)
+                                 (subseq list-2 0 key-position)))
           ((< rest-position key-position)
-           (every #'subtypep
-                  (subseq list-1 0 rest-position)
-                  (subseq list-2 0 rest-position)))
+           (%type-list-subtype-p 'required 'required
+                                 (subseq list-1 0 rest-position)
+                                 (subseq list-2 0 rest-position)))
           ((< key-position rest-position)
-           (and (every #'subtypep
-                       (subseq list-1 0 key-position)
-                       (subseq list-2 0 key-position))
-                ;; KEYWORD-supertypes at odd positions
+           (and (%type-list-subtype-p 'required 'required
+                                      (subseq list-1 0 key-position)
+                                      (subseq list-2 0 key-position))
+                ;; The args between &KEY and &REST should be subtype.
+                ;; For this we need two things:
+                ;; 1. KEYWORD-supertypes at odd positions
                 (let ((rest (subseq list-2 key-position rest-position)))
                   (loop :for (name type) :in (subseq list-1 (1+ key-position))
                         :while rest
@@ -203,7 +207,7 @@
                         :for type-2 := (second rest)
                         :always (typep name type-1)
                         :do (setq rest (cddr rest))))
-                ;; SUBTYPEs at even positions
+                ;; 2. SUBTYPEs at even positions
                 (let ((rest     (subseq list-2 key-position rest-position))
                       (subtypep nil))
                   (loop :for (name type) :in (subseq list-1 (1+ key-position))
@@ -219,6 +223,7 @@
                   subtypep))))))
 
 (def-test type-list-subtype-required-key-&-rest (:suite type-list-subtype-rest)
+  (5am:is-true  (type-list-subtype-p '(string array &key) '(array string &rest)))
   (5am:is-true  (type-list-subtype-p '(string array &key) '(string &rest)))
   (5am:is-true  (type-list-subtype-p '(string &key (:a string)) '(string keyword  &rest)))
   (5am:is-true  (type-list-subtype-p '(string &key (:a string))
@@ -245,9 +250,9 @@
          (n-required-1  list-1-length)
          (n-required-2  key-position))
     (cond ((= n-required-1 n-required-2)
-           (every #'subtypep
-                  (subseq list-1 0 list-1-length)
-                  (subseq list-2 0 list-1-length)))
+           (%type-list-subtype-p 'required 'required
+                                 (subseq list-1 0 list-1-length)
+                                 (subseq list-2 0 list-1-length)))
           ((< n-required-1 n-required-2)
            nil)
           ((> n-required-1 n-required-2)
@@ -255,9 +260,9 @@
            ;; Let's just hope the other cases are caught by the ambiguous-call detection
            ;; and we are never required to check type-list-subtype-p for them
            (and (evenp (- n-required-1 n-required-2))
-                (every #'subtypep
-                       (subseq list-1 0 n-required-2)
-                       (subseq list-2 0 n-required-2))
+                (%type-list-subtype-p 'required 'required
+                                      (subseq list-1 0 n-required-2)
+                                      (subseq list-2 0 n-required-2))
                 (let ((key-type-type-pairs-1 (remove-duplicates
                                               (loop :with i := 0
                                                     :while (< i (- n-required-1 n-required-2))
@@ -279,6 +284,7 @@
                                                      :test #'type=)))))))))))
 
 (def-test type-list-subtype-required-&-required-key (:suite type-list-subtype-rest)
+  (5am:is-true  (type-list-subtype-p '(string array) '(array string &key)))
   (5am:is-true  (type-list-subtype-p '(string string) '(string array &key)))
   (5am:is-true  (type-list-subtype-p '(string (eql :a) string)
                                      '(string &key (:a string))))
