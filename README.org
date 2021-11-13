@@ -1,4 +1,4 @@
-* About
+* TODO About
   :PROPERTIES:
   :CUSTOM_ID: polymorphic-functions
   :END:
@@ -27,7 +27,7 @@ The library provides all of
 - [[https://en.wikipedia.org/wiki/Subtyping][Subtype Polymorphism]]
 - [[https://en.wikipedia.org/wiki/Parametric_polymorphism][Parametric Polymorphism]] (but see [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]]!)
 
-to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#and-about-extended-types][extended types]] are also provided through [[[[*** Extended Types]\]]are also provided through [[https://github.com/s-expressionists/ctype/][ctype]].
+to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#and-about-extended-types][extended types]] are also provided through [[https://github.com/s-expressionists/ctype/][ctype]].
 
 The library was primarily made to dispatch on specialized-arrays for use in [[https://github.com/digikar99/numericals][numericals]], since CLHS does not enable generic-functions for specialized-arrays. But has also been put to use in [[https://github.com/lisp-polymorph/][lisp-polymorph]].
 
@@ -53,6 +53,7 @@ The library was primarily made to dispatch on specialized-arrays for use in [[ht
     - [[#and-about-extended-types][And about extended types?]]
     - [[#erm-about-the-polymorphs-themselves-is-there-a-notion-of-specificity-of-type-lists--polymorphs][Erm, about the polymorphs themselves, is there a notion of specificity of type-lists / polymorphs?]]
     - [[#that-looks-cool-is-there-more-comparison-against-generic-functions-and-specialization-store][That looks cool. Is there more comparison against generic-functions and specialization-store?]]
+    - [[#like-generic-functions-and-methods-do-polymorphic-functions-play-nice-with-slimeswank][Like generic-functions and methods, do polymorphic-functions play nice with slime/swank?]]
     - [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-while-using-pf][Thank you so much! Are there any pitfalls I need to be aware of while using pf?]]
 - [[#dependencies-outside-quicklisp][Dependencies outside quicklisp]]
   - [[#getting-it-from-ultralisp][Getting it from ultralisp]]
@@ -422,8 +423,7 @@ Note that both these are declared to be much more experimental than polymorphic-
 
 Sure!
  
-In addition to subtype-polymorphism described above (under [[#basic-usage][Basic Usage]]), PF also provides support for parametric-polymorphism. The interface for this is through the following
-symbols:
+In addition to subtype-polymorphism described above (under [[#basic-usage][Basic Usage]]), PF also provides support for parametric-polymorphism. Note that this does not provide user-defined parametric types. In fact, sane user-defined parametric-types might be impossible in Common Lisp. What this merely allows for then is parametric-polymorphism on functions aka polymorphs for existing parametric-types. The interface for this is through the following symbols:
 
 - \*parametric-type-symbol-predicates\*
 - parametric-type-run-time-lambda-body
@@ -625,6 +625,10 @@ polymorphs/methods/specializations.
 
 **Using [[https://github.com/marcoheisig/fast-generic-functions][fast-generic-functions]] - but this apparantly has a few limitations like requiring non-builtin-classes to have an additional metaclass. This effectively renders it impossible to use for the classes in already existing libraries. But, there's also [[https://github.com/alex-gutev/static-dispatch][static-dispatch]].
 
+*** Like generic-functions and methods, do polymorphic-functions play nice with slime/swank?
+
+At the moment, SLIME is non-extensible. There is an [[https://github.com/slime/slime/issues/642][open issue here]] about this. Until then, loading =(asdf:load-system "polymorphic-functions/swank")= should get you going. This essentially is just one file at file:src/swank.lisp.
+
 *** Thank you so much! Are there any pitfalls I need to be aware of while using pf?
     :PROPERTIES:
     :CUSTOM_ID: limitations
@@ -637,9 +641,7 @@ Yes, there are quite a few:
   [[https://github.com/alex-gutev/cl-form-types][cl-form-types]] does
   get pretty extensive. In cases wherein it does fail, we also rely on
   =sb-c:deftransform= on SBCL.
-- *Integration with SLIME* is yet to be thought about; etags could work,
-  but this needs more thinking given the apparant non-extensibility of
-  internals of =slime-edit-definition=. imenu is also another option.
+- *Integration with SLIME* currently works only on SBCL.
 - *ANSI is insufficient* for our purposes: we need
   =introspect-environment:policy-quality= and CLTL2 and more for
   cl-form-types; if someone needs a reduced feature version within the

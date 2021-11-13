@@ -51,3 +51,10 @@
                                               (5AM:*ON-ERROR* :DEBUG)
                                               (CL:*COMPILE-VERBOSE* NIL))
                                           (FIVEAM:RUN! :POLYMORPHIC-FUNCTIONS))")))))
+
+(defsystem "polymorphic-functions/swank"
+  :depends-on ("polymorphic-functions"
+               "swank")
+  :description "slime/swank integration for polymorphic-functions"
+  :pathname "src"
+  :components ((:file "swank")))

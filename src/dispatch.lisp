@@ -53,11 +53,10 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
          ,(when overwrite
             `(undefine-polymorphic-function ',name))
          (register-polymorphic-function ',name ',untyped-lambda-list ,documentation
-                                        ,default)
+                                        ,default
+                                        :source #+sbcl (sb-c:source-location) #-sbcl nil)
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
          (setf (compiler-macro-function ',name) #'pf-compiler-macro))
-       #+sbcl (setf (slot-value (fdefinition ',name) 'sb-pcl::source)
-                    (sb-c:source-location))
        (fdefinition ',name))))
 
 (defun extract-declarations (body)
@@ -306,7 +305,8 @@ Proceed at your own risk."
                                        ',static-dispatch-name
                                        ',lambda-list-type
                                        ',(run-time-applicable-p-form parameters)
-                                       ,(compiler-applicable-p-lambda-body parameters))
+                                       ,(compiler-applicable-p-lambda-body parameters)
+                                       #+sbcl (sb-c:source-location))
                    ',name)))))))))
 
 (defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list
@@ -326,7 +326,8 @@ Proceed at your own risk."
                                                  (second name)
                                                  name)
                                            ',compiler-macro-lambda-list
-                                           ',body)))
+                                           ',body))
+        #+sbcl (sb-c:source-location))
        ',name))
 
 (defun undefpolymorph (name type-list)

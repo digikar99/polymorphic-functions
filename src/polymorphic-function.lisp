@@ -84,6 +84,7 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   "
   (documentation nil :type (or null string))
   (name (error "NAME must be supplied!"))
+  (source)
   (return-type)
   (type-list nil)
   (lambda-list-type nil)
@@ -94,6 +95,7 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   (inline-lambda-body)
   (static-dispatch-name)
   (compiler-macro-lambda)
+  (compiler-macro-source)
   (parameters (error "POLYMORPH-PARAMETERS must be supplied") :type polymorph-parameters))
 
 (defmethod print-object ((o polymorph) stream)
@@ -105,6 +107,7 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   ((name        :initarg :name
                 :initform (error "NAME must be supplied.")
                 :reader polymorphic-function-name)
+   (source :initarg :source :reader polymorphic-function-source)
    (lambda-list :initarg :lambda-list :type list
                 :initform (error "LAMBDA-LIST must be supplied.")
                 :reader polymorphic-function-lambda-list)
@@ -125,8 +128,6 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
                   :type (or string null))
    (invalidated-p :accessor polymorphic-function-invalidated-p
                   :initform nil)
-   ;; Using SOURCE doesn't simply seem to be a matter of calling (SB-C:SOURCE-LOCATION)
-   #+sbcl (sb-pcl::source :initarg sb-pcl::source)
    #+sbcl (%lock
            :initform (sb-thread:make-mutex :name "GF lock")
            :reader sb-pcl::gf-lock))
@@ -155,7 +156,7 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
 use by functions like TYPE-LIST-APPLICABLE-P")
 
 (defun register-polymorphic-function (name untyped-lambda-list documentation default
-                                      &key overwrite)
+                                      &key overwrite source)
   (declare (type function-name       name)
            (type function            default)
            (type (or null string)    documentation)
@@ -187,6 +188,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
     ;; to construct apf
     (let ((apf (make-instance 'polymorphic-function
                               :name name
+                              :source source
                               :documentation documentation
                               :lambda-list untyped-lambda-list
                               :effective-lambda-list effective-lambda-list
@@ -238,9 +240,11 @@ use by functions like TYPE-LIST-APPLICABLE-P")
     ;; FIXME: Use a type-list equality check, not EQUALP
     ;; FIXME: A trivial fix for &key args is to sort them lexically
     (cond ((and p-old (numberp p-pos))
-           (setf (slot-value p-new 'compiler-macro-lambda)
-                 (or (slot-value p-new 'compiler-macro-lambda)
-                     (slot-value p-old 'compiler-macro-lambda)))
+           (unless (slot-value p-new 'compiler-macro-lambda)
+             (setf (slot-value p-new 'compiler-macro-lambda)
+                   (slot-value p-old 'compiler-macro-lambda))
+             (setf (slot-value p-new 'compiler-macro-source)
+                   (slot-value p-old 'compiler-macro-source)))
            ;; We replace p-old with p-new in the list POLYMORPHS
            ;; In doing so, the only thing we might need to preserve is the COMPILER-MACRO-LAMBDA
            (setf (nth p-pos polymorphs) p-new)
@@ -266,7 +270,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
 (defun register-polymorph (name inline-p typed-lambda-list type-list effective-type-list
                            return-type inline-lambda-body static-dispatch-name
                            lambda-list-type runtime-applicable-p-form
-                           compiler-applicable-p-lambda)
+                           compiler-applicable-p-lambda &optional source-location)
   (declare (type function-name  name)
            (type (member t nil :maybe) inline-p)
            (type typed-lambda-list typed-lambda-list)
@@ -288,7 +292,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
             "TYPE-LIST~%  ~S~%is not compatible with the LAMBDA-LIST~%  ~S~%of the POLYMORPHs associated with ~S"
             type-list untyped-lambda-list name)
     (ensure-unambiguous-call name type-list effective-type-list)
-    (let ((polymorph (make-polymorph :name name
+    (let ((polymorph (make-polymorph :name             name
+                                     :source           source-location
                                      :inline-p         inline-p
                                      :type-list        type-list
                                      :return-type      return-type
@@ -370,7 +375,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
       (removef (polymorphic-function-polymorphs apf) type-list
                :test #'equalp :key #'polymorph-type-list))))
 
-(defun register-polymorph-compiler-macro (name type-list lambda)
+(defun register-polymorph-compiler-macro (name type-list lambda &optional source)
   (declare (type function-name name)
            (type type-list type-list)
            (type function lambda))
@@ -397,7 +402,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
     (let ((polymorph (find type-list (polymorphic-function-polymorphs apf)
                            :test #'equalp
                            :key #'polymorph-type-list)))
-      (setf (polymorph-compiler-macro-lambda polymorph) lambda))))
+      (setf (polymorph-compiler-macro-lambda polymorph) lambda)
+      (setf (polymorph-compiler-macro-source polymorph) source))))
 
 (defun retrieve-polymorph-compiler-macro (name &rest arg-list)
   (declare (type function-name name))
