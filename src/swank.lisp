@@ -23,14 +23,16 @@ in swank/sbcl.lisp, as well as to trace SWANK/BACKEND:FIND-DEFINITIONS itself
 while it gets invoked for standard definitions.
 ")
 
-(defun swank/backend:find-definitions (name)
-  #.(documentation 'swank/backend:find-definitions 'function)
-  (apply #'append
-         (funcall *swank-find-standard-definitions* name)
-         (mapcar (lambda (deffn) (funcall deffn name))
-                 *swank-find-other-definitions*)))
+(defun extend-swank ()
+  (eval
+   `(defun swank/backend:find-definitions (name)
+      #.(documentation 'swank/backend:find-definitions 'function)
+      (apply #'append
+             (funcall *swank-find-standard-definitions* name)
+             (mapcar (lambda (deffn) (funcall deffn name))
+                     *swank-find-other-definitions*))))
+  (pushnew 'find-polymorph-sources *swank-find-other-definitions*))
 
-(pushnew 'find-polymorph-sources *swank-find-other-definitions*)
 (defun find-polymorph-sources (name)
   (when (and (fboundp name)
              (typep (fdefinition name)
