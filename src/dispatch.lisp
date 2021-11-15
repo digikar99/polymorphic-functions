@@ -151,17 +151,21 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
 (defmacro defpolymorph (&whole form name typed-lambda-list return-type
                         &body body &environment env)
   "  Expects OPTIONAL or KEY args to be in the form
+
     ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP).
-  NAME could also be (NAME &KEY (INLINE T)).
-  Possible values for INLINE are T, NIL and :MAYBE
+
+  - NAME could also be (NAME &KEY (INLINE T) STATIC-DISPATCH-NAME).
+  - Possible values for INLINE are T, NIL and :MAYBE
+  - STATIC-DISPATCH-NAME could be useful for tracing or profiling
 
   **Note**: INLINE T or :MAYBE can result in infinite expansions for recursive polymorphs.
 Proceed at your own risk."
-  (destructuring-bind (name &key (inline t ip))
+  (destructuring-bind (name &key (inline t ip) (static-dispatch-name nil static-dispatch-name-p))
       (if (typep name 'function-name)
           (list name)
           name)
-    (declare (type function-name name))
+    (declare (type function-name name)
+             (optimize debug))
     (let* ((block-name       (blockify-name name))
            (*environment*    env)
            (unsorted-typed-lambda-list (normalize-typed-lambda-list typed-lambda-list))
@@ -204,18 +208,20 @@ Proceed at your own risk."
           ;;   Thus, we actually do want collisions to take place so that a same
           ;; deterministic/latest version of the polymorph is called; therefore we
           ;; use INTERN.
-          (let* ((static-dispatch-name (let* ((p-old (and (fboundp name)
-                                                          (typep (fdefinition name)
-                                                                 'polymorphic-function)
-                                                          (find-polymorph name type-list)))
-                                              (old-name
-                                                (when p-old
-                                                  (polymorph-static-dispatch-name p-old))))
-                                         (if old-name
-                                             old-name
-                                             (intern (write-to-string
-                                                      `(polymorph ,name ,type-list))
-                                                     '#:polymorphic-functions.nonuser))))
+          (let* ((static-dispatch-name (if static-dispatch-name-p
+                                           static-dispatch-name
+                                           (let* ((p-old (and (fboundp name)
+                                                              (typep (fdefinition name)
+                                                                     'polymorphic-function)
+                                                              (find-polymorph name type-list)))
+                                                  (old-name
+                                                    (when p-old
+                                                      (polymorph-static-dispatch-name p-old))))
+                                             (if old-name
+                                                 old-name
+                                                 (intern (write-to-string
+                                                          `(polymorph ,name ,type-list))
+                                                         '#:polymorphic-functions.nonuser)))))
                  (lambda-body `(list-named-lambda (polymorph ,name ,type-list)
                                    ,(symbol-package block-name)
                                    ,param-list
