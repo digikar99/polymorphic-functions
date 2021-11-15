@@ -196,6 +196,7 @@ A compiler-note-providing compiler-macro has also been provided for compile-time
 
 - A speed=3 optimization coupled with debug<3 optimization results in (attempts to) static-dispatch. This is done using by f-binding gentemps to appropriate function objects.
 - Inline optimization may also be provided by =(declare (inline-pf my-polymorph))= or supplying =:inline t= (default) or =:inline :maybe= option in the =name= field of =defpolymorph= form.
+- static-dispatch can be avoided by declaring/declaiming the polymorphic-function to be =cl:notinline=. Globally, static-dispatch can be disabled by setting =*disable-static-dispatch*= to non-NIL.
 
 It is up to the user to ensure that a polymorph that specializes (or generalizes) another polymorph should have the same behavior, under the appropriate definition of same-ness.
 
@@ -423,7 +424,7 @@ Note that both these are declared to be much more experimental than polymorphic-
 
 Sure!
  
-In addition to subtype-polymorphism described above (under [[#basic-usage][Basic Usage]]), PF also provides support for parametric-polymorphism. Note that this does not provide user-defined parametric types. In fact, sane user-defined parametric-types might be impossible in Common Lisp. What this merely allows for then is parametric-polymorphism on functions aka polymorphs for existing parametric-types. The interface for this is through the following symbols:
+In addition to subtype-polymorphism described above (under [[#basic-usage][Basic Usage]]), PF also provides support for parametric-polymorphism. Note that this does not provide user-defined parametric types. In fact, sane user-defined parametric-types might be impossible in Common Lisp. What this merely allows for then is parametric-polymorphism on functions aka polymorphs for /existing/ parametric-types. The interface for this is through the following symbols:
 
 - \*parametric-type-symbol-predicates\*
 - parametric-type-run-time-lambda-body
@@ -627,7 +628,7 @@ polymorphs/methods/specializations.
 
 *** Like generic-functions and methods, do polymorphic-functions play nice with slime/swank?
 
-At the moment, SLIME is non-extensible. There is an [[https://github.com/slime/slime/issues/642][open issue here]] about this. Until then, loading =(asdf:load-system "polymorphic-functions/swank")= should get you going. This essentially is just one file at file:src/swank.lisp.
+At the moment, SLIME is non-extensible. There is an [[https://github.com/slime/slime/issues/642][open issue here]] about this. Until then, loading =(asdf:load-system "polymorphic-functions/swank")= and calling =(polymorphic-functions::extend-swank)= should get you going. This system essentially is just one file at file:src/swank.lisp.
 
 *** Thank you so much! Are there any pitfalls I need to be aware of while using pf?
     :PROPERTIES:

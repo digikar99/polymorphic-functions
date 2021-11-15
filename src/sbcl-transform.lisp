@@ -37,6 +37,9 @@
                                    :policy (< debug speed)
                                    :node ,node)
 
+           (when *disable-static-dispatch*
+             (sb-c::abort-ir1-transform))
+
            (let* ((,arg-lvar-alist
                     ,(sbcl-transform-arg-lvars-from-lambda-list-form
                       transform-lambda-list :typed nil))

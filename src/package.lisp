@@ -53,6 +53,7 @@
            #:defpolymorph-compiler-macro
            #:undefpolymorph
            #:find-polymorph
+           #:polymorph-apropos-list-type
 
            ;; Unstable API
            #:polymorphic-function
@@ -64,7 +65,7 @@
            #:pf-defined-before-use
            #:not-pf-defined-before-use
            #:*compiler-macro-expanding-p*
-           #:polymorph-apropos-list-type
+           #:*disable-static-dispatch*
 
            #:*parametric-type-symbol-predicates*
            #:parametric-type-run-time-lambda-body

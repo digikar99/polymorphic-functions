@@ -9,7 +9,8 @@
   `(compile ',name (lambda ,lambda-list ,@body)))
 
 (defmacro ignoring-error-output (&body body)
-  `(let ((*error-output* (make-string-output-stream)))
+  `(let ((*error-output* (make-string-output-stream))
+         (*disable-static-dispatch* nil))
      (handler-bind ((warning #'muffle-warning))
        ,@body)))
 

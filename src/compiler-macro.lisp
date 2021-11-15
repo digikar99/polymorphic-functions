@@ -1,5 +1,7 @@
 (in-package :polymorphic-functions)
 
+(defvar *disable-static-dispatch* nil
+  "If compile-time value is non-NIL, all polymorphic-functions are dispatched dynamically.")
 
 ;;; TODO: Allow user to specify custom optim-speed etc
 (defun pf-compiler-macro (form &optional env)
@@ -21,7 +23,8 @@
     (compiler-macro-notes:with-notes
         (original-form env :name (fdefinition name)
                            :unwind-on-signal nil
-                           :optimization-note-condition optim-speed)
+                           :optimization-note-condition (and optim-speed
+                                                             (not *disable-static-dispatch*)))
 
       (let* ((arg-list  (mapcar (lambda (form)
                                   (with-output-to-string (*error-output*)
@@ -85,7 +88,8 @@
                   (error c)
                   (signal c)))))
         (when (or (null polymorph)
-                  (not optim-speed))
+                  (not optim-speed)
+                  *disable-static-dispatch*)
           (return-from pf-compiler-macro original-form))
 
         (with-slots (inline-p return-type type-list
