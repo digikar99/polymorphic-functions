@@ -101,15 +101,8 @@
 
             :do (if (type= type-1 type-2)
                     t
-                    (multiple-value-bind (intersection-null-p knownp)
-                        (subtypep `(and ,type-1 ,type-2) nil)
-                      (if knownp
-                          (if intersection-null-p
-                              (return-from %type-list-intersection-null-p t)
-                              t)
-                          (progn
-                            (warn "Assuming intersection of types ~S and ~S is NIL" type-1 type-2)
-                            (return-from %type-list-intersection-null-p t)))))
+                    (when (definitive-subtypep `(and ,type-1 ,type-2) nil)
+                      (return-from %type-list-intersection-null-p t)))
             :finally (return nil))))
 
 (def-test type-list-intersection-null-required

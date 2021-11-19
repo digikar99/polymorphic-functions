@@ -19,7 +19,14 @@
            #:supertypep
            #:subtypep
            #:typep
-           #:type=))
+           #:type=
+
+           #:*subtypep-alist*
+           #:*extended-subtypep-functions*
+           #:subtypep-not-knowo
+           #:definitive-subtypep
+
+           ))
 
 (defpackage #:polymorphic-functions.nonuser
   (:use)

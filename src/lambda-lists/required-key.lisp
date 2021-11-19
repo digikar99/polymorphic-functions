@@ -241,27 +241,16 @@
                           ((type= type-1 type-2)
                            t)
                           (t
-                           (multiple-value-bind (subtypep knownp)
-                               (subtypep 'null `(and ,type-1 ,type-2))
-                             (if knownp
-                                 (if subtypep
-                                     ;; Both can accept NIL; the arguments are optional
-                                     ()
-                                     ;; At least one argument is compulsory
-                                     (multiple-value-bind (subtypep knownp)
-                                         (subtypep `(and ,type-1 ,type-2) nil)
-                                       ;; If there exist at least one &KEY argument which need
-                                       ;; to be compulsorily supplied, and both types are different,
-                                       ;; then there intersection is NULL
-                                       (if knownp
-                                           (return-from %type-list-intersection-null-p subtypep)
-                                           (progn
-                                             (warn "Assuming intersection of types ~S and ~S is NIL"
-                                                   type-1 type-2)
-                                             (return-from %type-list-intersection-null-p t)))))
-                                 (progn
-                                   (warn "Assuming intersection of types ~S and ~S is NIL" type-1 type-2)
-                                   (return-from %type-list-intersection-null-p t))))))
+                           (let ((subtypep (definitive-subtypep 'null `(and ,type-1 ,type-2))))
+                             (if subtypep
+                                 ;; Both can accept NIL; the arguments are optional
+                                 ()
+                                 ;; At least one argument is compulsory
+                                 ;; If there exist at least one &KEY argument which need
+                                 ;; to be compulsorily supplied, and both types are different,
+                                 ;; then there intersection is NULL
+                                 (return-from %type-list-intersection-null-p
+                                   (definitive-subtypep `(and ,type-1 ,type-2) nil))))))
                     (setq list-1 (rest list-1)
                           list-2 (rest list-2))
                 :finally
