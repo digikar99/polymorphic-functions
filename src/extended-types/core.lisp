@@ -139,6 +139,15 @@ is a subtype of TYPE2.")
                (format s "Not known whether ~S is a subtype of ~S"
                        type1 type2)))))
 
+(defun type-pair-= (type-pair-1 type-pair-2 &optional env)
+  "Each pair is a CONS of two types."
+  (and (type= (car type-pair-1)
+              (car type-pair-2)
+              env)
+       (type= (cdr type-pair-1)
+              (cdr type-pair-2)
+              env)))
+
 (defun definitive-subtypep (type1 type2 &optional environment)
   "Like POLYMORPHIC-FUNCTIONS.EXTENDED-TYPES:SUBTYPEP but uses *SUBTYPEP-ALIST*
 and *EXTENDED-SUBTYPEP-FUNCTIONS* and when the second value is NIL raises a
@@ -153,27 +162,22 @@ The function-order for determining the SUBTYPEP functions is undefined."
           (append '(subtypep
                     subtypep-using-subtypep-alist)
                   *extended-subtypep-functions*)))
-    (flet ((type-pair-= (type-pair-1 type-pair-2)
-           (and (type= (car type-pair-1)
-                       (car type-pair-2))
-                (type= (cdr type-pair-1)
-                       (cdr type-pair-2)))))
-      (restart-case
-          (multiple-value-bind (subtypep knownp)
-              (extended-subtypep type1 type2 environment)
-            (if knownp
-                subtypep
-                (error 'subtypep-not-known :type1 type1 :type2 type2)))
-        (subtypep-t ()
-          :report (lambda (s)
-                    (format s "Treat TYPE1 as a subtype of TYPE2"))
-          (setf (assoc-value *subtypep-alist* (cons type1 type2) :test #'type-pair-=) t)
-          t)
-        (subtypep-nil ()
-          :report (lambda (s)
-                    (format s "Treat TYPE1 as NOT a subtype of TYPE2"))
-          (setf (assoc-value *subtypep-alist* (cons type1 type2) :test #'type-pair-=) nil)
-          nil)))))
+    (restart-case
+        (multiple-value-bind (subtypep knownp)
+            (extended-subtypep type1 type2 environment)
+          (if knownp
+              subtypep
+              (error 'subtypep-not-known :type1 type1 :type2 type2)))
+      (subtypep-t ()
+        :report (lambda (s)
+                  (format s "Treat TYPE1 as a subtype of TYPE2"))
+        (setf (assoc-value *subtypep-alist* (cons type1 type2) :test #'type-pair-=) t)
+        t)
+      (subtypep-nil ()
+        :report (lambda (s)
+                  (format s "Treat TYPE1 as NOT a subtype of TYPE2"))
+        (setf (assoc-value *subtypep-alist* (cons type1 type2) :test #'type-pair-=) nil)
+        nil))))
 
 (defun supertypep (type1 type2 &optional environment)
   (subtypep type2 type1 environment))
@@ -200,6 +204,6 @@ COMPILER-MACROEXPANDs to CL:TYPEP if TYPE is a constant object not a EXTENDED-TY
                `(ctype:ctypep ,object (ctype:specifier-ctype ,type ,env-form)))))
       form))
 
-(defun type= (type1 type2)
-  (and (subtypep type1 type2)
-       (subtypep type2 type1)))
+(defun type= (type1 type2 &optional env)
+  (and (subtypep type1 type2 env)
+       (subtypep type2 type1 env)))

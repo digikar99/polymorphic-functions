@@ -25,6 +25,7 @@
            #:*extended-subtypep-functions*
            #:subtypep-not-knowo
            #:definitive-subtypep
+           #:type-pair-=
 
            ))
 
