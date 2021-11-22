@@ -123,17 +123,10 @@
                                         (enhanced-lambda-declarations parameters
                                                                       arg-types
                                                                       return-type)
-                                      (if (equalp return-type deparameterized-return-type)
-                                          `(,enhanced-decl
-                                            ,more-decl
-                                            (block ,block-name ,@body))
-                                          (progn
-                                            (setq return-type deparameterized-return-type)
-                                            `(,enhanced-decl
-                                              ,more-decl
-                                              (block ,block-name
-                                                ,@(butlast body)
-                                                ,(car (cdaadr (lastcar body)))))))))))
+                                      (setq return-type deparameterized-return-type)
+                                      `(,enhanced-decl
+                                        ,more-decl
+                                        (block ,block-name ,@body))))))
                            (macroexpanded-form
                              (handler-bind ((form-type-failure
                                               (lambda (note)

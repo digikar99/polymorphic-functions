@@ -222,19 +222,24 @@ Proceed at your own risk."
                                                  (intern (write-to-string
                                                           `(polymorph ,name ,type-list))
                                                          '#:polymorphic-functions.nonuser)))))
+                 (lambda-declarations (lambda-declarations parameters))
                  (lambda-body `(list-named-lambda (polymorph ,name ,type-list)
                                    ,(symbol-package block-name)
                                    ,param-list
-                                 ,(lambda-declarations parameters)
+                                 ,lambda-declarations
                                  ,declarations
                                  (block ,block-name
                                    ,@(butlast body)
                                    ,(ensure-type-form return-type (lastcar body)))))
-                 ;; Currently we only need INLINE-LAMBDA-BODY and the checks in M-V-B
-                 ;; below for DEFTRANSFORM
-                 ;; FIXME: Do away with this use even
+                 ;; Currently we need INLINE-LAMBDA-BODY and the checks in M-V-B
+                 ;; below for DEFTRANSFORM; as well as to avoid the ASSERTs in
+                 ;; pf-compiler-macro emitted by ENSURE-TYPE-FORM used for LAMBDA-BODY
                  (inline-lambda-body (when inline
-                                       `(lambda ,@(nthcdr 3 lambda-body))))
+                                       `(lambda ,param-list
+                                          ,lambda-declarations
+                                          ,declarations
+                                          (block ,block-name
+                                            ,@body))))
                  #+sbcl
                  (sbcl-transform-body (make-sbcl-transform-body name
                                                                 typed-lambda-list

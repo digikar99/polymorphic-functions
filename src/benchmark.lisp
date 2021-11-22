@@ -47,7 +47,7 @@
                                             ,expected-sym ,actual-sym ,percent-diff)))))
 
                           (expect-time (#+sbcl 5.1
-                                        #+ccl  1.08)
+                                        #+ccl  2.47)
                                        (locally (declare (optimize (debug 1) (speed 1)))
                                          (loop :repeat 50000000 :do (my= a b))))
 

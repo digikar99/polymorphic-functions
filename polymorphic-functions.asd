@@ -15,6 +15,7 @@
                (:file "package"                    :depends-on ("pre-package"))
                (:module "extended-types"           :depends-on ("package")
                 :components ((:file "parametric-types")
+                             (:file "ensure-type-form" :depends-on ("parametric-types"))
                              (:file "core"         :depends-on ("parametric-types"))
                              (:file "supertypep"   :depends-on ("core"))
                              (:file "type="        :depends-on ("core"))

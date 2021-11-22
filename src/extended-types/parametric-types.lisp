@@ -32,37 +32,6 @@ in this list, returns non-NIL for at least one predicate")
     #'parametric-type-symbol-p
     (flatten (ensure-list parametric-type-spec)))))
 
-(defun ensure-type-form (type form)
-  (if (parametric-type-specifier-p type)
-      (let ((type (traverse-tree type
-                                 (lambda (node)
-                                   (etypecase node
-                                     (atom node)
-                                     (list
-                                      ;; QUOTE cannot be used in a parametric-type expression
-                                      (if (eq 'quote (first node))
-                                          node
-                                          (cons 'list
-                                                (loop :for item :in node
-                                                      :collect
-                                                      (etypecase item
-                                                        (atom
-                                                         (if (parametric-type-symbol-p item)
-                                                             item
-                                                             (list 'quote item)))
-                                                        (list item)))))))))))
-        (with-gensyms (form-value)
-          `(let ((,form-value ,form))
-             (assert (typep ,form-value ,type)
-                     ()
-                     'type-error
-                     :expected-type ,type
-                     :datum ,form-value)
-             ,form-value)))
-      ;; If we sometime decide to emit the LET form in both cases (since THE has
-      ;; no guarantee, apparantly), do handle the VALUES types correctly!
-      `(the ,type ,form)))
-
 ;; TODO: Documentation
 
 (defgeneric parametric-type-run-time-lambda-body (type-car type-cdr type-parameter)
@@ -73,7 +42,7 @@ is one of the type parameter in the parametric-type.
 
 The methods implemented should return a one-argument lambda-*expression* (not function).
 The expression will be compiled to a function and called with the appropriate *object*
-at run-time. The function should return the value of the TYPE-PARAMTER corresponding
+at run-time. The function should return the value of the TYPE-PARAMETER corresponding
 to the *object* and the parametric type."))
 
 (defgeneric parametric-type-compile-time-lambda  (type-car type-cdr type-parameter)
@@ -84,7 +53,7 @@ is one of the type parameter in the parametric-type.
 
 The methods implemented should return a one-argument lambda-*expression* (not function).
 The expression will be compiled to a function and called with the appropriate
-*form-type* at run-time. The function should return the value of the TYPE-PARAMTER
+*form-type* at run-time. The function should return the value of the TYPE-PARAMETER
 corresponding to the *form-type* and the parametric type."))
 
 (defun deparameterize-type (type-specifier)
