@@ -229,8 +229,13 @@ Proceed at your own risk."
                                  ,lambda-declarations
                                  ,declarations
                                  (block ,block-name
-                                   ,@(butlast body)
-                                   ,(ensure-type-form return-type (lastcar body)))))
+                                   ,(multiple-value-bind (form form-return-type)
+                                        (ensure-type-form return-type
+                                                          `(locally ,lambda-declarations
+                                                             ,@body)
+                                                          env)
+                                      (setq return-type form-return-type)
+                                      form))))
                  ;; Currently we need INLINE-LAMBDA-BODY and the checks in M-V-B
                  ;; below for DEFTRANSFORM; as well as to avoid the ASSERTs in
                  ;; pf-compiler-macro emitted by ENSURE-TYPE-FORM used for LAMBDA-BODY
@@ -238,6 +243,8 @@ Proceed at your own risk."
                                        `(lambda ,param-list
                                           ,lambda-declarations
                                           ,declarations
+                                          ;; The RETURN-TYPE here would be augmented by
+                                          ;; PF-COMPILER-MACRO
                                           (block ,block-name
                                             ,@body))))
                  #+sbcl

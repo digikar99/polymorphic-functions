@@ -1,6 +1,8 @@
 (in-package :polymorphic-functions)
 
 (defun ensure-type-form (type form &optional env)
+  "Returns two values: a form that has ASSERTs with SIMPLE-TYPE-ERROR to check the type
+as well as the type enhanced using TYPE."
   (declare (optimize debug))
   (let* ((type (typexpand type env))
          (optional-position (when (listp type)
@@ -85,7 +87,8 @@
                                  `(list ,form-value ,type)
                                  `(list ,i ,form-value ,type))))))
 
-         (compiler-form-types (let ((may-be-list (cl-form-types:form-type form env)))
+         (compiler-form-types (let ((may-be-list (cl-form-types:form-type form env
+                                                                          :expand-compiler-macros t)))
                                 (if (and (listp may-be-list)
                                          (eql 'values (first may-be-list)))
                                     (remove '&optional (rest may-be-list))
@@ -98,6 +101,7 @@
                                   compiler-form-types)))
 
     (flet ((check-compiler-type (i compiler-type compiler-form-type)
+             ;; (print (list i compiler-type compiler-form-type))
              (multiple-value-bind (subtypep knownp)
                  (subtypep compiler-form-type compiler-type)
                (when (and knownp
@@ -122,54 +126,59 @@
                (loop :for compiler-form-type :in (nthcdr num-types compiler-form-types)
                      :for i :from i
                      :do (check-compiler-type i compiler-rest-type compiler-form-type)
-                     :finally (check-compiler-type i compiler-rest-type
-                                                   compiler-rest-form-type))))
+                     :finally (when compiler-rest-form-type
+                                (check-compiler-type i compiler-rest-type
+                                                     compiler-rest-form-type)))))
 
-    `(let* ((,form-value-list (multiple-value-list ,form))
-            (,num-values (length ,form-value-list)))
-       (declare (ignorable ,num-values))
-       ,@(cond ((and optional-position rest-p)
-                `((assert (<= ,(1- optional-position)
-                              ,num-values)
-                          (,form-value-list)
-                          'simple-type-error
-                          :format-control
-                          "Expected at least ~S return-values but received ~S"
-                          :format-arguments (list ,min-values
-                                                  ,num-values))
-                  ,(unless (eq rest-type t)
-                     `(assert (every (lambda (value)
-                                       (typep value ,rest-type))
-                                     (nthcdr ,num-types ,form-value-list))
-                              (,form-value-list)
-                              'simple-type-error
-                              :format-control
-                              "&REST return-values~%  ~{~^~&  ~S~}~%are not of expected type~%  ~S"
-                              :format-arguments (list (nthcdr ,num-types ,form-value-list)
-                                                      ,rest-type)))))
-               ((and optional-position (not rest-p))
-                `((assert (<= ,(1- optional-position)
-                              ,num-values
-                              ,num-types)
-                          (,form-value-list)
-                          'simple-type-error
-                          :format-control
-                          "Expected at least ~S and at most ~S return-values but received ~S"
-                          :format-arguments (list ,min-values
-                                                  ,num-types
-                                                  ,num-values))))
-               (t
-                `(,(unless (eq rest-type t)
-                     `(assert (every (lambda (value)
-                                       (typep value ,rest-type))
-                                     (nthcdr ,num-types ,form-value-list))
-                              (,form-value-list)
-                              'simple-type-error
-                              :format-control
-                              "&REST return-values~{~^~&  ~S~}~%are not of expected type~%  ~S"
-                              :format-arguments (list (nthcdr ,num-types ,form-value-list)
-                                                      ,rest-type))))))
-       (multiple-value-bind ,form-values
-           (values-list ,form-value-list)
-         ,@ensure-type-forms)
-       (values-list ,form-value-list))))
+    (values
+
+     `(let* ((,form-value-list (multiple-value-list ,form))
+             (,num-values (length ,form-value-list)))
+        (declare (ignorable ,num-values))
+        ,@(cond ((and optional-position rest-p)
+                 `((assert (<= ,(1- optional-position)
+                               ,num-values)
+                           (,form-value-list)
+                           'simple-type-error
+                           :format-control
+                           "Expected at least ~S return-values but received ~S"
+                           :format-arguments (list ,min-values
+                                                   ,num-values))
+                   ,(unless (eq rest-type t)
+                      `(assert (every (lambda (value)
+                                        (typep value ,rest-type))
+                                      (nthcdr ,num-types ,form-value-list))
+                               (,form-value-list)
+                               'simple-type-error
+                               :format-control
+                               "&REST return-values~%  ~{~^~&  ~S~}~%are not of expected type~%  ~S"
+                               :format-arguments (list (nthcdr ,num-types ,form-value-list)
+                                                       ,rest-type)))))
+                ((and optional-position (not rest-p))
+                 `((assert (<= ,(1- optional-position)
+                               ,num-values
+                               ,num-types)
+                           (,form-value-list)
+                           'simple-type-error
+                           :format-control
+                           "Expected at least ~S and at most ~S return-values but received ~S"
+                           :format-arguments (list ,min-values
+                                                   ,num-types
+                                                   ,num-values))))
+                (t
+                 `(,(unless (eq rest-type t)
+                      `(assert (every (lambda (value)
+                                        (typep value ,rest-type))
+                                      (nthcdr ,num-types ,form-value-list))
+                               (,form-value-list)
+                               'simple-type-error
+                               :format-control
+                               "&REST return-values~{~^~&  ~S~}~%are not of expected type~%  ~S"
+                               :format-arguments (list (nthcdr ,num-types ,form-value-list)
+                                                       ,rest-type))))))
+        (multiple-value-bind ,form-values
+            (values-list ,form-value-list)
+          ,@ensure-type-forms)
+        (values-list ,form-value-list))
+
+     (cl-form-types:form-type `(the ,type ,form) env :expand-compiler-macros t))))
