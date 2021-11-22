@@ -307,6 +307,17 @@ Proceed at your own risk."
                         `(with-muffled-compilation-warnings
                            (setf (fdefinition ',static-dispatch-name) ,lambda-body))
                         `(setf (fdefinition ',static-dispatch-name) ,lambda-body))
+                   ,(let ((proclaimation
+                            `(proclaim '(ftype (function ,(mapcar #'deparameterize-type
+                                                           (if (eq 'rest lambda-list-type)
+                                                               (butlast effective-type-list)
+                                                               effective-type-list))
+                                                ,(deparameterize-type return-type))
+                                         ,static-dispatch-name))))
+                      (if optim-debug
+                          proclaimation
+                          `(handler-bind ((warning #'muffle-warning))
+                             ,proclaimation)))
                    (register-polymorph ',name ',inline
                                        ',typed-lambda-list
                                        ',type-list
