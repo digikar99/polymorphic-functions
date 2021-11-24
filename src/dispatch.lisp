@@ -231,9 +231,12 @@ Proceed at your own risk."
                                  (block ,block-name
                                    ,(multiple-value-bind (form form-return-type)
                                         (ensure-type-form return-type
-                                                          `(locally ,lambda-declarations
-                                                             ,@body)
-                                                          env)
+                                                          `(progn ,@body)
+                                                          (augment-environment
+                                                           env
+                                                           :variable (mapcar #'third
+                                                                             (rest lambda-declarations))
+                                                           :declare (rest lambda-declarations)))
                                       (setq return-type form-return-type)
                                       form))))
                  ;; Currently we need INLINE-LAMBDA-BODY and the checks in M-V-B

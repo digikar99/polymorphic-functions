@@ -464,6 +464,60 @@
   (fmakunbound 'setf-foo-caller-direct)
   (undefine-polymorphic-function '(setf foo)))
 
+
+(def-test return-type-check ()
+  (ignoring-error-output
+    (eval `(progn
+             (defun my-identity (x) x)
+             (define-polymorphic-function foo (x) :overwrite t))))
+
+  ;; Basic
+  (5am:is-true (eval `(defpolymorph foo ((x string)) string x)))
+  (5am:signals warning
+    (eval `(defpolymorph foo ((x string)) number x)))
+  (5am:is-true (eval `(defpolymorph foo ((x string)) string (my-identity x))))
+  (5am:is-true (eval `(defpolymorph foo ((x string))
+                          (values string number)
+                        (values x 5 #\a))))
+
+  ;; Optional
+  (5am:is-true (eval `(defpolymorph foo ((x string))
+                          (values string number &optional)
+                        (values x 5))))
+  (5am:signals warning
+    (eval `(defpolymorph foo ((x string)) (values string number &optional)
+             (values x 5 #\a))))
+
+  ;; Rest
+  (5am:signals warning
+    (eval `(defpolymorph foo ((x string))
+               (values string number &rest string)
+             (values x 5 #\a))))
+  (5am:is-true (eval `(defpolymorph foo ((x string))
+                          (values string number &rest t)
+                        (values x 5))))
+  (5am:is-true (eval `(defpolymorph foo ((x string))
+                          (values string number &rest t)
+                        (values x 5 #\a))))
+
+  ;; Optional and Rest
+  (5am:is-true (eval `(defpolymorph foo ((x string))
+                          (values string number &optional character &rest t)
+                        (values x 5 #\a))))
+  (5am:is-true (eval `(defpolymorph foo ((x string))
+                          (values string number &optional character &rest t)
+                        (values x 5))))
+  (5am:is-true (eval `(defpolymorph foo ((x string))
+                          (values string number &optional character &rest t)
+                        (values x 5 #\a ""))))
+  (5am:signals warning
+    (eval `(defpolymorph foo ((x string)) (values string number &optional character &rest t)
+             (values x))))
+
+  (undefine-polymorphic-function 'foo)
+  (fmakunbound 'my-identity))
+
+
 (def-test subtype-polymorphism ()
   (unwind-protect
        (handler-bind ((warning #'muffle-warning))
@@ -492,10 +546,10 @@
                     (declare (type array b))
                     (inner b))))
          (is (eq 'array (funcall (compile nil
-                                           `(lambda (a)
-                                              (declare (optimize speed (debug 1))
-                                                       (type string a))
-                                              (outer a)))
+                                          `(lambda (a)
+                                             (declare (optimize speed (debug 1))
+                                                      (type string a))
+                                             (outer a)))
                                  "hello")))
          ;; FIXME: Perhaps, this does not belong here:
          (eval `(defpolymorph (outer :inline t) ((a array)) t
