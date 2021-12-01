@@ -39,7 +39,6 @@
   (:use :cl-form-types :alexandria :cl)
   (:import-from :5am #:is #:def-test)
   (:import-from :ctype
-                #:typexpand
                 #:ctype
                 #:cons-specifier-ctype)
   (:import-from :polymorphic-functions.extended-types
@@ -115,6 +114,9 @@
                                              (/= 3 (policy-quality 'speed env))
                                              (<= (policy-quality 'debug env)
                                                  (policy-quality 'speed env))))
+
+(defun typexpand (type-specifier &optional env)
+  (ctype::typexpand type-specifier env))
 
 (defun policy-quality (quality &optional env)
   (second (assoc quality (declaration-information 'optimize env))))

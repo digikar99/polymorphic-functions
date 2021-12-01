@@ -7,7 +7,7 @@
                "closer-mop"
                "compiler-macro-notes"
                "ctype"
-               "fiveam" ;; just keep things together!
+               "fiveam" ;; just keep tests together!
                "cl-form-types"
                "introspect-environment")
   :pathname #P"src/"

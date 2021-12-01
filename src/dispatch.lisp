@@ -234,8 +234,10 @@ Proceed at your own risk."
                                                           `(progn ,@body)
                                                           (augment-environment
                                                            env
-                                                           :variable (mapcar #'third
-                                                                             (rest lambda-declarations))
+                                                           :variable (remove-if
+                                                                      #'null
+                                                                      (mapcar #'third
+                                                                              (rest lambda-declarations)))
                                                            :declare (rest lambda-declarations)))
                                       (setq return-type form-return-type)
                                       form))))

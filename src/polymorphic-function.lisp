@@ -514,11 +514,11 @@ If it exists, the second value is T and the first value is a possibly empty
                 :collect `(,var inline-pf notinline-pf))))
 
 (define-declaration pf-defined-before-use (args)
-  (declare (ignore args))
+  ;; (declare (ignore args))
   (values :declare
           (cons 'pf-defined-before-use t)))
 
 (define-declaration not-pf-defined-before-use (args)
-  (declare (ignore args))
+  ;; (declare (ignore args))
   (values :declare
           (cons 'pf-defined-before-use nil)))

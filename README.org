@@ -1,4 +1,4 @@
-* TODO About
+* About
   :PROPERTIES:
   :CUSTOM_ID: polymorphic-functions
   :END:
@@ -30,6 +30,8 @@ The library provides all of
 to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#and-about-extended-types][extended types]] are also provided through [[https://github.com/s-expressionists/ctype/][ctype]].
 
 The library was primarily made to dispatch on specialized-arrays for use in [[https://github.com/digikar99/numericals][numericals]], since CLHS does not enable generic-functions for specialized-arrays. But has also been put to use in [[https://github.com/lisp-polymorph/][lisp-polymorph]].
+
+See also: [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-while-using-pf][pitfalls]].
 
 * Table of Contents
 :PROPERTIES:
@@ -158,7 +160,7 @@ See [[file:src/misc-tests.lisp]] for some more examples.
   ;       (A B)
   ;
   ;     derived to be of TYPES:
-  ;     
+  ;
   ;       (STRING INTEGER)
   ;
   ;     Available Effective-Type-Lists include:
@@ -378,13 +380,13 @@ One observation that might sound useful is the following: the faster the code, t
 
 #+BEGIN_SRC lisp
   (defun sf-pf-dot-original-100 (a b c)
-    (specialized-function:specializing (a b c) ()            
+    (specialized-function:specializing (a b c) ()
       (declare (optimize speed))
       (loop repeat 100 do (pf-dot-original a b c))
       c))
 
   (defun sf-pf-dot-original-100000 (a b c)
-    (specialized-function:specializing (a b c) ()            
+    (specialized-function:specializing (a b c) ()
       (declare (optimize speed))
       (loop repeat 100000 do (pf-dot-original a b c))
       c))
@@ -423,7 +425,7 @@ Note that both these are declared to be much more experimental than polymorphic-
 *** Could you elaborate on parametric-polymorphism?
 
 Sure!
- 
+
 In addition to subtype-polymorphism described above (under [[#basic-usage][Basic Usage]]), PF also provides support for parametric-polymorphism. Note that this does not provide user-defined parametric types. In fact, sane user-defined parametric-types might be impossible in Common Lisp. What this merely allows for then is parametric-polymorphism on functions aka polymorphs for /existing/ parametric-types. The interface for this is through the following symbols:
 
 - \*parametric-type-symbol-predicates\*
@@ -524,7 +526,7 @@ compile time optimization.
 
 There is a =polymorphic-functions.extended-types= package (not system!) that provides types based on [[https://github.com/s-expressionists/ctype][ctype]]. This allows one to extend the CL type system beyond what is possible with =cl:deftype=.
 
-An example for this is the =(supertypep TYPE)= type at 
+An example for this is the =(supertypep TYPE)= type at
 [[file:src/extended-types/supertypep.lisp]].
 
 - In essence, =(supertypep TYPE)= is the set of all type-specifiers that are a supertype of =TYPE=.
@@ -637,35 +639,23 @@ At the moment, SLIME is non-extensible. There is an [[https://github.com/slime/s
 
 Yes, there are quite a few:
 
-- For *form-type-inference*, polymorphic-functions depends on
-  cl-form-types. Thus, this works as long as cl-form-types succeeds, and
-  [[https://github.com/alex-gutev/cl-form-types][cl-form-types]] does
-  get pretty extensive. In cases wherein it does fail, we also rely on
-  =sb-c:deftransform= on SBCL.
 - *Integration with SLIME* currently works only on SBCL.
-- *ANSI is insufficient* for our purposes: we need
-  =introspect-environment:policy-quality= and CLTL2 and more for
-  cl-form-types; if someone needs a reduced feature version within the
-  bounds of ANSI standard, please raise an issue!
-
-  - Static dispatch relies on policy-quality working as expected, and
-    compiler-macros being called. As a result, it may not work on all
-    implementations.
-  - Some implementations produce interpreted functions some times while
-    compiled functions other times; and accordingly differ if or not
-    compiler-macros are called.
-
-- A [[https://github.com/Clozure/ccl/pull/369][*bug on CCL*]] may not
-  let PF work as correctly on CCL; subjectively dirty workarounds are
-  possible until it gets fixed.
-- A =polymorphic-functions.extended-types= package (not system!) is also
-  provided based on [[https://github.com/s-expressionists/ctype][ctype]]. This allows one to extend the CL type system to define types beyond what =cl:deftype= can do to some extent. While these *cannot be used inside an arbitrary
-  CL form* with =cl:declare=, these can be used in the type lists of polymorphs. See [[file:src/extended-types/type=.lisp]] for an example put to use in [[https://github.com/digikar99/trivial-coerce][trivial-coerce]].
+- *ANSI is insufficient* for our purposes*: we need
+  - CLTL2 environment API: this is used through [[https://github.com/alex-gutev/cl-environments][cl-environments]] (and [[https://github.com/Bike/introspect-environment][introspect-environments]])
+    - For *form-type-inference*, polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [[https://github.com/alex-gutev/cl-form-types][cl-form-types]] does get pretty extensive. In cases wherein it does fail, we also rely on =sb-c:deftransform= on SBCL.
+  - [[https://github.com/pcostanza/closer-mop][closer-mop]]; if someone needs a reduced feature version within the bounds of ANSI standard, please raise an issue!
+    - A [[https://github.com/Clozure/ccl/pull/369][*bug on CCL*]] may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
+  - [[https://github.com/s-expressionists/ctype][ctype]]: =typexpand= functionality and =polymorphic-functions.extended-types= package
+    - A =polymorphic-functions.extended-types= package (not system!) is also provided based on [[https://github.com/s-expressionists/ctype][ctype]]. This allows one to extend the CL type system to define types beyond what =cl:deftype= can do to some extent. While these *cannot be used inside an arbitrary CL form* with =cl:declare=, these can be used in the type lists of polymorphs. See [[file:src/extended-types/type=.lisp]] for an example put to use in [[https://github.com/digikar99/trivial-coerce][trivial-coerce]].
+- Static dispatch relies on =policy-quality= working as expected, and compiler-macros being called. As a result, it may not work on all implementations.
+- Some implementations produce interpreted functions some times while compiled functions other times; and accordingly differ if or not compiler-macros are called.
 - Currently *inlining uses the lexical environment of the call-site*
   rather than the definition-site as is the usual case. To work around
   this, users should avoid shadowing global lexical elements.
 - See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]] for parametric-types.
 - Avoid using =&rest= lambda-lists if you are aiming for stability. The algorithms for heterogeneous-type-lists methods for specialization and ambiguity detection implemented at file:src/lambda-lists/rest.lisp are non-trivial; PRs with more simplistic algorithms would be much welcome :D!
+
+*If someone would want a reduced-feature ANSI-compatible library, feel free to raise an issue. However, even with ANSI, one needs =cl:subtypep= working correctly, for instance, on Allegro CL 10.1: =(subtypep `(and (or string number) (or string symbol)) nil)= returns =T T=. CI is run on SBCL and ECL.
 
 * Dependencies outside quicklisp
    :PROPERTIES:
