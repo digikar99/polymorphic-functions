@@ -222,13 +222,8 @@
               ;; without a definite direction of SUBTYPEP
               :do (if (type= type-1 type-2)
                       t
-                      (multiple-value-bind (subtypep knownp)
-                          (subtypep `(and ,type-1 ,type-2) nil)
-                        (if knownp
-                            (return-from %type-list-intersection-null-p subtypep)
-                            (progn
-                              (warn "Assuming intersection of types ~S and ~S is NIL" type-1 type-2)
-                              (return-from %type-list-intersection-null-p t)))))
+                      (return-from %type-list-intersection-null-p
+                        (definitive-subtypep `(and ,type-1 ,type-2) nil)))
               :finally (return nil))
         (let ((list-1 (subseq list-1 (1+ key-position-1)))
               (list-2 (subseq list-2 (1+ key-position-2))))
