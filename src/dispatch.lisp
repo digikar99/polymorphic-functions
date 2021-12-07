@@ -287,7 +287,9 @@ Proceed at your own risk."
                          (values inline-lambda-body
                                  nil))))
               (setq inline (case inline
-                             ((t) (if inline-note nil t))
+                             ((t) (if ip
+                                      inline
+                                      (if inline-note nil t)))
                              (otherwise inline)))
               ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
               ;; and "objects of type FUNCTION can't be dumped into fasl files"
