@@ -55,12 +55,12 @@
              (extended-p nil))
          (loop :for elt :in list
                :until extended-p
-               :do (setq extended-p
-                         (ecase state
-                           ((:required &optional) (extended-type-specifier-p elt))
-                           (&key (extended-type-specifier-p (second elt)))))
-                   (when (member elt lambda-list-keywords)
-                     (setq state elt))
+               :do (if (member elt lambda-list-keywords)
+                       (setq state elt)
+                       (setq extended-p
+                             (ecase state
+                               ((:required &optional) (extended-type-specifier-p elt))
+                               (&key (extended-type-specifier-p (second elt))))))
                :finally (return extended-p)))))
 
 (deftype type-list () `(satisfies type-list-p))

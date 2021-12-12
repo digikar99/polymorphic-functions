@@ -30,12 +30,13 @@
 (defvar *extended-type-specifiers* nil)
 ;; (declaim (inline extended-type-specifier-p))
 (defun extended-type-specifier-p (object &optional env)
-  "Returns T if OBJECT is a type specifier is implemented using CTYPE and TYPEXPAND
-to a tree containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
+  "Returns T if OBJECT is a type specifier implemented using CTYPE and is a
+tree containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
+  (declare (ignore env))
   (if (parametric-type-specifier-p object)
       nil
-      (let ((specifier (typexpand object env)))
-        (traverse-tree specifier
+      (progn
+        (traverse-tree object
                        (lambda (node)
                          (typecase node
                            (list (if (member (car node) *extended-type-specifiers*)
@@ -45,15 +46,14 @@ to a tree containing a list starting with an element in *EXTENDED-TYPE-SPECIFIER
         nil)))
 
 (deftype extended-type-specifier ()
-  "These type specifiers are implemented using CTYPE and TYPEXPAND to a tree
+  "These type specifiers are implemented using CTYPE and are a tree
 containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
   `(satisfies extended-type-specifier-p))
 
 (defun type-specifier-p (object &optional env)
-  "Assumes everything is a type-specifier unless the object TYPEXPANDs to a LIST
-starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
-  (and (not (extended-type-specifier-p object env))
-       (not (parametric-type-specifier-p object))))
+  (or (cl-type-specifier-p object)
+      (extended-type-specifier-p object env)
+      (parametric-type-specifier-p object)))
 
 (defgeneric upgraded-extended-type (type-car)
   (:documentation "Used within POLYMORPHIC-FUNCTIONS to prepare a (CL:DECLARE (CL:TYPE ...))
@@ -69,9 +69,9 @@ CL:UPGRADED-ARRAY-ELEMENT-TYPE."))
   )
 
 (defun upgrade-extended-type (extended-type-specifier &optional env)
-  (let ((specifier (typexpand extended-type-specifier env))
-        (upgradeable-cars (cons 'type-like *extended-type-specifiers*)))
-    (traverse-tree specifier
+  (declare (ignore env))
+  (let ((upgradeable-cars (cons 'type-like *extended-type-specifiers*)))
+    (traverse-tree extended-type-specifier
                    (lambda (node)
                      (typecase node
                        (list (if (member (car node) upgradeable-cars)
@@ -85,8 +85,8 @@ COMPILER-MACROEXPANDs to CL:SUBTYPEP if both types are constant objects and
 neither is a EXTENDED-TYPE-SPECIFIER."
   (let ((type1 (deparameterize-type type1))
         (type2 (deparameterize-type type2)))
-    (if (and (type-specifier-p type1)
-             (type-specifier-p type2))
+    (if (and (cl-type-specifier-p type1)
+             (cl-type-specifier-p type2))
         (cl:subtypep type1 type2 environment)
         (ctype:subctypep (ctype:specifier-ctype type1 environment)
                          (ctype:specifier-ctype type2 environment)))))
@@ -95,13 +95,16 @@ neither is a EXTENDED-TYPE-SPECIFIER."
   (if (and (constantp type1 env) (constantp type2 env))
       (let ((type1 (deparameterize-type type1))
             (type2 (deparameterize-type type2)))
-        (cond ((and (type-specifier-p (constant-form-value type1 env))
-                    (type-specifier-p (constant-form-value type2 env)))
+        (cond ((and (cl-type-specifier-p (constant-form-value type1 env))
+                    (cl-type-specifier-p (constant-form-value type2 env)))
                `(cl:subtypep ,type1 ,type2 ,env-form))
-              (t
+              ((and (extended-type-specifier-p (constant-form-value type1 env))
+                    (extended-type-specifier-p (constant-form-value type2 env)))
                (once-only (env-form)
                  `(ctype:subctypep (ctype:specifier-ctype ,type1 ,env-form)
-                                   (ctype:specifier-ctype ,type2 ,env-form))))))
+                                   (ctype:specifier-ctype ,type2 ,env-form))))
+              (t
+               form)))
       form))
 
 (defvar *subtypep-alist* nil
@@ -191,17 +194,20 @@ The function-order for determining the SUBTYPEP functions is undefined."
   "Like CL:TYPEP but allows TYPE to be a PARAMETRIC-TYPE-SPECIFIER or EXTENDED-TYPE-SPECIFIER.
 COMPILER-MACROEXPANDs to CL:TYPEP if TYPE is a constant object not a EXTENDED-TYPE-SPECIFIER."
   (let ((type (deparameterize-type type)))
-    (if (type-specifier-p type)
+    (if (cl-type-specifier-p type)
         (cl:typep object type)
         (ctype:ctypep object (ctype:specifier-ctype type environment)))))
 
 (define-compiler-macro typep (&whole form object type &optional env-form &environment env)
   (if (constantp type env)
-      (let ((type (deparameterize-type type)))
-        (cond ((type-specifier-p (constant-form-value type env))
-               `(cl:typep ,object ,type ,env-form))
+      (let* ((type (deparameterize-type type))
+             (type (constant-form-value type env)))
+        (cond ((cl-type-specifier-p type)
+               `(cl:typep ,object ',type ,env-form))
+              ((extended-type-specifier-p type)
+               `(ctype:ctypep ,object (ctype:specifier-ctype ',type ,env-form)))
               (t
-               `(ctype:ctypep ,object (ctype:specifier-ctype ,type ,env-form)))))
+               form)))
       form))
 
 (defun type= (type1 type2 &optional env)

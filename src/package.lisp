@@ -14,6 +14,7 @@
            #:typep
            #:type=)
   (:export #:extended-type-specifier-p
+           #:cl-type-specifier-p
            #:type-specifier-p
            #:upgrade-extended-type
            #:supertypep
@@ -76,7 +77,11 @@
 
            #:*parametric-type-symbol-predicates*
            #:parametric-type-run-time-lambda-body
-           #:parametric-type-compile-time-lambda-body))
+           #:parametric-type-compile-time-lambda-body
+
+           #:the*
+
+           ))
 
 (in-package :polymorphic-functions)
 
@@ -116,7 +121,9 @@
                                                  (policy-quality 'speed env))))
 
 (defun typexpand (type-specifier &optional env)
-  (ctype::typexpand type-specifier env))
+  (if (cl-type-specifier-p type-specifier)
+      (ctype::typexpand type-specifier env)
+      type-specifier))
 
 (defun policy-quality (quality &optional env)
   (second (assoc quality (declaration-information 'optimize env))))
@@ -128,17 +135,18 @@
                                   form
                                   env))
 
-(defun type-specifier-p (type-specifier)
+(defun cl-type-specifier-p (type-specifier)
   "Returns true if TYPE-SPECIFIER is a valid type specfiier."
-  (or (when (symbolp type-specifier)
-        (documentation type-specifier 'type))
-      (block nil
-        #+sbcl (return (sb-ext:valid-type-specifier-p type-specifier))
-        #+openmcl (return (ccl:type-specifier-p type-specifier))
-        #+ecl (return (c::valid-type-specifier type-specifier))
-        #+clisp (return (null
-                         (nth-value 1 (ignore-errors
-                                       (ext:type-expand type-specifier)))))
+  (block nil
+    #+sbcl (return (ignore-some-conditions (sb-kernel:parse-unknown-type)
+                     (sb-ext:valid-type-specifier-p type-specifier)))
+    #+openmcl (return (ccl:type-specifier-p type-specifier))
+    #+ecl (return (c::valid-type-specifier type-specifier))
+    #+clisp (return (null
+                     (nth-value 1 (ignore-errors
+                                   (ext:type-expand type-specifier)))))
+    (or (when (symbolp type-specifier)
+          (documentation type-specifier 'type))
         (error "TYPE-SPECIFIER-P not available for this implementation"))))
 
 (defun setf-function-name-p (object)

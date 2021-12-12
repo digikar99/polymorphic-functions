@@ -421,7 +421,7 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                (loop :for tp :in (pp-type-parameters pp)
                      :do (pushnew (type-parameter-name tp) type-parameter-names))
                (let ((value-type (deparameterize-type value-type)))
-                 (cond ((type-specifier-p value-type)
+                 (cond ((cl-type-specifier-p value-type)
                         `(type ,value-type ,local-name))
                        (t
                         `(type ,(upgrade-extended-type value-type) ,local-name)))))))
@@ -596,7 +596,7 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                    (setq arg-types (cdr arg-types))
                    (populate-deparameterizer-alist pp arg-type)
                    `(type ,(or arg-type (let ((type (pp-value-type pp)))
-                                          (if (type-specifier-p type)
+                                          (if (cl-type-specifier-p type)
                                               type
                                               (upgrade-extended-type type))))
                           ,(pp-local-name pp))))
@@ -624,7 +624,7 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                                        (intern (symbol-name (pp-local-name pp)) :keyword))))
                    (populate-deparameterizer-alist pp arg-type)
                    `(type ,(or arg-type (let ((type (pp-value-type pp)))
-                                          (if (type-specifier-p type)
+                                          (if (cl-type-specifier-p type)
                                               type
                                               (upgrade-extended-type type))))
                           ,(pp-local-name pp))))
