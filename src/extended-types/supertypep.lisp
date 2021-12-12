@@ -42,7 +42,9 @@
   '(or list symbol))
 
 (defmethod ctypep (object (ct csupertypep))
-  (subctypep (csupertypep-type ct) (specifier-ctype object)))
+  (if (type-specifier-p object)
+      (subctypep (csupertypep-type ct) (specifier-ctype object))
+      nil))
 
 (defmethod ctype:ctype= ((ct1 csupertypep) (ct2 csupertypep))
   (ctype:ctype= (csupertypep-type ct1)
@@ -66,7 +68,9 @@
     (every (lambda (object)
              ;; Instead of converting to usual types, we instead convert
              ;; everything to CTYPE
-             (subctypep specifier (specifier-ctype object)))
+             (if (type-specifier-p object)
+                 (subctypep specifier (specifier-ctype object))
+                 (return-from subctypep (values nil t))))
            (cmember-members ct1))))
 
 (defmethod subctypep ((ct1 csupertypep) (ct2 (eql (ctype::top))))
