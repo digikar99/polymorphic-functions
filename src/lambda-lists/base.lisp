@@ -216,7 +216,33 @@ Non-examples:
 
 (5am:def-suite type-list-intersection-null-p :in lambda-list)
 
+;; FTYPE-FOR-STATIC-DISPATCH ================================================
 
+(defun ftype-for-static-dispatch (static-dispatch-name effective-type-list return-type env)
+  `(ftype (function ,(let ((type-list (loop :with state := :required
+                                            :for type-spec :in effective-type-list
+                                            :with processed-type-spec := nil
+                                            :do (setq processed-type-spec
+                                                      (if (member type-spec lambda-list-keywords)
+                                                          (setq state type-spec)
+                                                          (ecase state
+                                                            ((:required &optional)
+                                                             (upgrade-extended-type
+                                                              (deparameterize-type type-spec)
+                                                              env))
+                                                            (&key
+                                                             `(,(first type-spec)
+                                                               ,(upgrade-extended-type
+                                                                 (deparameterize-type (second type-spec))
+                                                                 env))))))
+                                            :collect processed-type-spec)))
+                       (if (eq '&rest (lastcar effective-type-list))
+                           (append type-list '(t))
+                           type-list))
+                    ,(upgrade-extended-type
+                      (deparameterize-type return-type)
+                      env))
+          ,static-dispatch-name))
 
 
 

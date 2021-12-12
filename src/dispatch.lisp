@@ -322,17 +322,10 @@ Proceed at your own risk."
                            (setf (fdefinition ',static-dispatch-name) ,lambda-body))
                         `(setf (fdefinition ',static-dispatch-name) ,lambda-body))
                    ,(let ((proclaimation
-                            `(proclaim '(ftype (function ,(mapcar (lambda (type)
-                                                                    (upgrade-extended-type
-                                                                     (deparameterize-type type)
-                                                                     env))
-                                                           (if (eq 'rest lambda-list-type)
-                                                               (butlast effective-type-list)
-                                                               effective-type-list))
-                                                ,(upgrade-extended-type
-                                                  (deparameterize-type return-type)
-                                                  env))
-                                         ,static-dispatch-name))))
+                            `(proclaim ',(ftype-for-static-dispatch static-dispatch-name
+                                                                    effective-type-list
+                                                                    return-type
+                                                                    env))))
                       (if optim-debug
                           proclaimation
                           `(handler-bind ((warning #'muffle-warning))
