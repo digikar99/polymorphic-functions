@@ -4,13 +4,7 @@
   :END:
 
 #+BEGIN_QUOTE
-  This library is still experimental. Interface can change in
-  backward-incompatible ways. Please wait until a proper release to use
-  in production code. (Or track commits and use git submodules and/or
-  qlot!)
-
-  If you would like at least a few grams (or ounce :p) of stability,
-  stick to the following symbols, and avoid non-trivial uses of &rest type-lists:
+  This library is still unstable, albeit the main interface comprising of the below symbols hasn't changed in at least the last six months. Users are also recommended to avoid non-trivial uses of &rest type-lists:
 
   - define-polymorphic-function
   - undefine-polymorphic-function
@@ -654,6 +648,7 @@ Yes, there are quite a few:
   this, users should avoid shadowing global lexical elements.
 - See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]] for parametric-types.
 - Avoid using =&rest= lambda-lists if you are aiming for stability. The algorithms for heterogeneous-type-lists methods for specialization and ambiguity detection implemented at file:src/lambda-lists/rest.lisp are non-trivial; PRs with more simplistic algorithms would be much welcome :D!
+- This library is not meant to compete against [[https://github.com/coalton-lang/coalton/][Coalton]]; because CLHS leaves it unspecified about what happens when the type declared at compile time (using =declare= or =the=) differs from the actual runtime type of the form or variable, compile time safety only exists on implementations that already provide it, and that too to a lesser extent that a fully static language. But on other implementations this is non-existent. However, an effort is certainly made to use the derived/declared types at the polymorph boundaries when compiled with =(debug 3)= or =(safety 3)= to ensure that the runtime types match these declared types, independent of the implementation support.
 
 *If someone would want a reduced-feature ANSI-compatible library, feel free to raise an issue. However, even with ANSI, one needs =cl:subtypep= working correctly, for instance, on Allegro CL 10.1: =(subtypep `(and (or string number) (or string symbol)) nil)= returns =T T=. CI is run on SBCL and ECL.
 

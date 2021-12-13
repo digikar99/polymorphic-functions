@@ -143,8 +143,8 @@
            nil)
           ((= list-1-length rest-position)
            (%type-list-subtype-p 'required 'required
-                  (subseq list-1 0 list-1-length)
-                  (subseq list-2 0 list-1-length)))
+                                 (subseq list-1 0 list-1-length)
+                                 (subseq list-2 0 list-1-length)))
           (t nil))))
 
 (def-test type-list-subtype-required-&-rest (:suite type-list-subtype-rest)
@@ -414,8 +414,8 @@
         (key-position  (position '&key  list-2)))
     (cond ((= key-position list-1-length)
            (%type-list-intersection-null-p 'required 'required
-                                            (subseq list-1 0 list-1-length)
-                                            (subseq list-2 0 list-1-length)))
+                                           (subseq list-1 0 list-1-length)
+                                           (subseq list-2 0 list-1-length)))
           ((< list-1-length key-position)
            t)
           ((< key-position list-1-length)
@@ -472,11 +472,11 @@
   (%type-list-intersection-null-p type-2 type-1 list-2 list-1))
 
 (defmethod %type-list-intersection-null-p ((type-1 (eql 'required-key))
-                                               (type-2 (eql 'rest))
-                                               list-1 list-2)
+                                           (type-2 (eql 'rest))
+                                           list-1 list-2)
   (%type-list-intersection-null-p type-2 type-1 list-2 list-1))
 
 (defmethod %type-list-intersection-null-p ((type-1 (eql 'required-key))
-                                               (type-2 (eql 'required))
-                                               list-1 list-2)
+                                           (type-2 (eql 'required))
+                                           list-1 list-2)
   (%type-list-intersection-null-p type-2 type-1 list-2 list-1))
