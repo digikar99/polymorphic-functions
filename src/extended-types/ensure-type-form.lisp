@@ -229,4 +229,4 @@ as well as the type enhanced using TYPE."
 
         (values-list ,form-value-list))
 
-     (cl-form-types:form-type `(the ,type ,form) env :expand-compiler-macros t))))
+     (cl-form-types:form-type `(the ,(deparameterize-type type) ,form) env :expand-compiler-macros t))))

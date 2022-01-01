@@ -17,6 +17,7 @@
                 :components ((:file "parametric-types")
                              (:file "ensure-type-form" :depends-on ("parametric-types"))
                              (:file "core"         :depends-on ("parametric-types"))
+                             (:file "deparameterize-type" :depends-on ("parametric-types"))
                              (:file "supertypep"   :depends-on ("core"))
                              (:file "type="        :depends-on ("core"))
                              (:file "subtypep"     :depends-on ("core"))))

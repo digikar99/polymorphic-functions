@@ -56,17 +56,6 @@ The expression will be compiled to a function and called with the appropriate
 *form-type* at run-time. The function should return the value of the TYPE-PARAMETER
 corresponding to the *form-type* and the parametric type."))
 
-(defun deparameterize-type (type-specifier)
-  (etypecase type-specifier
-    (atom (if (parametric-type-symbol-p type-specifier)
-              t
-              type-specifier))
-    (list (traverse-tree type-specifier (lambda (node)
-                                          (etypecase node
-                                            (atom (if (parametric-type-symbol-p node)
-                                                      'cl:*
-                                                      node))
-                                            (list node)))))))
 
 (defun type-parameters-from-parametric-type (parametric-type-spec)
   "Returns a list oF TYPE-PARAMETERS"

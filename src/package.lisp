@@ -81,7 +81,7 @@
 
            #:the*
 
-           ))
+           #:%deparameterize-type))
 
 (in-package :polymorphic-functions)
 
