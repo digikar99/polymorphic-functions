@@ -1,12 +1,17 @@
 (in-package :polymorphic-functions)
 
 (defun traverse-tree (tree &optional (function #'identity))
-  "Traverses TREE and calls function on each subtree and node of TREE."
-  (let ((tree (funcall function tree)))
-    (if (proper-list-p tree)
-        (loop :for node :in tree
+  "Traverses TREE and calls function on each subtree and node of TREE.
+If FUNCTION returns a list, then traversing the list can be avoided if
+the second return value is non-NIL. If FUNCTION returns a list, traverses
+the list only if the second return value is NIL."
+  (multiple-value-bind (new-tree traversal-complete-p)
+      (funcall function tree)
+    (if (and (proper-list-p new-tree)
+             (not traversal-complete-p))
+        (loop :for node :in new-tree
               :collect (traverse-tree node function))
-        (funcall function tree))))
+        (funcall function new-tree))))
 
 (defun translate-body (body translation-alist)
   (flet ((translate (node)

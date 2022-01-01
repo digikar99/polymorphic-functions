@@ -101,10 +101,13 @@ as well as the type enhanced using TYPE."
                                (traverse-tree type
                                               (lambda (node)
                                                 (etypecase node
-                                                  (atom (if (parametric-type-symbol-p node)
+                                                  (atom (if (or (parametric-type-symbol-p node)
+                                                                (member node '(quote list)))
                                                             node
-                                                            `(quote ,node)))
-                                                  (list `(list ,@node))))))))
+                                                            (values `(quote ,node) t)))
+                                                  (list (if (member (car node) '(quote list))
+                                                            node
+                                                            `(list ,@node)))))))))
          (rest-type-form (if rest-supplied-p
                              (lastcar type-forms)
                              t))
