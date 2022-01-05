@@ -344,6 +344,7 @@
 
 (def-test type-list-intersection-null-rest-&-required
     (:suite type-list-intersection-null-rest)
+  (5am:is-false (type-list-intersection-null-p '(string &rest) '(string)))
   (5am:is-false (type-list-intersection-null-p '(string &rest) '(string array)))
   (5am:is-true  (type-list-intersection-null-p '(string string &rest) '(string)))
   (5am:is-false (type-list-intersection-null-p '(string string &rest) '(string array)))

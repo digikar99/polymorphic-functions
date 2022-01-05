@@ -24,7 +24,7 @@ in this list, returns non-NIL for at least one predicate")
          nil)))
 
 (deftype parametric-type-specifier ()
-  `(satisfiers parametric-type-specifier-p))
+  `(satisfies parametric-type-specifier-p))
 
 (defun parametric-type-parameters (parametric-type-spec)
   (remove-duplicates

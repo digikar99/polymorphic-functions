@@ -425,6 +425,7 @@ In addition to subtype-polymorphism described above (under [[#basic-usage][Basic
 - \*parametric-type-symbol-predicates\*
 - parametric-type-run-time-lambda-body
 - parametric-type-compile-time-lambda-body
+- %deparameterize-type
 
 An example for this is at [[file:src/extended-types/parametric-types.lisp#L135][src/extended-types/parametric-types.lisp]] and [[file:src/misc-tests.lisp#L496][src/misc-tests.lisp]].
 
