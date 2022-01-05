@@ -161,7 +161,7 @@
                 (pos-2 (position '&optional untyped-lambda-list)))
          (= pos-1 pos-2))))
 
-(defmethod %type-list-subtype-p ((type-1 (eql 'required-optional))
+(defmethod %type-list-more-specific-p ((type-1 (eql 'required-optional))
                                  (type-2 (eql 'required-optional))
                                  list-1 list-2)
   (declare (type list list-1 list-2))
@@ -177,23 +177,23 @@
                         ((type= type-1 type-2)
                          t)
                         ((subtypep type-1 type-2)
-                         (return-from %type-list-subtype-p t))
+                         (return-from %type-list-more-specific-p t))
                         (t
-                         (return-from %type-list-subtype-p nil)))
+                         (return-from %type-list-more-specific-p nil)))
               :finally (return t))
         ;; Let's hope that this case will be caught by the ambiguous-call-p
         ;; functionality. Let's have this hope for the second part of and above
         ;; as well.
         (error "This case has not been handled!"))))
 
-(def-test type-list-subtype-optional (:suite type-list-subtype-p)
-  (5am:is-true  (type-list-subtype-p '(string &optional string)
+(def-test type-list-subtype-optional (:suite type-list-more-specific-p)
+  (5am:is-true  (type-list-more-specific-p '(string &optional string)
                                      '(string &optional array)))
-  (5am:is-true  (type-list-subtype-p '(&optional string)
+  (5am:is-true  (type-list-more-specific-p '(&optional string)
                                      '(&optional string number)))
-  (5am:is-false (type-list-subtype-p '(string &optional string)
+  (5am:is-false (type-list-more-specific-p '(string &optional string)
                                      '(string &optional number)))
-  (5am:is-false (type-list-subtype-p '(string &optional string)
+  (5am:is-false (type-list-more-specific-p '(string &optional string)
                                      '(number &optional string))))
 
 (defmethod %type-list-intersection-null-p

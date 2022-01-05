@@ -6,7 +6,7 @@
 ;; - COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY
 ;; - SBCL-TRANSFORM-ARGS-FROM-LAMBDA-LIST-FORM
 ;; - TYPE-LIST-COMPATIBLE-P
-;; - TYPE-LIST-SUBTYPE-P
+;; - type-list-more-specific-p
 ;; - TYPE-LIST-CAUSES-AMBIGUOUS-CALL-P
 
 ;; THE BASICS ==================================================================
@@ -183,21 +183,21 @@ Non-examples:
 (defvar *environment*)
 
 
-;; TYPE-LIST-SUBTYPE-P =========================================================
+;; type-list-more-specific-p =========================================================
 
-(defun type-list-subtype-p (type-list-1 type-list-2)
-  #.+type-list-subtype-p+
+(defun type-list-more-specific-p (type-list-1 type-list-2)
+  #.+type-list-more-specific-p+
   (declare (type type-list type-list-1 type-list-2))
   (let ((*lambda-list-typed-p* nil))
-    (%type-list-subtype-p (potential-type-of-lambda-list type-list-1)
+    (%type-list-more-specific-p (potential-type-of-lambda-list type-list-1)
                           (potential-type-of-lambda-list type-list-2)
                           type-list-1
                           type-list-2)))
 
-(defgeneric %type-list-subtype-p (type-1 type-2 type-list-1 type-list-2)
-  (:documentation #.+type-list-subtype-p+))
+(defgeneric %type-list-more-specific-p (type-1 type-2 type-list-1 type-list-2)
+  (:documentation #.+type-list-more-specific-p+))
 
-(5am:def-suite type-list-subtype-p :in lambda-list)
+(5am:def-suite type-list-more-specific-p :in lambda-list)
 
 ;; TYPE-LIST-INTERSECTION-NULL-P ===============================================
 

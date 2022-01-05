@@ -76,8 +76,8 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
   (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition name))
         :for existing-type-list := (polymorph-type-list polymorph)
         :for existing-effective-type-list := (polymorph-effective-type-list polymorph)
-        :for new-specific-p := (type-list-subtype-p effective-type-list existing-effective-type-list)
-        :for existing-specific-p := (type-list-subtype-p existing-effective-type-list effective-type-list)
+        :for new-specific-p := (type-list-more-specific-p effective-type-list existing-effective-type-list)
+        :for existing-specific-p := (type-list-more-specific-p existing-effective-type-list effective-type-list)
         :do (when (or (and new-specific-p
                            existing-specific-p
                            (not (equalp type-list existing-type-list)))

@@ -54,8 +54,8 @@
                                     (untyped-lambda-list list))
   (length= type-list untyped-lambda-list))
 
-;; FIXME: Rename TYPE-LIST-SUBTYPE-P to TYPE-LIST-MORE-SPECIFIC-P
-(defmethod %type-list-subtype-p ((type-1 (eql 'required))
+;; FIXME: Rename type-list-more-specific-p to TYPE-LIST-MORE-SPECIFIC-P
+(defmethod %type-list-more-specific-p ((type-1 (eql 'required))
                                  (type-2 (eql 'required))
                                  list-1
                                  list-2)
@@ -69,18 +69,18 @@
              :do (cond ((type= type-1 type-2)
                         t)
                        ((subtypep type-1 type-2)
-                        (return-from %type-list-subtype-p t))
+                        (return-from %type-list-more-specific-p t))
                        (t
-                        (return-from %type-list-subtype-p nil)))
+                        (return-from %type-list-more-specific-p nil)))
              :finally (return t))))
 
-(def-test type-list-subtype-required (:suite type-list-subtype-p)
-  (5am:is-true  (type-list-subtype-p '(string string) '(string array)))
-  (5am:is-false (type-list-subtype-p '(array string) '(string array)))
-  (5am:is-true  (type-list-subtype-p '(string array) '(array string)))
-  (5am:is-false (type-list-subtype-p '(string string) '(string number)))
-  (5am:is-false (type-list-subtype-p '(string string) '(string)))
-  (5am:is-false (type-list-subtype-p '((or string number) string) '((or string symbol) array))))
+(def-test type-list-subtype-required (:suite type-list-more-specific-p)
+  (5am:is-true  (type-list-more-specific-p '(string string) '(string array)))
+  (5am:is-false (type-list-more-specific-p '(array string) '(string array)))
+  (5am:is-true  (type-list-more-specific-p '(string array) '(array string)))
+  (5am:is-false (type-list-more-specific-p '(string string) '(string number)))
+  (5am:is-false (type-list-more-specific-p '(string string) '(string)))
+  (5am:is-false (type-list-more-specific-p '((or string number) string) '((or string symbol) array))))
 
 (defmethod %type-list-intersection-null-p
     ((type-1 (eql 'required)) (type-2 (eql 'required)) list-1 list-2)

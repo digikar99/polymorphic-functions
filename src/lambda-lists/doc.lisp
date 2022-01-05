@@ -49,9 +49,9 @@ UPDATE-POLYMORPHIC-FUNCTION-LAMBDA with INVALIDATE as NIL, and then recall the f
 be a TYPED-LAMBDA-LIST"
   :test 'string=)
 
-;; TYPE-LIST-SUBTYPE-P =========================================================
+;; type-list-more-specific-p =========================================================
 
-(define-constant +type-list-subtype-p+
+(define-constant +type-list-more-specific-p+
   "Returns T if TYPE-LIST-1 is more specialized than TYPE-LIST-2"
   :test 'string=)
 

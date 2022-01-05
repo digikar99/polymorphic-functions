@@ -255,7 +255,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (labels ((add-polymorph (polymorph polymorphs)
                       (cond ((null polymorphs)
                              (list polymorph))
-                            ((type-list-subtype-p
+                            ((type-list-more-specific-p
                               (polymorph-type-list polymorph)
                               (polymorph-type-list (first polymorphs)))
                              (cons polymorph polymorphs))
