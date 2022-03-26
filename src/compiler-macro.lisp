@@ -96,7 +96,8 @@
                      compiler-macro-lambda lambda-list-type
                      static-dispatch-name parameters)
             polymorph
-          (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph)))
+          (let ((inline-lambda-body (polymorph-inline-lambda-body polymorph))
+                (return-type        return-type))
             (when inline-lambda-body
               (setq inline-lambda-body
                     ;; The only thing we want to preserve from the ENV are the OPTIMIZE
