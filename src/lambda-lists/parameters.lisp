@@ -518,7 +518,7 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                       (declare (ignore pp))
                       nil)))))
 
-          `(lambda ,lambda-list
+          `(cl:lambda ,lambda-list
              (declare (optimize speed)
                       (ignorable ,@(mapcar (lambda (elt)
                                              (etypecase elt

@@ -535,7 +535,7 @@
                   (defpolymorph (outer :inline t) ((a array)) t
                     (inner a))))
          (is (eq 'string (funcall (compile nil
-                                           `(lambda (a)
+                                           `(cl:lambda (a)
                                               (declare (optimize speed (debug 1))
                                                        (type string a))
                                               (outer a)))
@@ -546,7 +546,7 @@
                     (declare (type array b))
                     (inner b))))
          (is (eq 'array (funcall (compile nil
-                                          `(lambda (a)
+                                          `(cl:lambda (a)
                                              (declare (optimize speed (debug 1))
                                                       (type string a))
                                              (outer a)))
@@ -557,7 +557,7 @@
                     (declare (type-like a b))
                     (inner b))))
          (is (eq 'string (funcall (compile nil
-                                           `(lambda (a)
+                                           `(cl:lambda (a)
                                               (declare (optimize speed)
                                                        (type string a))
                                               (outer a)))

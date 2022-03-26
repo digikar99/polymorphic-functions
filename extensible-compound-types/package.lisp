@@ -41,9 +41,8 @@
   (:shadowing-import-exported-symbols :polymorphic-functions.extended-types)
   (:use :cl-form-types :alexandria :extensible-compound-types-cl)
   (:import-from :5am #:is #:def-test)
-  (:import-from :ctype
-                #:ctype
-                #:cons-specifier-ctype)
+  (:import-from :extensible-compound-types-cl.impl
+                #:decl-and-type-check-body)
   (:import-from :polymorphic-functions.extended-types
                 #:*extended-type-specifiers*
                 #:upgraded-extended-type)
@@ -96,11 +95,11 @@
 (defmacro is-error (form)
   `(5am:signals error ,form))
 
-(defmacro list-named-lambda (name package lambda-list &body body)
+(defmacro list-named-lambda (name package lambda-list &body body &environment env)
   (declare (type list name))
   #+sbcl
   `(sb-int:named-lambda ,name ,lambda-list
-     ,@body)
+     ,@(decl-and-type-check-body body env))
   #+ccl
   `(ccl:nfunction ,name
                   (lambda ,lambda-list

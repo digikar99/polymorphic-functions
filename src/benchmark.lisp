@@ -46,6 +46,7 @@
                                             "Expected: ~D~%Actual:   ~D~%%diff:    ~D%"
                                             ,expected-sym ,actual-sym ,percent-diff)))))
 
+                          #-extensible-compound-types
                           (expect-time (#+sbcl 5.1
                                         #+ccl  2.47)
                                        (locally (declare (optimize (debug 1) (speed 1)))

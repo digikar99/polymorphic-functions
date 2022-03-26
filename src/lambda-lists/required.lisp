@@ -23,24 +23,24 @@
                    (funcall (fdefinition ',*name*) ,@untyped-lambda-list)))
                (t
                 `(funcall
-                  (the function
-                       (locally
-                           (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
-                         (cond
-                           ,@(loop
-                               :for i :from 0
-                               :for polymorph
-                                 :in (polymorphic-function-polymorphs (fdefinition *name*))
-                               :for static-dispatch-name
-                                 := (polymorph-static-dispatch-name polymorph)
-                               :for runtime-applicable-p-form
-                                 := (polymorph-runtime-applicable-p-form polymorph)
-                               :collect
-                               `(,runtime-applicable-p-form #',static-dispatch-name))
-                           (t
-                            (return-from ,block-name
-                              (funcall ,(polymorphic-function-default (fdefinition *name*))
-                                       ',*name* nil (list ,@untyped-lambda-list)))))))
+                  (cl:the cl:function
+                          (locally
+                              (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                            (cond
+                              ,@(loop
+                                  :for i :from 0
+                                  :for polymorph
+                                    :in (polymorphic-function-polymorphs (fdefinition *name*))
+                                  :for static-dispatch-name
+                                    := (polymorph-static-dispatch-name polymorph)
+                                  :for runtime-applicable-p-form
+                                    := (polymorph-runtime-applicable-p-form polymorph)
+                                  :collect
+                                  `(,runtime-applicable-p-form #',static-dispatch-name))
+                              (t
+                               (return-from ,block-name
+                                 (funcall ,(polymorphic-function-default (fdefinition *name*))
+                                          ',*name* nil (list ,@untyped-lambda-list)))))))
                   ,@untyped-lambda-list)))))))
 
 (defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required))
@@ -56,9 +56,9 @@
 
 ;; FIXME: Rename type-list-more-specific-p to TYPE-LIST-MORE-SPECIFIC-P
 (defmethod %type-list-more-specific-p ((type-1 (eql 'required))
-                                 (type-2 (eql 'required))
-                                 list-1
-                                 list-2)
+                                       (type-2 (eql 'required))
+                                       list-1
+                                       list-2)
   (declare (optimize speed)
            (type list list-1 list-2))
   (and (length= list-1 list-2)

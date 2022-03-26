@@ -68,7 +68,7 @@
                      (destructuring-bind (,lambda ,param-list-sym ,declarations &body ,body)
                          ',inline-lambda-body
                        (declare (ignore ,lambda ,param-list-sym))
-                       `(lambda ,',param-list
+                       `(cl:lambda ,',param-list
                           ;; The source of parametric-polymorphism
                           ,(enhanced-lambda-declarations (polymorph-parameters
                                                           (find-polymorph ',name ',type-list))
@@ -78,7 +78,7 @@
 
                ,(if (eq 'rest lambda-list-type)
                     ;; Yes, we are returning a LAMBDA-FORM below
-                    ``(lambda ,,arg-syms
+                    ``(cl:lambda ,,arg-syms
                         ,(if-let ((,compiler-macro-lambda
                                    (polymorph-compiler-macro-lambda
                                     (find-polymorph ',name ',type-list)))

@@ -135,10 +135,10 @@
                                                                            0 optional-idx)))
                                 :collect `(,supplied-p
                                            (funcall
-                                            (the function ,static-dispatch-fn)
+                                            (cl:the cl:function ,static-dispatch-fn)
                                             ,@parameters)))
                         (t
-                         (funcall (the function ,static-dispatch-fn)
+                         (funcall (cl:the cl:function ,static-dispatch-fn)
                                   ,@required-parameters))))))))))
 
 (defmethod %sbcl-transform-arg-lvars-from-lambda-list-form ((type (eql 'required-optional))

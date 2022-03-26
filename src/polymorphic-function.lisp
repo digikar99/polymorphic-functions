@@ -493,6 +493,7 @@ If it exists, the second value is T and the first value is a possibly empty
                      l)))
              (mappend #'apropos-pf names))))))
 
+#-extensible-compound-types
 (define-declaration type-like (vars env)
   ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
   (destructuring-bind (original &rest similar) vars
@@ -502,6 +503,18 @@ If it exists, the second value is T and the first value is a possibly empty
                                     (nth-value 2 (variable-information original env))))
                   :for var :in similar
                   :collect `(,var cl:type ,type)))))
+
+#+extensible-compound-types
+(define-declaration type-like (vars env)
+  ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
+  (destructuring-bind (original &rest similar) vars
+    (values :variable
+            (loop :with type
+                    := (rest (assoc 'extensible-compound-types:extype
+                                    (nth-value 2 (variable-information original env))))
+                  :for var :in similar
+                  :collect `(,var 'extensible-compound-types:extype ,type)
+                  :collect `(,var 'cl:type ,(upgraded-cl-type type env))))))
 
 (define-declaration inline-pf (vars env)
   (values :function

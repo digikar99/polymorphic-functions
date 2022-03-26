@@ -64,11 +64,11 @@ corresponding to the *form-type* and the parametric type."))
      (if (parametric-type-symbol-p parametric-type-spec)
          (list (make-type-parameter :name parametric-type-spec
                                     :run-time-deparameterizer-lambda-body
-                                    `(lambda (o) (type-of o))
+                                    `(cl:lambda (o) (type-of o))
                                     :compile-time-deparameterizer-lambda
-                                    (lambda (form-type) form-type)
+                                    (cl:lambda (form-type) form-type)
                                     :compile-time-deparameterizer-lambda-body
-                                    `(lambda (form-type) form-type)))
+                                    `(cl:lambda (form-type) form-type)))
          nil))
     (list
      (let* ((type-car (car parametric-type-spec))
@@ -94,10 +94,10 @@ corresponding to the *form-type* and the parametric type."))
     ((type-car (eql 'array)) type-cdr parameter)
   (destructuring-bind (&optional (elt-type 'cl:*) (rank/dimensions 'cl:*)) type-cdr
     (cond ((eq parameter elt-type)
-           `(lambda (array) (array-element-type array)))
+           `(cl:lambda (array) (array-element-type array)))
           ((symbolp rank/dimensions)
            (cond ((eq parameter rank/dimensions)
-                  `(lambda (array) (array-dimensions array)))
+                  `(cl:lambda (array) (array-dimensions array)))
                  (t
                   (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
                          parameter (cons type-car type-cdr)))))
@@ -106,7 +106,7 @@ corresponding to the *form-type* and the parametric type."))
                  :for i :from 0
                  :do (cond ((eq parameter s)
                             (return-from parametric-type-run-time-lambda-body
-                              `(lambda (array) (array-dimension array ,i))))
+                              `(cl:lambda (array) (array-dimension array ,i))))
                            (t
                             (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
                                    parameter (cons type-car type-cdr)))))))))
@@ -114,7 +114,7 @@ corresponding to the *form-type* and the parametric type."))
 (defmethod parametric-type-compile-time-lambda-body
     ((type-car (eql 'array)) type-cdr parameter)
   (destructuring-bind (&optional (elt-type 'cl:*) (rank/dimensions 'cl:*)) type-cdr
-    `(lambda (type)
+    `(cl:lambda (type)
        ,(cond ((eq parameter elt-type)
                `(if (and (listp type)
                          (or (eq 'array (first type))

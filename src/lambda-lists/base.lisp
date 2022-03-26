@@ -190,9 +190,9 @@ Non-examples:
   (declare (type type-list type-list-1 type-list-2))
   (let ((*lambda-list-typed-p* nil))
     (%type-list-more-specific-p (potential-type-of-lambda-list type-list-1)
-                          (potential-type-of-lambda-list type-list-2)
-                          type-list-1
-                          type-list-2)))
+                                (potential-type-of-lambda-list type-list-2)
+                                type-list-1
+                                type-list-2)))
 
 (defgeneric %type-list-more-specific-p (type-1 type-2 type-list-1 type-list-2)
   (:documentation #.+type-list-more-specific-p+))
