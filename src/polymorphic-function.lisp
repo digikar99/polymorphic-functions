@@ -196,7 +196,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               :lambda-list-type (lambda-list-type untyped-lambda-list))))
       (invalidate-polymorphic-function-lambda apf)
       (setf (fdefinition name) apf)
-      (setf (documentation name 'function) documentation)
+      (setf (documentation name 'cl:function) documentation)
       #+ccl (setf (ccl:arglist name) effective-lambda-list)
       apf)))
 

@@ -137,7 +137,7 @@
                       (mapc #'compiler-macro-notes:muffle notes)
                       ;; Some macroexpand-all can produce a (function (lambda ...)) from (lambda ...)
                       ;; Some others do not
-                      (if (eq 'function (first macroexpanded-form))
+                      (if (eq 'cl:function (first macroexpanded-form))
                           (second macroexpanded-form)
                           macroexpanded-form))))
             (cond (compiler-macro-lambda

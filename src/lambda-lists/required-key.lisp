@@ -195,17 +195,17 @@
 
 (def-test type-list-subtype-key (:suite type-list-more-specific-p)
   (5am:is-true  (type-list-more-specific-p '(string &key (:a string))
-                                     '(string &key (:a array))))
+                                           '(string &key (:a array))))
   (5am:is-true  (type-list-more-specific-p '(string &key (:a string))
-                                     '(array  &key (:a string))))
+                                           '(array  &key (:a string))))
   (5am:is-true  (type-list-more-specific-p '(string &key (:a string))
-                                     '(string &key (:a string) (:b number))))
+                                           '(string &key (:a string) (:b number))))
   (5am:is-false (type-list-more-specific-p '(string &key (:a string))
-                                     '(string &key (:a number))))
+                                           '(string &key (:a number))))
   (5am:is-false (type-list-more-specific-p '(string &key (:a string))
-                                     '(number &key (:a string))))
+                                           '(number &key (:a string))))
   (5am:is-false (type-list-more-specific-p '(&key (:a string) (:b number))
-                                     '(string &key (:a string) (:b number)))))
+                                           '(string &key (:a string) (:b number)))))
 
 (defmethod %type-list-intersection-null-p
     ((type-1 (eql 'required-key))

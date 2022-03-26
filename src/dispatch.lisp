@@ -158,8 +158,12 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
   - Possible values for INLINE are T, NIL and :MAYBE
   - STATIC-DISPATCH-NAME could be useful for tracing or profiling
 
-  **Note**: INLINE T or :MAYBE can result in infinite expansions for recursive polymorphs.
-Proceed at your own risk."
+  **Note**:
+  - INLINE T or :MAYBE can result in infinite expansions for recursive polymorphs.
+Proceed at your own risk.
+  - Also, because inlining results in type declaration upgradation for purposes
+of subtype polymorphism, it is recommended to not mutate the variables used
+in the lambda list; the consequences of mutation are undefined."
   (destructuring-bind (name &key (inline t ip) (static-dispatch-name nil static-dispatch-name-p))
       (if (typep name 'function-name)
           (list name)
@@ -239,7 +243,8 @@ Proceed at your own risk."
                                                                       (mapcar #'third
                                                                               (rest lambda-declarations)))
                                                            :declare (rest lambda-declarations)))
-                                      (setq return-type form-return-type)
+                                      (unless (parametric-type-specifier-p return-type)
+                                        (setq return-type form-return-type))
                                       form))))
                  ;; Currently we need INLINE-LAMBDA-BODY and the checks in M-V-B
                  ;; below for DEFTRANSFORM; as well as to avoid the ASSERTs in
