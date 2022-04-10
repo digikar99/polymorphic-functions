@@ -14,6 +14,7 @@
   :pathname #P"extensible-compound-types/"
   :components ((:file "pre-package")
                (:file "package"                    :depends-on ("pre-package"))
+               (:file "types"                      :depends-on ("package"))
                (:module "extended-types"           :depends-on ("package")
                 :components ((:file "parametric-types")
                              (:file "ensure-type-form" :depends-on ("parametric-types"))
@@ -22,7 +23,7 @@
                              (:file "supertypep"   :depends-on ("core"))
                              (:file "type="        :depends-on ("core"))
                              (:file "subtypep"     :depends-on ("core"))))
-               (:module "lambda-lists"             :depends-on ("extended-types")
+               (:module "lambda-lists"             :depends-on ("types" "extended-types")
                 :components ((:file "doc")
                              (:file "parameters")
                              (:file "base"         :depends-on ("doc"
@@ -31,7 +32,8 @@
                              (:file "required-optional" :depends-on ("base"))
                              (:file "required-key" :depends-on ("base"))
                              (:file "rest"         :depends-on ("base"))))
-               (:file "polymorphic-function"       :depends-on ("extended-types"
+               (:file "polymorphic-function"       :depends-on ("types"
+                                                                "extended-types"
                                                                 "lambda-lists"))
                (:file "conditions"                 :depends-on ("extended-types"))
                (:file "compiler-macro"             :depends-on ("polymorphic-function"
