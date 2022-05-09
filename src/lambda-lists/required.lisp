@@ -25,7 +25,9 @@
                 `(funcall
                   (cl:the cl:function
                           (locally
-                              (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                              (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note)
+                                       (compiler-macro-notes:muffle
+                                        compiler-macro-notes:optimization-failure-note))
                             (cond
                               ,@(loop
                                   :for i :from 0
@@ -101,6 +103,12 @@
 
             :do (if (type= type-1 type-2)
                     t
+                    #+extensible-compound-types
+                    (when (definitive-intersection-null-p (when (boundp '*environment*)
+                                                            *environment*)
+                            type-1 type-2)
+                      (return-from %type-list-intersection-null-p t))
+                    #-extensible-compound-types
                     (when (definitive-subtypep `(and ,type-1 ,type-2) nil)
                       (return-from %type-list-intersection-null-p t)))
             :finally (return nil))))

@@ -2,14 +2,10 @@
 ;; uiop:define-package :polymorphic-functions.extended-types
 ;; polymorphic-functions.defpackage:defpackage :polymorphic-functions.extended-types
 (polymorphic-functions.defpackage:defpackage :polymorphic-functions.extended-types
-  (:use :extensible-compound-types-cl :ctype)
-  (:import-from :ctype
-                #:cons-specifier-ctype
-                #:ctype)
+  (:use :extensible-compound-types-cl)
   (:intern #:*extended-type-specifiers*
            #:upgraded-extended-type)
-  (:shadow #:ctype=
-           #:extended-type-specifier-p
+  (:shadow #:extended-type-specifier-p
            #:type-specifier-p
            #:supertypep
            #:subtypep

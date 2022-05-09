@@ -6,11 +6,11 @@
   :depends-on ("alexandria"
                "closer-mop"
                "compiler-macro-notes"
-               "ctype"
                "extensible-compound-types-cl"
                "fiveam" ;; just keep tests together!
                "cl-form-types"
-               "introspect-environment")
+               "introspect-environment"
+               "optima")
   :pathname #P"extensible-compound-types/"
   :components ((:file "pre-package")
                (:file "package"                    :depends-on ("pre-package"))

@@ -112,7 +112,9 @@
                 (apply (fdefinition ',*name*) ,@required-parameters ,rest-args))
              `(apply
                (cl:the cl:function
-                       (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
+                       (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note)
+                                         (compiler-macro-notes:muffle
+                                          compiler-macro-notes:optimization-failure-note))
                          (cond
                            ,@(loop
                                :for i :from 0

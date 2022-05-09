@@ -22,59 +22,44 @@
 ;; include that coercions with (supertypep 'vector) and (supertypep 'list)
 ;; prove to be ambiguous if the argument (OUTPUT-TYPE-SPEC) is 'sequence.
 
-(pushnew 'supertypep *extended-type-specifiers*)
+(define-compound-type symbol-or-list-supertype-p (symbol-or-list type-specifier)
+  "Denotes the set of type specifiers that are a SUPERTYPE of TYPE-SPECIFIER"
+  (and (or (symbolp symbol-or-list)
+           (listp   symbol-or-list))
+       (type-specifier-p symbol-or-list)
+       (supertypep symbol-or-list type-specifier)))
 
-(defclass csupertypep (ctype)
-  ((%type :initarg :type :reader csupertypep-type :type ctype::ctype)))
+(deftype extensible-compound-types:supertypep (type-specifier)
+  "Denotes the set of type specifiers that are a SUPERTYPE of TYPE-SPECIFIER"
+  `(and (or symbol list)
+        (symbol-or-list-supertype-p ,type-specifier)))
 
-(defun csupertypep (type)
-  (make-instance 'csupertypep :type type))
+(defmethod %upgraded-cl-type ((name (eql 'symbol-or-list-supertype-p)) type &optional env)
+  (declare (ignore env))
+  (etypecase type
+    (symbol 'symbol)
+    (list   'list)))
 
-(defmethod cons-specifier-ctype ((head (eql 'supertypep)) rest env)
-  (declare (ignorable env))
-  (destructuring-bind (type) rest
-    (csupertypep (specifier-ctype type env))))
+(defmethod %subtypep ((n1 (eql 'symbol-or-list-supertype-p))
+                      (n2 (eql 'symbol-or-list-supertype-p))
+                      t1 t2 &optional env)
+  (optima.extra:let-match (((list 'symbol-or-list-supertype-p ts1) t1)
+                           ((list 'symbol-or-list-supertype-p ts2) t2))
+    (multiple-value-bind (subtypep knownp) (subtypep ts2 ts1 env)
+      (values subtypep knownp))))
 
-(defmethod unparse ((ct csupertypep))
-  `(supertypep ,(unparse (csupertypep-type ct))))
-
-(defmethod upgraded-extended-type ((type-car (eql 'supertypep)))
-  '(or list symbol))
-
-(defmethod ctypep (object (ct csupertypep))
-  (if (type-specifier-p object)
-      (subctypep (csupertypep-type ct) (specifier-ctype object))
-      nil))
-
-(defmethod ctype:ctype= ((ct1 csupertypep) (ct2 csupertypep))
-  (ctype:ctype= (csupertypep-type ct1)
-                (csupertypep-type ct2)))
-
-(defmethod subctypep ((ct1 csupertypep) (ct2 csupertypep))
-  (subctypep (csupertypep-type ct2) (csupertypep-type ct1)))
-
-(defmethod conjoin/2 ((ct1 csupertypep) (ct2 csupertypep))
-  (csupertypep (specifier-ctype
-                `(or ,(unparse (csupertypep-type ct1))
-                     ,(unparse (csupertypep-type ct2))))))
-
-(defmethod subctypep ((ct1 csupertypep) (ct2 ctype:disjunction))
-  (if (null (ctype:junction-ctypes ct2))
-      (values nil t)
-      (error "Unhandled case!")))
-
-(defmethod subctypep ((ct1 cmember) (ct2 csupertypep))
-  (let ((specifier (csupertypep-type ct2)))
-    (every (lambda (object)
-             ;; Instead of converting to usual types, we instead convert
-             ;; everything to CTYPE
-             (if (type-specifier-p object)
-                 (subctypep specifier (specifier-ctype object))
-                 (return-from subctypep (values nil t))))
-           (cmember-members ct1))))
-
-(defmethod subctypep ((ct1 csupertypep) (ct2 (eql (ctype::top))))
-  (values t t))
-
-(defmethod subctypep ((ct1 csupertypep) ct2)
-  (values nil nil))
+(defmethod %subtypep ((n1 (eql 'member))
+                      (n2 (eql 'symbol-or-list-supertype-p))
+                      t1 t2 &optional env)
+  (optima.extra:let-match (((list 'symbol-or-list-supertype-p specifier) t2)
+                           ((list* 'member objects) t1))
+    (values (every (lambda (object)
+                     (if (type-specifier-p object)
+                         (multiple-value-bind (supertypep knownp)
+                             (supertypep object specifier env)
+                           (if knownp
+                               supertypep
+                               (return-from %subtypep (values nil nil))))
+                         (return-from %subtypep (values nil t))))
+                   objects)
+            t)))

@@ -11,9 +11,9 @@
   (multiple-value-bind (param-list type-list effective-type-list)
       (polymorph-effective-lambda-list polymorph-parameters)
     (declare (ignore effective-type-list))
-    (when (or (extended-type-list-p type-list)
+    (when (or (some #'parametric-type-specifier-p type-list)
               ;; FIXME: Not a simple mapping, is it?
-              (some #'parametric-type-specifier-p type-list))
+              (extended-type-list-p type-list))
       (return-from make-sbcl-transform-body nil))
     (let ((lambda-list-type (lambda-list-type typed-lambda-list :typed t))
           (transform-lambda-list (untyped-lambda-list typed-lambda-list)))

@@ -421,6 +421,9 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                (loop :for tp :in (pp-type-parameters pp)
                      :do (pushnew (type-parameter-name tp) type-parameter-names))
                (let ((value-type (deparameterize-type value-type)))
+                 #+extensible-compound-types
+                 `(type ,value-type ,local-name)
+                 #-extensible-compound-types
                  (cond ((cl-type-specifier-p value-type)
                         `(type ,value-type ,local-name))
                        (t

@@ -1,48 +1,43 @@
 (in-package :polymorphic-functions.extended-types)
 
-(pushnew 'subtypep *extended-type-specifiers*)
+(define-compound-type symbol-or-list-subtype-p (symbol-or-list type-specifier)
+  "Denotes the set of type specifiers that are a SUBTYPE of TYPE-SPECIFIER"
+  (and (or (symbolp symbol-or-list)
+           (listp   symbol-or-list))
+       (type-specifier-p symbol-or-list)
+       (subtypep symbol-or-list type-specifier)))
 
-(defclass csubtypep (ctype)
-  ((%type :initarg :type :reader csubtypep-type :type ctype::ctype)))
+(deftype extensible-compound-types:subtypep (type-specifier)
+  "Denotes the set of type specifiers that are a SUBTYPE of TYPE-SPECIFIER"
+  `(and (or symbol list)
+        (symbol-or-list-subtype-p ,type-specifier)))
 
-(defun csubtypep (type)
-  (make-instance 'csubtypep :type type))
+(defmethod %upgraded-cl-type ((name (eql 'symbol-or-list-subtype-p)) type &optional env)
+  (declare (ignore env))
+  (etypecase type
+    (symbol 'symbol)
+    (list   'list)))
 
-(defmethod cons-specifier-ctype ((head (eql 'subtypep)) rest env)
-  (declare (ignorable env))
-  (destructuring-bind (type) rest
-    (csubtypep (specifier-ctype type env))))
+(defmethod %subtypep ((n1 (eql 'symbol-or-list-subtype-p))
+                      (n2 (eql 'symbol-or-list-subtype-p))
+                      t1 t2 &optional env)
+  (optima.extra:let-match (((list 'symbol-or-list-subtype-p ts1) t1)
+                           ((list 'symbol-or-list-subtype-p ts2) t2))
+    (multiple-value-bind (subtypep knownp) (subtypep ts1 ts2 env)
+      (values subtypep knownp))))
 
-(defmethod unparse ((ct csubtypep))
-  `(subtypep ,(unparse (csubtypep-type ct))))
-
-(defmethod upgraded-extended-type ((type-car (eql 'subtypep)))
-  '(or list symbol))
-
-(defmethod ctypep (object (ct csubtypep))
-  (if (type-specifier-p object)
-      (subctypep (specifier-ctype object) (csubtypep-type ct))
-      nil))
-
-(defmethod ctype:ctype= ((ct1 csubtypep) (ct2 csubtypep))
-  (ctype:ctype= (csubtypep-type ct1)
-                (csubtypep-type ct2)))
-
-(defmethod subctypep ((ct1 csubtypep) (ct2 csubtypep))
-  (subctypep (csubtypep-type ct1) (csubtypep-type ct2)))
-
-(defmethod subctypep ((ct1 cmember) (ct2 csubtypep))
-  (let ((specifier (csubtypep-type ct2)))
-    (every (lambda (object)
-             ;; Instead of converting to usual types, we instead convert
-             ;; everything to CTYPE
-             (if (type-specifier-p object)
-                 (subctypep (specifier-ctype object) specifier)
-                 (return-from subctypep (values nil t))))
-           (cmember-members ct1))))
-
-(defmethod subctypep ((ct1 csubtypep) (ct2 (eql (ctype::top))))
-  (values t t))
-
-(defmethod subctypep ((ct1 csubtypep) ct2)
-  (values nil nil))
+(defmethod %subtypep ((n1 (eql 'member))
+                      (n2 (eql 'symbol-or-list-subtype-p))
+                      t1 t2 &optional env)
+  (optima.extra:let-match (((list 'symbol-or-list-subtype-p specifier) t2)
+                           ((list* 'member objects) t1))
+    (values (every (lambda (object)
+                     (if (type-specifier-p object)
+                         (multiple-value-bind (subtypep knownp)
+                             (subtypep object specifier env)
+                           (if knownp
+                               subtypep
+                               (return-from %subtypep (values nil nil))))
+                         (return-from %subtypep (values nil t))))
+                   objects)
+            t)))

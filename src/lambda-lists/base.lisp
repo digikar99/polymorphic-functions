@@ -201,6 +201,18 @@ Non-examples:
 
 ;; TYPE-LIST-INTERSECTION-NULL-P ===============================================
 
+#+extensible-compound-types
+(defun definitive-intersection-null-p (env &rest type-specifiers)
+  (multiple-value-bind (intersection-null-p knownp)
+      (apply #'intersection-null-p env type-specifiers)
+    (cond ((not knownp)
+           (cerror "Retry"
+                   "Please implement appropriate %SUBTYPEP and %INTERSECT-TYPE-P methods to check for the intersection of the following types:~{~%  ~S~}"
+                   type-specifiers)
+           (apply #'definitive-subtypep env type-specifiers))
+          (t
+           intersection-null-p))))
+
 (defun type-list-intersection-null-p (type-list-1 type-list-2)
   #.+type-list-intersection-null-p+
   (declare (type type-list type-list-1 type-list-2))
@@ -227,11 +239,17 @@ Non-examples:
                                                           (setq state type-spec)
                                                           (ecase state
                                                             ((:required &optional)
+                                                             #+extensible-compound-types
+                                                             (deparameterize-type type-spec)
+                                                             #-extensible-compound-types
                                                              (upgrade-extended-type
                                                               (deparameterize-type type-spec)
                                                               env))
                                                             (&key
                                                              `(,(first type-spec)
+                                                               #+extensible-compound-types
+                                                               ,(deparameterize-type (second type-spec))
+                                                               #-extensible-compound-types
                                                                ,(upgrade-extended-type
                                                                  (deparameterize-type (second type-spec))
                                                                  env))))))
@@ -239,6 +257,9 @@ Non-examples:
                        (if (eq '&rest (lastcar effective-type-list))
                            (append type-list '(t))
                            type-list))
+                    #+extensible-compound-types
+                    ,(deparameterize-type return-type)
+                    #-extensible-compound-types
                     ,(upgrade-extended-type
                       (deparameterize-type return-type)
                       env))

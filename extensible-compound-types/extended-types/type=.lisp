@@ -1,58 +1,66 @@
 (in-package :polymorphic-functions.extended-types)
 
-(pushnew 'type= *extended-type-specifiers*)
+(define-compound-type extensible-compound-types:type= (object type-specifier)
+  "Denotes the set of type specifiers that are TYPE= to TYPE-SPECIFIER"
+  (and (or (symbolp object)
+           (listp   object))
+       (type-specifier-p object)
+       (type= object type-specifier)))
 
-(defclass ctype= (ctype)
-  ((%type :initarg :type :reader ctype=-type :type ctype::ctype)))
+(defmethod %upgraded-cl-type ((name (eql 'extensible-compound-types:type=)) type &optional env)
+  (declare (ignore env))
+  (etypecase type
+    (symbol 'symbol)
+    (list   'list)))
 
-(defun ctype= (type)
-  (make-instance 'ctype= :type type))
+(defmethod %subtypep ((n1 (eql 'extensible-compound-types:type=))
+                      (n2 (eql 'extensible-compound-types:type=))
+                      t1 t2 &optional env)
+  (optima.extra:let-match (((list 'extensible-compound-types:type= ts1) t1)
+                           ((list 'extensible-compound-types:type= ts2) t2))
+    (multiple-value-bind (type= knownp) (type= ts1 ts2 env)
+      (values type= knownp))))
 
-(defmethod cons-specifier-ctype ((head (eql 'type=)) rest env)
-  (declare (ignorable env))
-  (destructuring-bind (type) rest
-    (ctype= (specifier-ctype type env))))
+(defmethod %subtypep ((n1 (eql 'member))
+                      (n2 (eql 'extensible-compound-types:type=))
+                      t1 t2 &optional env)
+  (optima.extra:let-match (((list 'extensible-compound-types:type= specifier) t2)
+                           ((list* 'member objects) t1))
+    (values (every (lambda (object)
+                     (if (type-specifier-p object)
+                         (multiple-value-bind (type= knownp)
+                             (type= specifier object env)
+                           (if knownp
+                               type=
+                               (return-from %subtypep (values nil nil))))
+                         (return-from %subtypep (values nil t))))
+                   objects)
+            t)))
 
-(defmethod unparse ((ct ctype=))
-  `(type= ,(unparse (ctype=-type ct))))
+(defmethod %subtypep ((n1 (eql 'extensible-compound-types:type=))
+                              n2 t1 (t2 symbol) &optional env)
+  (declare (ignore n1 n2 t1 t2 env))
+  (values nil t))
 
-(defmethod upgraded-extended-type ((type-car (eql 'type=)))
-  '(or list symbol))
+(defmethod %subtypep (n1 (n2 (eql 'extensible-compound-types:type=))
+                              (t1 symbol) t2 &optional env)
+  (declare (ignore n1 n2 t1 t2 env))
+  (values nil t))
 
-(defmethod ctypep (object (ct ctype=))
-  (if (type-specifier-p object)
-      (ctype:ctype= (ctype=-type ct) (specifier-ctype object))
-      nil))
+(defmethod %intersect-type-p ((n1 (eql 'extensible-compound-types:type=))
+                              (n2 (eql 'extensible-compound-types:type=))
+                              t1 t2 &optional env)
+  (optima.extra:let-match (((list 'extensible-compound-types:type= ts1) t1)
+                           ((list 'extensible-compound-types:type= ts2) t2))
+    (multiple-value-bind (type= knownp) (type= ts1 ts2 env)
+      (values type= knownp))))
 
-(defmethod ctype:ctype= ((ct1 ctype=) (ct2 ctype=))
-  (ctype:ctype= (ctype=-type ct1)
-                (ctype=-type ct2)))
+(defmethod %intersect-type-p ((n1 (eql 'extensible-compound-types:type=))
+                              n2 t1 (t2 symbol) &optional env)
+  (declare (ignore n1 n2 t1 t2 env))
+  (values nil t))
 
-(defmethod subctypep ((ct1 ctype=) (ct2 ctype=))
-  (ctype:ctype= (ctype=-type ct1) (ctype=-type ct2)))
-
-(defmethod conjoin/2 ((ct1 ctype=) (ct2 ctype=))
-  (if (ctype:ctype= ct1 ct2)
-      ct1
-      (ctype:specifier-ctype nil)))
-
-(defmethod subctypep ((ct1 ctype=) (ct2 ctype:disjunction))
-  (if (null (ctype:junction-ctypes ct2))
-      (values nil t)
-      (error "Unhandled case!")))
-
-(defmethod subctypep ((ct1 cmember) (ct2 ctype=))
-  (let ((specifier (ctype=-type ct2)))
-    (every (lambda (object)
-             ;; Instead of converting to usual types, we instead convert
-             ;; everything to CTYPE
-             (if (type-specifier-p object)
-                 (ctype:ctype= specifier (specifier-ctype object))
-                 (return-from subctypep (values nil t))))
-           (cmember-members ct1))))
-
-(defmethod subctypep ((ct1 ctype=) (ct2 (eql (ctype::top))))
-  (values t t))
-
-(defmethod subctypep ((ct1 ctype=) ct2)
-  (values nil nil))
+(defmethod %intersect-type-p (n1 (n2 (eql 'extensible-compound-types:type=))
+                              (t1 symbol) t2 &optional env)
+  (declare (ignore n1 n2 t1 t2 env))
+  (values nil t))

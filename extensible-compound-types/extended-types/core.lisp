@@ -32,57 +32,17 @@ the list only if the second return value is NIL."
 ;;; - "extended-type-specifier-p"
 ;;; Shadowed: subtypep typep type=
 
-(defvar *extended-type-specifiers* nil)
-;; (declaim (inline extended-type-specifier-p))
 (defun extended-type-specifier-p (object &optional env)
-  "Returns T if OBJECT is a type specifier implemented using CTYPE and is a
-tree containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
-  (declare (ignore env))
-  (if (parametric-type-specifier-p object)
-      nil
-      (progn
-        (traverse-tree object
-                       (lambda (node)
-                         (typecase node
-                           (list (if (member (car node) *extended-type-specifiers*)
-                                     (return-from extended-type-specifier-p t)
-                                     node))
-                           (t node))))
-        nil)))
-
-(deftype extended-type-specifier ()
-  "These type specifiers are implemented using CTYPE and are a tree
-containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
-  `(satisfies extended-type-specifier-p))
+  "Returns T if OBJECT is a non-CL type specifier. This means that
+(UPGRADED-CL-TYPE OBJECT ENV) returns a different value than OBJECT."
+  (when (type-specifier-p object env)
+    (not (extensible-compound-types:type= (upgraded-cl-type object env)
+                                          object
+                                          env))))
 
 (defun type-specifier-p (object &optional env)
-  (or (cl-type-specifier-p object)
-      (extended-type-specifier-p object env)
+  (or (extensible-compound-types:type-specifier-p object)
       (parametric-type-specifier-p object)))
-
-(defgeneric upgraded-extended-type (type-car)
-  (:documentation "Used within POLYMORPHIC-FUNCTIONS to prepare a (CL:DECLARE (CL:TYPE ...))
-statement for further type-based optimization by the compiler. This is similar to
-CL:UPGRADED-ARRAY-ELEMENT-TYPE."))
-
-
-(defmethod upgraded-extended-type ((type-car (eql 'type-like)))
-  ;; FIXME: Use FUNCTION-TYPE or something to extract appropriate type from TYPE-CDR
-  t
-  ;; (destructuring-bind (var type-parameterizer) type-cdr
-  ;;   (cdr (assoc 'cl:type (nth-value 2 (cltl2:variable-information var env)))))
-  )
-
-(defun upgrade-extended-type (extended-type-specifier &optional env)
-  (declare (ignore env))
-  (let ((upgradeable-cars (cons 'type-like *extended-type-specifiers*)))
-    (traverse-tree extended-type-specifier
-                   (lambda (node)
-                     (typecase node
-                       (list (if (member (car node) upgradeable-cars)
-                                 (upgraded-extended-type (car node))
-                                 node))
-                       (t node))))))
 
 (defun subtypep (type1 type2 &optional environment)
   "Like EXTENDED-TYPE-SPECIFIER:SUBTYPEP but allows PARAMETRIC-TYPE-SPECIFIER."
@@ -194,5 +154,11 @@ COMPILER-MACROEXPANDs to EXTENSIBLE-COMPOUND-TYPES:TYPEP if TYPE is a constant o
       form))
 
 (defun type= (type1 type2 &optional env)
-  (and (subtypep type1 type2 env)
-       (subtypep type2 type1 env)))
+  (multiple-value-bind (s1 k1) (subtypep type1 type2 env)
+    (multiple-value-bind (s2 k2) (subtypep type2 type1 env)
+      (cond ((and s1 k1 s2 k2)
+             (values t t))
+            ((and k1 k2)
+             (values nil t))
+            (t
+             (values nil nil))))))

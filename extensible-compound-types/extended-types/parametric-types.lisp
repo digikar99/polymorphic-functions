@@ -45,7 +45,7 @@ The expression will be compiled to a function and called with the appropriate *o
 at run-time. The function should return the value of the TYPE-PARAMETER corresponding
 to the *object* and the parametric type."))
 
-(defgeneric parametric-type-compile-time-lambda  (type-car type-cdr type-parameter)
+(defgeneric parametric-type-compile-time-lambda-body (type-car type-cdr type-parameter)
   (:documentation
    "Users are expected to specialize on the TYPE-CAR using an (EQL symbol) specializer.
 TYPE-CAR and TYPE-CDR together make up the parametric-type, while TYPE-PARAMETER
@@ -53,7 +53,7 @@ is one of the type parameter in the parametric-type.
 
 The methods implemented should return a one-argument lambda-*expression* (not function).
 The expression will be compiled to a function and called with the appropriate
-*form-type* at run-time. The function should return the value of the TYPE-PARAMETER
+*form-type* at compile-time. The function should return the value of the TYPE-PARAMETER
 corresponding to the *form-type* and the parametric type."))
 
 

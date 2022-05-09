@@ -19,9 +19,12 @@ The library provides all of
 
 - [[https://en.wikipedia.org/wiki/Ad_hoc_polymorphism][Ad hoc polymorphism]] and
 - [[https://en.wikipedia.org/wiki/Subtyping][Subtype Polymorphism]]
-- [[https://en.wikipedia.org/wiki/Parametric_polymorphism][Parametric Polymorphism]] (but see [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]]!)
+- [[https://en.wikipedia.org/wiki/Parametric_polymorphism][Parametric Polymorphism]] (in a very limited sense; see [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]]!)
 
-to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#and-about-extended-types][extended types]] are also provided through [[https://github.com/s-expressionists/ctype/][ctype]].
+to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#and-about-extended-types][extended types]] are also provided through two means:
+
+1. [[https://github.com/s-expressionists/ctype/][ctype]], and the system =polymorphic-functions=
+2. [[https://github.com/digikar99/extensible-compound-types][extensible-compound-types]], and the system =polymorphic-functions+extensible-compound-types=. Recommended usage is by first =(push :extensible-compound-types cl:*features*)= and then =(asdf:compile-system ... :force t)=.
 
 The library was primarily made to dispatch on specialized-arrays for use in [[https://github.com/digikar99/numericals][numericals]], since CLHS does not enable generic-functions for specialized-arrays. But has also been put to use in [[https://github.com/lisp-polymorph/][lisp-polymorph]].
 
@@ -45,7 +48,7 @@ See also: [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-whil
     - [[#but-what-about-inline-induced-code-bloat][But, what about inline induced code-bloat?]]
     - [[#that-sounds-bad-isnt-there-a-best-of-both-worlds][That sounds bad; isn't there a "best of both worlds"?]]
     - [[#well-thats-awesome-what-else-can-you-do-with-polymorphic-functions][Well, that's awesome! What else can you do with polymorphic-functions?]]
-    - [[#could-you-elaborate-on-parametric-polymorphism][Could you elaborate on parametric-polymorphism?]]
+    - [[#could-you-elaborate-a-bit-more-on-parametric-polymorphism][Could you elaborate a bit more on parametric-polymorphism?]]
     - [[#and-about-extended-types][And about extended types?]]
     - [[#erm-about-the-polymorphs-themselves-is-there-a-notion-of-specificity-of-type-lists--polymorphs][Erm, about the polymorphs themselves, is there a notion of specificity of type-lists / polymorphs?]]
     - [[#that-looks-cool-is-there-more-comparison-against-generic-functions-and-specialization-store][That looks cool. Is there more comparison against generic-functions and specialization-store?]]
@@ -72,7 +75,7 @@ See also: [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-whil
 - Users are expected to define a =polymorphic-function= (analogous to =cl:generic-function=) with one or more =polymorph= (similar to =cl:method=). These may be dispatched at runtime or at compile time if optimization policy is ~(and (= speed 3) (/= debug 3))~ abbreviated as  =optim-speed=.
 - Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
 - Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a
-  polymorph that was defined for =vector= when compiled with arguments declared to be =simple-string=, then the body is made aware at /compiler/macroexpansion time/ that the arguments are actually =simple-string= rather than just =vector=. Code further in the succeeding compiler/macroexpansion phases can then make use of this information.
+  polymorph that was defined for =vector= when compiled with arguments declared to be =simple-string=, then the body is made aware at /compiler/macroexpansion time/ that the arguments are actually =simple-string= rather than just =vector=. Code further in the succeeding compiler/macroexpansion phases can then make use of this information. This requires that the parameters to the polymorph be treated as read-only variables; otherwise the consequences can be undefined because code might have been initially written assuming the parameter/variable to be a =vector= and not merely a =simple-string=. 
 - Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for /correctness/.
 - See [[#discussion-and-advanced-usage][Discussion and Advanced Usage]] for parametric polymorphism. Adhoc and Subtype polymorphisms should suffice in most cases for optimization; parametric polymorphism can aid in further type safety.
 
@@ -416,11 +419,13 @@ Support for extended-types is also provided through [[https://github.com/s-expre
 
 Note that both these are declared to be much more experimental than polymorphic-functions themselves; and it seems they will be that way for a while.
 
-*** Could you elaborate on parametric-polymorphism?
+Equally experimental is the support provided for parametric polymorphism through [[https://github.com/digikar99/extensible-compound-types][extensible-compound-types]]. An example is provided in the documentation [[https://github.com/digikar99/extensible-compound-types#parametric-types][there]].
+
+*** Could you elaborate a bit more on parametric-polymorphism?
 
 Sure!
 
-In addition to subtype-polymorphism described above (under [[#basic-usage][Basic Usage]]), PF also provides support for parametric-polymorphism. Note that this does not provide user-defined parametric types. In fact, sane user-defined parametric-types might be impossible in Common Lisp. What this merely allows for then is parametric-polymorphism on functions aka polymorphs for /existing/ parametric-types. The interface for this is through the following symbols:
+In addition to subtype-polymorphism described above (under [[#basic-usage][Basic Usage]]), PF also provides support for parametric-polymorphism. If you are not using [[https://github.com/digikar99/extensible-compound-types][extensible-compound-types]], this does not provide user-defined parametric types. In fact, sane user-defined parametric-types might be impossible in Common Lisp. What this merely allows for (in the absence of =extensible-compound-types=) then is parametric-polymorphism on functions aka polymorphs for /existing/ parametric-types. The interface for this is through the following symbols:
 
 - \*parametric-type-symbol-predicates\*
 - parametric-type-run-time-lambda-body
@@ -642,14 +647,15 @@ Yes, there are quite a few:
     - A [[https://github.com/Clozure/ccl/pull/369][*bug on CCL*]] may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
   - [[https://github.com/s-expressionists/ctype][ctype]]: =typexpand= functionality and =polymorphic-functions.extended-types= package
     - A =polymorphic-functions.extended-types= package (not system!) is also provided based on [[https://github.com/s-expressionists/ctype][ctype]]. This allows one to extend the CL type system to define types beyond what =cl:deftype= can do to some extent. While these *cannot be used inside an arbitrary CL form* with =cl:declare=, these can be used in the type lists of polymorphs. See [[file:src/extended-types/type=.lisp]] for an example put to use in [[https://github.com/digikar99/trivial-coerce][trivial-coerce]].
+- The variables used in the *parameters of the polymorphs should be treated as read-only variables*. This is important for inlining with subtype polymorphism, because inlining involves upgrading the declaration of the parameters to the type of the argument declared at the call site, and this type can be more specific than the types of the parameters specified during the compilation of the polymorph itself.
 - Static dispatch relies on =policy-quality= working as expected, and compiler-macros being called. As a result, it may not work on all implementations.
 - Some implementations produce interpreted functions some times while compiled functions other times; and accordingly differ if or not compiler-macros are called.
 - Currently *inlining uses the lexical environment of the call-site*
   rather than the definition-site as is the usual case. To work around
   this, users should avoid shadowing global lexical elements.
-- See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]] for parametric-types.
+- Parametric-polymorphism is in a very limited sense. See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]] for parametric-types.
 - Avoid using =&rest= lambda-lists if you are aiming for stability. The algorithms for heterogeneous-type-lists methods for specialization and ambiguity detection implemented at file:src/lambda-lists/rest.lisp are non-trivial; PRs with more simplistic algorithms would be much welcome :D!
-- This library is not meant to compete against [[https://github.com/coalton-lang/coalton/][Coalton]]; because CLHS leaves it unspecified about what happens when the type declared at compile time (using =declare= or =the=) differs from the actual runtime type of the form or variable, compile time safety only exists on implementations that already provide it, and that too to a lesser extent that a fully static language. But on other implementations this is non-existent. However, an effort is certainly made to use the derived/declared types at the polymorph boundaries when compiled with =(debug 3)= or =(safety 3)= to ensure that the runtime types match these declared types, independent of the implementation support.
+- This library is not meant to compete against [[https://github.com/coalton-lang/coalton/][Coalton]]; because safety-wise, CLHS leaves it unspecified about what happens when the type declared at compile time (using =declare= or =the=) differs from the actual runtime type of the form or variable, compile time safety only exists on implementations that already provide it, and that too to a lesser extent that a fully static language. But on other implementations this is non-existent. However, an effort is certainly made to use the derived/declared types at the polymorph boundaries when compiled with =(debug 3)= or =(safety 3)= to ensure that the runtime types match these declared types, independent of the implementation support.
 
 *If someone would want a reduced-feature ANSI-compatible library, feel free to raise an issue. However, even with ANSI, one needs =cl:subtypep= working correctly, for instance, on Allegro CL 10.1: =(subtypep `(and (or string number) (or string symbol)) nil)= returns =T T=. CI is run on SBCL and ECL.
 
