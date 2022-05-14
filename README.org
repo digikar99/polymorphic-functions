@@ -24,7 +24,7 @@ The library provides all of
 to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#and-about-extended-types][extended types]] are also provided through two means:
 
 1. [[https://github.com/s-expressionists/ctype/][ctype]], and the system =polymorphic-functions=
-2. [[https://github.com/digikar99/extensible-compound-types][extensible-compound-types]], and the system =polymorphic-functions+extensible-compound-types=. Recommended usage is by first =(push :extensible-compound-types cl:*features*)= and then =(asdf:compile-system ... :force t)=.
+2. [[https://github.com/digikar99/extensible-compound-types][extensible-compound-types]], recommended usage is =(cl:pushnew :extensible-compound-types cl:*features*)= and then =(asdf:compile-system ... :force t)=. You may optionally need to recompile dependencies, and it might be recommendable to force compile "extensible-compound-types" itself, so that others are recompiled automagically.
 
 The library was primarily made to dispatch on specialized-arrays for use in [[https://github.com/digikar99/numericals][numericals]], since CLHS does not enable generic-functions for specialized-arrays. But has also been put to use in [[https://github.com/lisp-polymorph/][lisp-polymorph]].
 

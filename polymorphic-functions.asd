@@ -6,7 +6,8 @@
   :depends-on ("alexandria"
                "closer-mop"
                "compiler-macro-notes"
-               "ctype"
+               (:feature :extensible-compound-types "extensible-compound-types-cl")
+               (:feature (:not :extensible-compound-types) "ctype")
                "fiveam" ;; just keep tests together!
                "cl-form-types"
                "introspect-environment")
@@ -15,6 +16,9 @@
                (:file "package"                    :depends-on ("pre-package"))
                (:file "types"                      :depends-on ("package"))
                (:module "extended-types"           :depends-on ("package")
+                :pathname
+                #+extensible-compound-types #P"extended-types-exct/"
+                #-extensible-compound-types #P"extended-types-cl/"
                 :components ((:file "parametric-types")
                              (:file "ensure-type-form" :depends-on ("parametric-types"))
                              (:file "core"         :depends-on ("parametric-types"))

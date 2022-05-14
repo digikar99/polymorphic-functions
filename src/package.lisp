@@ -1,6 +1,10 @@
 
 (polymorphic-functions.defpackage:defpackage :polymorphic-functions.extended-types
+  #+extensible-compound-types
+  (:use :extensible-compound-types-cl)
+  #-extensible-compound-types
   (:use :cl :ctype)
+  #-extensible-compound-types
   (:import-from :ctype
                 #:cons-specifier-ctype
                 #:ctype)
@@ -37,11 +41,15 @@
 
 (polymorphic-functions.defpackage:defpackage :polymorphic-functions
   (:shadowing-import-exported-symbols :polymorphic-functions.extended-types)
+  #+extensible-compound-types
+  (:use :cl-form-types :alexandria :extensible-compound-types-cl)
+  #-extensible-compound-types
   (:use :cl-form-types :alexandria :cl)
-  (:import-from :5am #:is #:def-test)
+  #-extensible-compound-types
   (:import-from :ctype
                 #:ctype
                 #:cons-specifier-ctype)
+  (:import-from :5am #:is #:def-test)
   (:import-from :polymorphic-functions.extended-types
                 #:*extended-type-specifiers*
                 #:upgraded-extended-type)
@@ -120,6 +128,7 @@
                                              (<= (policy-quality 'debug env)
                                                  (policy-quality 'speed env))))
 
+#-extensible-compound-types
 (defun typexpand (type-specifier &optional env)
   (if (cl-type-specifier-p type-specifier)
       (ctype::typexpand type-specifier env)

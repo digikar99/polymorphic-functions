@@ -250,6 +250,9 @@ in the lambda list; the consequences of mutation are undefined."
                  ;; below for DEFTRANSFORM; as well as to avoid the ASSERTs in
                  ;; pf-compiler-macro emitted by ENSURE-TYPE-FORM used for LAMBDA-BODY
                  (inline-lambda-body (when inline
+                                       ;; The declarations could also be EXTYPE declarations,
+                                       ;; which we will need to convert to CL:TYPE.
+                                       ;; That's why, avoid the use of CL:LAMBDA here.
                                        `(lambda ,param-list
                                           ,lambda-declarations
                                           ,declarations
