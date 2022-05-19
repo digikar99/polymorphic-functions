@@ -160,6 +160,10 @@
       (loop :for (param default paramp) :in (subseq untyped-lambda-list (+ pos-key 3))
             :do (unless (assoc-value assoc-list (intern (symbol-name param) :keyword))
                   (return-from %type-list-compatible-p nil))))
+    (let ((key-list (mapcar #'first (subseq untyped-lambda-list (+ pos-key 3)))))
+      (loop :for (key . rest) :in (subseq type-list (1+ pos-key))
+            :do (unless (find (intern (symbol-name key) :keyword) key-list :test #'string=)
+                  (return-from %type-list-compatible-p nil))))
     t))
 
 (defmethod %type-list-more-specific-p ((type-1 (eql 'required-key))
@@ -224,8 +228,14 @@
               ;; without a definite direction of SUBTYPEP
               :do (if (type= type-1 type-2)
                       t
-                      (return-from %type-list-intersection-null-p
-                        (definitive-subtypep `(and ,type-1 ,type-2) nil)))
+                      #+extensible-compound-types
+                      (when (definitive-intersection-null-p (when (boundp '*environment*)
+                                                              *environment*)
+                              type-1 type-2)
+                        (return-from %type-list-intersection-null-p t))
+                      #-extensible-compound-types
+                      (when (definitive-subtypep `(and ,type-1 ,type-2) nil)
+                        (return-from %type-list-intersection-null-p t)))
               :finally (return nil))
         (let ((list-1 (subseq list-1 (1+ key-position-1)))
               (list-2 (subseq list-2 (1+ key-position-2))))
@@ -246,8 +256,14 @@
                                  ;; If there exist at least one &KEY argument which need
                                  ;; to be compulsorily supplied, and both types are different,
                                  ;; then there intersection is NULL
-                                 (return-from %type-list-intersection-null-p
-                                   (definitive-subtypep `(and ,type-1 ,type-2) nil))))))
+                                 #+extensible-compound-types
+                                 (when (definitive-intersection-null-p (when (boundp '*environment*)
+                                                                         *environment*)
+                                         type-1 type-2)
+                                   (return-from %type-list-intersection-null-p t))
+                                 #-extensible-compound-types
+                                 (when (definitive-subtypep `(and ,type-1 ,type-2) nil)
+                                   (return-from %type-list-intersection-null-p t))))))
                     (setq list-1 (rest list-1)
                           list-2 (rest list-2))
                 :finally
