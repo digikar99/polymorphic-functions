@@ -42,7 +42,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                   (list '&key)
                                   (mapcar #'first (subseq lambda-list (1+ key-pos))))
                           lambda-list)))
-              (return-from register-polymorphic-function name)
+              (progn
+                (setf (documentation name 'cl:function) documentation)
+                (return-from register-polymorphic-function name))
               (cerror "Yes, delete existing POLYMORPHs to associate new ones"
                       'lambda-list-has-changed
                       :name name
