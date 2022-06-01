@@ -102,15 +102,18 @@
 (defmacro is-error (form)
   `(5am:signals error ,form))
 
-(defmacro list-named-lambda (name package lambda-list &body body)
-  (declare (type list name))
+(defmacro list-named-lambda (name package lambda-list &body body &environment env)
+  (declare (type list name)
+           (ignorable env package))
   #+sbcl
   `(sb-int:named-lambda ,name ,lambda-list
      ,@body)
   #+ccl
   `(ccl:nfunction ,name
-                  (lambda ,lambda-list
-                    ,@body))
+                  #+extensible-compound-types
+                  (cl:lambda ,@(rest (macroexpand-1 `(lambda ,lambda-list ,@body) env)))
+                  #-extensible-compound-types
+                  (cl:lambda ,lambda-list ,@body))
   #-(or sbcl ccl)
   (let ((function-name (intern (write-to-string name) package)))
     `(flet ((,function-name ,lambda-list ,@body))

@@ -110,7 +110,10 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
       (handler-bind ((warning (lambda (c)
                                 (push c warnings)
                                 (muffle-warning c))))
-        (compile nil lambda-form)))
+        (compile nil #-extensible-compound-types
+                     lambda-form
+                     #+extensible-compound-types
+                     (macroexpand-1 lambda-form))))
     (if warnings
         (format nil "~{~A~^~%~}" (nreverse warnings))
         nil)))
