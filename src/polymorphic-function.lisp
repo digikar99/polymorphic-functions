@@ -385,8 +385,8 @@ If it exists, the second value is T and the first value is a possibly empty
                     := (rest (assoc 'extensible-compound-types:extype
                                     (nth-value 2 (variable-information original env))))
                   :for var :in similar
-                  :collect `(,var 'extensible-compound-types:extype ,type)
-                  :collect `(,var 'cl:type ,(upgraded-cl-type type env))))))
+                  :collect `(,var extensible-compound-types:extype ,type)
+                  :collect `(,var cl:type ,(upgraded-cl-type type env))))))
 
 (define-declaration inline-pf (vars env)
   (values :function
