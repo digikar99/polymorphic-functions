@@ -215,9 +215,10 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                              nil))
                         (required-key
                          (let ((key-pos (position '&key type-list)))
-                           (if (<= key-pos
-                                   num-args
-                                   (+ key-pos (* 2 (- (length type-list) key-pos 1))))
+                           (if (and (evenp (- num-args key-pos))
+                                    (<= key-pos
+                                        num-args
+                                        (+ key-pos (* 2 (- (length type-list) key-pos 1)))))
                                (apply app-p-lambda
                                       (loop :for (arg . arg-type) :in arg-types-alist
                                             :for idx :from 0
