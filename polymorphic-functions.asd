@@ -1,6 +1,6 @@
 (asdf:defsystem "polymorphic-functions"
   :license "MIT"
-  :version "0.1.0" ; beta
+  :version "0.2.1" ; beta
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"

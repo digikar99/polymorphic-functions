@@ -139,11 +139,11 @@ as well as the type enhanced using TYPE."
                  :for type :in type-forms
                  :for compiler-type :in types
                  :for i :from 0
-                 :do (multiple-value-bind (subtypep knownp)
-                         (subtypep form-type compiler-type)
+                 :do (multiple-value-bind (nilp knownp)
+                         (subtypep `(and ,form-type ,compiler-type) nil env)
                        (when (and (not (type= t form-type))
                                   knownp
-                                  (not subtypep))
+                                  nilp)
                          (warn 'return-type-mismatch/warning
                                :index i :actual form-type :declared compiler-type)))
                  :collect
@@ -195,11 +195,11 @@ as well as the type enhanced using TYPE."
                   (unless (eq rest-type-form t)
                     (loop :for form-type :in (nthcdr num-types form-types)
                           :for i :from num-types
-                          :do (multiple-value-bind (subtypep knownp)
-                                  (subtypep form-type rest-type)
+                          :do (multiple-value-bind (nilp knownp)
+                                  (subtypep `(and ,form-type ,rest-type) nil env)
                                 (when (and (not (type= t form-type))
                                            knownp
-                                           (not subtypep))
+                                           nilp)
                                   (warn 'return-type-mismatch/warning
                                         :index i :actual form-type :declared rest-type)))
                           :finally
