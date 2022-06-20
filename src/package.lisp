@@ -142,8 +142,18 @@
 
 (defun macroexpand-all (form &optional env)
   (cl-form-types.walker:walk-form (lambda (form env)
-                                    (declare (ignore env))
-                                    form)
+                                    (optima:match form
+                                      ((list* name _)
+                                       (cond ((listp name)
+                                              form)
+                                             ((compiler-macro-function name env)
+                                              (funcall (compiler-macro-function name env)
+                                                       form
+                                                       env))
+                                             (t
+                                              form)))
+                                      (_
+                                       form)))
                                   form
                                   env))
 
