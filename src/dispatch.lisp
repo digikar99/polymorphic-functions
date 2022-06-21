@@ -38,6 +38,8 @@ and compile-time in case no polymorph is applicable.
 At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
   (declare (type function-name       name)
            (type untyped-lambda-list untyped-lambda-list))
+  (when (and docp (symbolp documentation) (constantp documentation))
+    (setq documentation (constant-form-value documentation env)))
   (when docp (check-type documentation string))
   (let ((*name*        name)
         (*environment*  env)
