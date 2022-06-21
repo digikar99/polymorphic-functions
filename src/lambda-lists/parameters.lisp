@@ -448,26 +448,30 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
 
     (with-gensyms (form form-type)
       (flet ((app-p-form (param pp)
-               (let ((type (pp-value-type pp))
+               (let ((type (pp-value-effective-type pp))
                      (type-parameters (pp-type-parameters pp)))
-                 `(let ((,form      (car ,param))
-                        (,form-type (cdr ,param)))
-                    (cond ((eq t ',type)
-                           t)
-                          ((eq t ,form-type)
-                           (signal 'form-type-failure
-                                   :form ,form))
-                          (t
-                           ,(if type-parameters
-                                (loop :for type-parameter :in type-parameters
-                                      :do (with-slots (name
-                                                       compile-time-deparameterizer-lambda-body)
-                                              type-parameter
-                                            (push `(,compile-time-deparameterizer-lambda-body
-                                                    (cdr ,param))
-                                                  (assoc-value type-parameters-alist name)))
-                                      :finally (return t))
-                                `(subtypep ,form-type ',type))))))))
+                 (if (and (null type-parameters)
+                          (type= t type))
+                     t
+                     `(let ((,form      (car ,param))
+                            (,form-type (cdr ,param)))
+                        (cond ((type= t ,form-type)
+                               (signal 'form-type-failure :form ,form))
+                              (t
+                               ,(if type-parameters
+                                    (loop :for type-parameter :in type-parameters
+                                          :do (with-slots (name
+                                                           compile-time-deparameterizer-lambda-body)
+                                                  type-parameter
+                                                (push `(,compile-time-deparameterizer-lambda-body
+                                                        (cdr ,param))
+                                                      (assoc-value type-parameters-alist name)))
+                                          :finally (return t))
+                                    `(if ,form-type ; FORM is supplied
+                                         (subtypep ,form-type ',type)
+                                         ;; If FORM is not supplied, then PP-VALUE-EFFECTIVE-TYPE
+                                         ;; determines whether polymorph is applicable
+                                         ,(subtypep 'null type))))))))))
 
         (let* ((lambda-list
                  (map-polymorph-parameters polymorph-parameters
