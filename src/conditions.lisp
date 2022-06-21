@@ -137,4 +137,18 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
                      (name condition)
                      (type-list condition)))))
 
-;; TODO: Add a NOT-THE-MOST-SPECIALIZED-POLYMORPH condition
+(define-condition suboptimal-polymorph-note
+    (compiler-macro-notes:optimization-failure-note)
+  ((type-list :initarg :type-list :reader type-list))
+  (:report (lambda (condition stream)
+             (format stream "POLYMORPH with TYPE-LIST~%  ~S~%was used for optimizing, but it is possibly suboptimal~%Better POLYMORPHs should exist"
+                     (type-list condition)))))
+
+(define-condition more-optimal-polymorph-inapplicable
+    (suboptimal-polymorph-note)
+  ((more-optimal-type-list :initarg :more-optimal-type-list
+                           :initform (error "MORE-OPTIMAL-TYPE-LIST not specified")
+                           :reader more-optimal-type-list))
+  (:report (lambda (condition stream)
+             (format stream "More optimal POLYMORPH with TYPE-LIST~%  ~S~%was found to be inapplicable"
+                     (more-optimal-type-list condition)))))

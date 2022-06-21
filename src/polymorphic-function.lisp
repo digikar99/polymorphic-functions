@@ -140,6 +140,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            nil))))
 
 (defun register-polymorph (name inline-p typed-lambda-list type-list effective-type-list
+                           more-optimal-type-list suboptimal-note
                            return-type inline-lambda-body static-dispatch-name
                            lambda-list-type runtime-applicable-p-form
                            compiler-applicable-p-lambda &optional source-location)
@@ -149,6 +150,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
            (type function-name  static-dispatch-name)
            (type type-list      type-list)
            (type type-list      effective-type-list)
+           (type type-list      more-optimal-type-list)
+           (type symbol         suboptimal-note)
            (type list           inline-lambda-body))
   (let* ((apf                        (fdefinition name))
          (apf-lambda-list-type       (polymorphic-function-lambda-list-type apf))
@@ -171,6 +174,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      :return-type      return-type
                                      :lambda-list-type lambda-list-type
                                      :effective-type-list effective-type-list
+                                     :more-optimal-type-list more-optimal-type-list
+                                     :suboptimal-note  suboptimal-note
                                      :compiler-applicable-p-lambda
                                      compiler-applicable-p-lambda
                                      :runtime-applicable-p-form

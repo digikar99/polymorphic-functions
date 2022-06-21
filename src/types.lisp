@@ -6,9 +6,12 @@
 of the polymorphic-function, then the dispatch is done on LAMBDA. The prioritization
 is done by ADD-OR-UPDATE-POLYMORPH so that a more specialized polymorph is checked
 for compatibility before a less specialized polymorph.
-- The APF-COMPILER-MACRO calls the COMPILER-APPLICABLE-P-LAMBDA with the FORM-TYPEs
+- The PF-COMPILER-MACRO calls the COMPILER-APPLICABLE-P-LAMBDA with the FORM-TYPEs
 of the arguments derived at compile time. The compiler macro dispatches on the polymorph
 at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
+
+- If this POLYMORPH is used for INLINE-ing or STATIC-DISPATCH and if MORE-OPTIMAL-TYPE-LIST
+or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
   "
   (documentation nil :type (or null string))
   (name (error "NAME must be supplied!"))
@@ -17,6 +20,8 @@ at compile time if the COMPILER-APPLICABLE-P-LAMBDA returns true.
   (type-list nil)
   (lambda-list-type nil)
   (effective-type-list nil)
+  (more-optimal-type-list nil)
+  (suboptimal-note nil)
   (compiler-applicable-p-lambda)
   (runtime-applicable-p-form)
   (inline-p)

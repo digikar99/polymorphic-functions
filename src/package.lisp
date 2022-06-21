@@ -87,9 +87,10 @@
            #:parametric-type-run-time-lambda-body
            #:parametric-type-compile-time-lambda-body
 
-           #:the*
+           #:%deparameterize-type
 
-           #:%deparameterize-type))
+           #:suboptimal-polymorph-note
+           #:more-optimal-polymorph-inapplicable))
 
 (in-package :polymorphic-functions)
 

@@ -157,9 +157,15 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
 
     ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP).
 
-  - NAME could also be (NAME &KEY (INLINE T) STATIC-DISPATCH-NAME).
+  - NAME could also be
+      (NAME &KEY (INLINE T) STATIC-DISPATCH-NAME MORE-OPTIMAL-TYPE-LIST SUBOPTIMAL-NOTE)
   - Possible values for INLINE are T, NIL and :MAYBE
   - STATIC-DISPATCH-NAME could be useful for tracing or profiling
+  - SUBOPTIMAL-NOTE and MORE-OPTIMAL-TYPE-LIST are useful for signalling that the
+    POLYMORPH chosen for static-dispatch, inlining, or compiler-macro is not the most optimal.
+    It is recommended that SUBOPTIMAL-NOTE should be the name of a subclass of
+    SUBOPTIMAL-POLYMORPH-NOTE - the condition class should have a slot to accept the TYPE-LIST
+    of the currently chosen POLYMORPH
 
   **Note**:
   - INLINE T or :MAYBE can result in infinite expansions for recursive polymorphs.
@@ -167,7 +173,8 @@ Proceed at your own risk.
   - Also, because inlining results in type declaration upgradation for purposes
 of subtype polymorphism, it is recommended to not mutate the variables used
 in the lambda list; the consequences of mutation are undefined."
-  (destructuring-bind (name &key (inline t ip) (static-dispatch-name nil static-dispatch-name-p))
+  (destructuring-bind (name &key (inline t ip) (static-dispatch-name nil static-dispatch-name-p)
+                              more-optimal-type-list suboptimal-note)
       (if (typep name 'function-name)
           (list name)
           name)
@@ -345,6 +352,8 @@ in the lambda list; the consequences of mutation are undefined."
                                        ',typed-lambda-list
                                        ',type-list
                                        ',effective-type-list
+                                       ',more-optimal-type-list
+                                       ',suboptimal-note
                                        ',return-type
                                        ',inline-safe-lambda-body
                                        ',static-dispatch-name

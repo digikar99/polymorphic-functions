@@ -93,6 +93,7 @@
           (return-from pf-compiler-macro original-form))
 
         (with-slots (inline-p return-type type-list
+                     more-optimal-type-list suboptimal-note
                      compiler-macro-lambda lambda-list-type
                      static-dispatch-name parameters)
             polymorph
@@ -142,11 +143,19 @@
                           (second macroexpanded-form)
                           macroexpanded-form))))
             (cond (compiler-macro-lambda
+                   (when more-optimal-type-list
+                     (signal 'more-optimal-polymorph-inapplicable
+                             :more-optimal-type-list more-optimal-type-list))
+                   (when suboptimal-note (signal suboptimal-note :type-list type-list))
                    (return-from compiler-macro-notes:with-notes
                      (funcall compiler-macro-lambda
                               (cons inline-lambda-body (rest form))
                               env)))
                   (optim-speed
+                   (when more-optimal-type-list
+                     (signal 'more-optimal-polymorph-inapplicable
+                             :more-optimal-type-list more-optimal-type-list))
+                   (when suboptimal-note (signal suboptimal-note :type-list type-list))
                    (return-from compiler-macro-notes:with-notes
                      (let ((inline-pf
                              (assoc 'inline-pf
