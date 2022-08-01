@@ -131,7 +131,8 @@ Non-examples:
               (< (+ (* 12 (+ (* 10 2) 2))
                     3)
                  (destructuring-bind (major-1 major-2 minor)
-                     (mapcar #'parse-integer (str:split #\. (lisp-implementation-version)))
+                     (mapcar #'parse-integer (split-sequence:split-sequence
+                                              #\. (lisp-implementation-version)))
                    (+ (* 12 (+ (* 10 major-1) major-2))
                       minor)))))
         `(optimize compilation-speed)
@@ -180,6 +181,9 @@ Non-examples:
                                         '(string number &optional t) '(c d &optional e)))
   (5am:is-false (type-list-compatible-p 'required-optional
                                         '(number) '(c d &optional d)))
+  (5am:is-false (type-list-compatible-p 'required-key
+                                        '(string &key (:d number))
+                                        '(c &rest args &key (d nil dp) (e nil ep))))
   (5am:is-true  (type-list-compatible-p 'required-key
                                         '(string &key (:d number) (:e string))
                                         '(c &rest args &key (d nil dp) (e nil ep))))

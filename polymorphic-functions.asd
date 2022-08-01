@@ -10,7 +10,8 @@
                (:feature (:not :extensible-compound-types) "ctype")
                "fiveam" ;; just keep tests together!
                "cl-form-types"
-               "introspect-environment")
+               "introspect-environment"
+               "split-sequence")
   :pathname #P"src/"
   :components ((:file "pre-package")
                (:file "package"                    :depends-on ("pre-package"))
