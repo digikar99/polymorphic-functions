@@ -57,7 +57,7 @@
          (block-name          (blockify-name *name*)))
     `((declare (ignorable ,@required-parameters)
                (dynamic-extent ,rest-args)
-               (optimize speed))
+               ,+optimize-speed-or-compilation-speed+)
       (block ,block-name
         ,(if invalidated-p
              `(progn

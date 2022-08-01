@@ -93,7 +93,7 @@
                                :collect `(when ,op-p (list ,op)))))
          (block-name (blockify-name *name*)))
     (with-gensyms (static-dispatch-fn)
-      `((declare (optimize speed)
+      `((declare ,+optimize-speed-or-compilation-speed+
                  (ignorable ,@(mapcar #'first optional-parameters)
                             ,@(mapcar #'third optional-parameters)))
         (block ,block-name

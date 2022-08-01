@@ -104,7 +104,7 @@
     `((declare (ignorable ,@(mapcar #'first keyword-parameters)
                           ,@(mapcar #'third keyword-parameters))
                (dynamic-extent ,rest-args)
-               (optimize speed))
+               ,+optimize-speed-or-compilation-speed+)
       (block ,block-name
         ,(if invalidated-p
              `(progn

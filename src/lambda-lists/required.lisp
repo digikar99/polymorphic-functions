@@ -15,7 +15,7 @@
 (defmethod compute-polymorphic-function-lambda-body
     ((type (eql 'required)) (untyped-lambda-list list) &optional invalidated-p)
   (let ((block-name (blockify-name *name*)))
-    `((declare (optimize speed))
+    `((declare ,+optimize-speed-or-compilation-speed+)
       (block ,block-name
         ,(cond (invalidated-p
                 `(progn
