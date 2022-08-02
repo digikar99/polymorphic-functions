@@ -112,8 +112,8 @@ If the *form-type* does not match the parametric-type, then NIL may be returned.
   `(cl:lambda (type)
      (optima:match type
        (variable nil)
-       ((guard (list* ft-type-car _)
-               (subtypep ft-type-car ',type-car))
+       ((optima:guard (list* ft-type-car _)
+                      (subtypep ft-type-car ',type-car))
         ,(optima:match type-cdr
            ((list* (eql parameter) _)
             `(let ((elt-type (array-type-element-type type)))
