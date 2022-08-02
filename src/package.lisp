@@ -90,7 +90,10 @@
            #:%deparameterize-type
 
            #:suboptimal-polymorph-note
-           #:more-optimal-polymorph-inapplicable))
+           #:more-optimal-polymorph-inapplicable
+
+           #:pflet
+           #:pflet*))
 
 (in-package :polymorphic-functions)
 

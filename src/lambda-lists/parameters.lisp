@@ -574,15 +574,14 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
 
 (defun enhanced-lambda-declarations (polymorph-parameters arg-types &optional return-type)
 
-  (let* ((deparameterizer-alist  ())
-         (processed-for-keyword-arguments nil))
+  (let* ((processed-for-keyword-arguments nil))
 
     (flet ((populate-deparameterizer-alist (pp arg-type)
              (when-let (type-parameters (pp-type-parameters pp))
                (let* ((type-parameter-names (mapcar #'type-parameter-name type-parameters)))
                  (loop :for name :in type-parameter-names
-                       :do (unless (assoc-value deparameterizer-alist name)
-                             (setf (assoc-value deparameterizer-alist name)
+                       :do (unless (assoc-value *deparameterizer-alist* name)
+                             (setf (assoc-value *deparameterizer-alist* name)
                                    (funcall
                                     (type-parameter-compile-time-deparameterizer-lambda
                                      (find name type-parameters :key #'type-parameter-name))
@@ -638,11 +637,18 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                :rest
                (lambda (pp)
                  (declare (ignore pp))
-                 nil))))
+                 nil)))
+
+            (ignorable-type-parameters (set-difference (mapcar #'car *deparameterizer-alist*)
+                                                       *type-parameter-ignored-list*)))
+
+        (setq *type-parameter-ignored-list*
+              (union *type-parameter-ignored-list*
+                     (mapcar #'car *deparameterizer-alist*)))
 
         (values `(declare ,@(set-difference type-forms lambda-list-keywords)
-                          (ignorable ,@(mapcar #'car deparameterizer-alist)))
-                (translate-body return-type deparameterizer-alist))))))
+                          (ignorable ,@ignorable-type-parameters))
+                (translate-body return-type *deparameterizer-alist*))))))
 
 (defun accepts-argument-of-type-p (polymorph-parameters type)
   (flet ((%subtypep (pp) (subtypep type (pp-value-type pp))))

@@ -114,6 +114,8 @@
                                                            (declaration-information 'optimize env)))))
                            (notes nil)
                            ;; The source of compile-time subtype-polymorphism
+                           (*deparameterizer-alist* (copy-alist *deparameterizer-alist*))
+                           (*type-parameter-ignored-list* (copy-list *type-parameter-ignored-list*))
                            (lambda-with-enhanced-declarations
                              (destructuring-bind (lambda args declarations
                                                    more-decl (block block-name &body body))
@@ -121,7 +123,8 @@
                                (declare (ignore block declarations))
                                `(,lambda ,args
                                   ;; The source of compile-time subtype-polymorphism
-                                  ,@(multiple-value-bind (enhanced-decl deparameterized-return-type)
+                                  ,@(multiple-value-bind
+                                          (enhanced-decl deparameterized-return-type)
                                         (enhanced-lambda-declarations parameters
                                                                       arg-types
                                                                       return-type)
@@ -188,3 +191,36 @@
                                  (error "Unexpected case in pf-compiler-macro!"))))))))
                   (t
                    (return-from pf-compiler-macro form)))))))))
+
+(defmacro pflet (bindings &body body)
+  ;; TODO: Should we just call ENHANCED-LAMBDA-DECLARATIONS in general?
+  "Like LET but when expanded inside PF-COMPILER-MACRO, this uses information in
+*DEPARAMETERIZER-ALIST* to deparameterize types."
+  `(let ,bindings
+     ,@(multiple-value-bind (body decls) (alexandria:parse-body body)
+         `(,@(loop :for decl :in decls
+                   :collect `(declare
+                              ,@(loop :with specs := (rest decl)
+                                      :for spec :in specs
+                                      :collect (if (and (eq 'type (first spec))
+                                                        (parametric-type-specifier-p (second spec)))
+                                                   `(type ,(deparameterize-type (second spec))
+                                                          ,@(nthcdr 2 spec))
+                                                   spec))))
+           ,@body))))
+
+(defmacro pflet* (bindings &body body)
+  "Like LET* but when expanded inside PF-COMPILER-MACRO, this uses information in
+*DEPARAMETERIZER-ALIST* to deparameterize types."
+  `(let* ,bindings
+     ,@(multiple-value-bind (body decls) (alexandria:parse-body body)
+         `(,@(loop :for decl :in decls
+                   :collect `(declare
+                              ,@(loop :with specs := (rest decl)
+                                      :for spec :in specs
+                                      :collect (if (and (eq 'type (first spec))
+                                                        (parametric-type-specifier-p (second spec)))
+                                                   `(type ,(deparameterize-type (second spec))
+                                                          ,@(nthcdr 2 spec))
+                                                   spec))))
+           ,@body))))

@@ -1,9 +1,18 @@
 (in-package :polymorphic-functions)
 
+(defvar *deparameterizer-alist* nil
+  "(Re)Bound in PF-COMPILER-MACRO, modified by ENHANCED-LAMBDA-DECLARATIONS.")
+
+(defvar *type-parameter-ignored-list* nil
+  "(Re)Bound in PF-COMPILER-MACRO, modified by ENHANCED-LAMBDA-DECLARATIONS
+to avoid multiple IGNORABLE declarations.")
+;; FIXME: Clarify the above usage
+
 (defun deparameterize-type (type-specifier)
   (etypecase type-specifier
     (atom (if (parametric-type-symbol-p type-specifier)
-              t
+              (or (assoc-value *deparameterizer-alist* type-specifier)
+                  t)
               type-specifier))
     (list (%deparameterize-type (car type-specifier) type-specifier))))
 
@@ -14,12 +23,14 @@
   (declare (ignore car-type-specifier env))
   (etypecase type-specifier
     (atom (if (parametric-type-symbol-p type-specifier)
-              t
+              (or (assoc-value *deparameterizer-alist* type-specifier)
+                  t)
               type-specifier))
     (list (traverse-tree type-specifier (lambda (node)
                                           (etypecase node
                                             (atom (if (parametric-type-symbol-p node)
-                                                      'cl:*
+                                                      (or (assoc-value *deparameterizer-alist* node)
+                                                          'cl:*)
                                                       node))
                                             (list node)))))))
 
@@ -29,7 +40,8 @@
     ,@(loop :for type :in (rest type-specifier)
             :collect (etypecase type
                        (atom (if (parametric-type-symbol-p type)
-                                 t
+                                 (or (assoc-value *deparameterizer-alist* type)
+                                     t)
                                  type))
                        (list (%deparameterize-type (car type) type))))))
 
@@ -62,7 +74,10 @@
                                                 ((:required &optional &rest)
                                                  (etypecase typespec
                                                    (atom (if (parametric-type-symbol-p typespec)
-                                                             t
+                                                             (or (assoc-value
+                                                                  *deparameterizer-alist*
+                                                                  typespec)
+                                                                 t)
                                                              typespec))
                                                    (list (%deparameterize-type (car typespec) typespec))))
                                                 ((&key)
@@ -70,7 +85,10 @@
                                                    ,(let ((typespec (second typespec)))
                                                       (etypecase typespec
                                                         (atom (if (parametric-type-symbol-p typespec)
-                                                                  t
+                                                                  (or (assoc-value
+                                                                       *deparameterizer-alist*
+                                                                       typespec)
+                                                                      t)
                                                                   typespec))
                                                         (list
                                                          (%deparameterize-type (car typespec)
@@ -82,7 +100,8 @@
                        (error "Unexpected parameters ~S" parameters)))
                ,(etypecase return-type
                   (atom (if (parametric-type-symbol-p return-type)
-                            t
+                            (or (assoc-value *deparameterizer-alist* return-type)
+                                t)
                             return-type))
                   (list (%deparameterize-type (car return-type) return-type))))))
 
