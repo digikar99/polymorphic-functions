@@ -92,8 +92,8 @@ If the *form-type* does not match the parametric-type, then NIL may be returned.
                                         (compile nil compiler-body))))
                type-parameter-names)))))
 
-(defmethod parametric-type-run-time-lambda-body
-    ((type-car (eql 'array)) type-cdr parameter)
+(defun parametric-type-run-time-lambda-body-for-array
+    (type-car type-cdr parameter)
   `(cl:lambda (array)
      ,(optima:match type-cdr
         ((list* (eql parameter) _)
@@ -107,13 +107,12 @@ If the *form-type* does not match the parametric-type, then NIL may be returned.
          (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
                 parameter (cons type-car type-cdr))))))
 
-(defmethod parametric-type-compile-time-lambda-body
-    ((type-car (eql 'array)) type-cdr parameter)
+(defun parametric-type-compile-time-lambda-body-for-array
+    (type-car type-cdr parameter)
   `(cl:lambda (type)
      (optima:match type
-       (variable nil)
-       ((guard (list* ft-type-car _)
-               (subtypep ft-type-car ',type-car))
+       ((optima:guard (list* ft-type-car _)
+                      (subtypep ft-type-car ',type-car))
         ,(optima:match type-cdr
            ((list* (eql parameter) _)
             `(let ((elt-type (array-type-element-type type)))
@@ -136,3 +135,19 @@ If the *form-type* does not match the parametric-type, then NIL may be returned.
             (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
                    parameter (cons type-car type-cdr)))))
        (otherwise nil))))
+
+(defmethod parametric-type-run-time-lambda-body
+    ((type-car (eql 'array)) type-cdr parameter)
+  (parametric-type-run-time-lambda-body-for-array 'array type-cdr parameter))
+
+(defmethod parametric-type-run-time-lambda-body
+    ((type-car (eql 'simple-array)) type-cdr parameter)
+  (parametric-type-run-time-lambda-body-for-array 'simple-array type-cdr parameter))
+
+(defmethod parametric-type-compile-time-lambda-body
+    ((type-car (eql 'array)) type-cdr parameter)
+  (parametric-type-compile-time-lambda-body-for-array 'array type-cdr parameter))
+
+(defmethod parametric-type-compile-time-lambda-body
+    ((type-car (eql 'simple-array)) type-cdr parameter)
+ (parametric-type-compile-time-lambda-body-for-array 'simple-array type-cdr parameter))
