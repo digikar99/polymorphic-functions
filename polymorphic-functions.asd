@@ -11,6 +11,7 @@
                "fiveam" ;; just keep tests together!
                "cl-form-types"
                "introspect-environment"
+               "optima"
                "split-sequence")
   :pathname #P"src/"
   :components ((:file "pre-package")

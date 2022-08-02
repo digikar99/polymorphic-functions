@@ -54,7 +54,9 @@ is one of the type parameter in the parametric-type.
 The methods implemented should return a one-argument lambda-*expression* (not function).
 The expression will be compiled to a function and called with the appropriate
 *form-type* at compile-time. The function should return the value of the TYPE-PARAMETER
-corresponding to the *form-type* and the parametric type."))
+corresponding to the parametric-type in the *form-type*.
+
+If the *form-type* does not match the parametric-type, then NIL may be returned."))
 
 
 (defun type-parameters-from-parametric-type (parametric-type-spec)
@@ -92,60 +94,45 @@ corresponding to the *form-type* and the parametric type."))
 
 (defmethod parametric-type-run-time-lambda-body
     ((type-car (eql 'array)) type-cdr parameter)
-  (destructuring-bind (&optional (elt-type 'cl:*) (rank/dimensions 'cl:*)) type-cdr
-    (cond ((eq parameter elt-type)
-           `(cl:lambda (array) (array-element-type array)))
-          ((symbolp rank/dimensions)
-           (cond ((eq parameter rank/dimensions)
-                  `(cl:lambda (array) (array-dimensions array)))
-                 (t
-                  (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
-                         parameter (cons type-car type-cdr)))))
-          (t
-           (loop :for s :in rank/dimensions
-                 :for i :from 0
-                 :do (cond ((eq parameter s)
-                            (return-from parametric-type-run-time-lambda-body
-                              `(cl:lambda (array) (array-dimension array ,i))))
-                           (t
-                            (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
-                                   parameter (cons type-car type-cdr)))))))))
+  `(cl:lambda (array)
+     ,(optima:match type-cdr
+        ((list* (eql parameter) _)
+         `(array-element-type array))
+        ((list _ (eql parameter))
+         `(array-rank array))
+        ((optima:guard (list _ dimensions)
+                       (position parameter dimensions))
+         `(array-dimension array ,(position parameter dimensions)))
+        (otherwise
+         (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
+                parameter (cons type-car type-cdr))))))
 
 (defmethod parametric-type-compile-time-lambda-body
     ((type-car (eql 'array)) type-cdr parameter)
-  (destructuring-bind (&optional (elt-type 'cl:*) (rank/dimensions 'cl:*)) type-cdr
-    `(cl:lambda (type)
-       ,(cond ((eq parameter elt-type)
-               `(if (and (listp type)
-                         (or (eq 'array (first type))
-                             (eq 'simple-array (first type)))
-                         (not (eq 'cl:* (second type)))
-                         (nthcdr 1 type))
-                    (second type)
-                    nil))
-              (t
-               `(if (and (listp type)
-                         (or (eq 'array (first type))
-                             (eq 'simple-array (first type)))
-                         (not (eq 'cl:* (third type)))
-                         (nthcdr 2 type))
-                    ,(if (symbolp rank/dimensions)
-                         `(cond ((eq 'cl:* (third type))
-                                 nil)
-                                ((listp (third type))
-                                 (length (third type)))
-                                (t
-                                 (third type)))
-                         (block loop-block
-                           (loop :for s :in rank/dimensions
-                                 :for i :from 0
-                                 :do (cond ((eq parameter s)
-                                            (return-from loop-block
-                                              `(if (and (listp (third type))
-                                                        (eq 'cl:* (nth ,i (third type))))
-                                                   nil
-                                                   (nth ,i (third type)))))
-                                           (t
-                                            (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
-                                                   parameter (cons type-car type-cdr)))))))
-                    nil))))))
+  `(cl:lambda (type)
+     (optima:match type
+       (variable nil)
+       ((guard (list* ft-type-car _)
+               (subtypep ft-type-car ',type-car))
+        ,(optima:match type-cdr
+           ((list* (eql parameter) _)
+            `(let ((elt-type (array-type-element-type type)))
+               (if (eq elt-type 'cl:*)
+                   nil
+                   elt-type)))
+           ((list _ (eql parameter))
+            `(let ((rank (array-type-rank type)))
+               (if (eq rank 'cl:*)
+                   nil
+                   rank)))
+           ((optima:guard (list _ dimensions)
+                          (position parameter dimensions))
+            (let ((pos (position parameter dimensions)))
+              `(let ((dimension (nth ,pos (array-type-dimensions type))))
+                 (if (eq dimension 'cl:*)
+                     nil
+                     dimension))))
+           (otherwise
+            (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
+                   parameter (cons type-car type-cdr)))))
+       (otherwise nil))))
