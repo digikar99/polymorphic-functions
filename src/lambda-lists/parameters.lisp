@@ -541,18 +541,23 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
 
 
 (defun run-time-applicable-p-form (polymorph-parameters)
-  (let ((type-parameter-alist ()))
+  (let ((type-parameter-alist ())
+        (may-be-null-forms-in-pf ()))
     (flet ((process (pp)
-             (when-let (type-parameters (pp-type-parameters pp))
-               (loop :for type-parameter :in type-parameters
-                     :do (with-slots (name run-time-deparameterizer-lambda-body)
-                             type-parameter
-                           (push `(,run-time-deparameterizer-lambda-body
-                                   ,(pp-form-in-pf pp))
-                                 (assoc-value type-parameter-alist name)))
-                     :finally (return nil)))
              (with-slots (form-in-pf value-effective-type) pp
-               `(typep ,form-in-pf ',(deparameterize-type value-effective-type)))))
+               (when-let (type-parameters (pp-type-parameters pp))
+                 (loop :for type-parameter :in type-parameters
+                       :do (with-slots (name run-time-deparameterizer-lambda-body)
+                               type-parameter
+                             (push (cons form-in-pf
+                                         `(,run-time-deparameterizer-lambda-body
+                                           ,form-in-pf))
+                                   (assoc-value type-parameter-alist name)))
+                       :finally (return nil)))
+               (let ((deparameterized-type (deparameterize-type value-effective-type)))
+                 (when (subtypep 'null deparameterized-type)
+                   (pushnew form-in-pf may-be-null-forms-in-pf :test #'equal))
+                 `(typep ,form-in-pf ',deparameterized-type)))))
       (let ((type-forms
               (map-polymorph-parameters polymorph-parameters
                                         :required #'process
@@ -565,10 +570,24 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
         `(and ,(or (polymorph-parameters-validator-form polymorph-parameters)
                    t)
               ,@(set-difference type-forms lambda-list-keywords)
-              ,@(loop :for (name . forms) :in type-parameter-alist
-                      :collect `(and ,@(loop :for form :in (rest forms)
-                                             :collect `(equalp ,(first forms)
-                                                               ,form)))))))))
+              ,@(loop :for (name . form-specs) :in type-parameter-alist
+                      :collect
+                      (let* ((non-null-form-pos (position-if-not (lambda (form-in-pf)
+                                                                  (member form-in-pf
+                                                                          may-be-null-forms-in-pf
+                                                                          :test #'equal))
+                                                                form-specs :key #'car))
+                             (non-null-form (cdr (nth non-null-form-pos form-specs))))
+                        `(and ,@(loop :for pos :from 0
+                                      :for (form-in-pf . form) :in form-specs
+                                      :if (/= pos non-null-form-pos)
+                                        :collect (if (member form-in-pf may-be-null-forms-in-pf
+                                                             :test #'equal)
+                                                     `(or (null ,form-in-pf)
+                                                          (equalp ,non-null-form
+                                                                  ,form))
+                                                     `(equalp ,non-null-form
+                                                              ,form)))))))))))
 
 
 
