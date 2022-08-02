@@ -543,16 +543,16 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
 (defun run-time-applicable-p-form (polymorph-parameters)
   (let ((type-parameter-alist ()))
     (flet ((process (pp)
-             (if-let (type-parameters (pp-type-parameters pp))
+             (when-let (type-parameters (pp-type-parameters pp))
                (loop :for type-parameter :in type-parameters
                      :do (with-slots (name run-time-deparameterizer-lambda-body)
                              type-parameter
                            (push `(,run-time-deparameterizer-lambda-body
                                    ,(pp-form-in-pf pp))
                                  (assoc-value type-parameter-alist name)))
-                     :finally (return nil))
-               (with-slots (form-in-pf value-effective-type) pp
-                 `(typep ,form-in-pf ',value-effective-type)))))
+                     :finally (return nil)))
+             (with-slots (form-in-pf value-effective-type) pp
+               `(typep ,form-in-pf ',(deparameterize-type value-effective-type)))))
       (let ((type-forms
               (map-polymorph-parameters polymorph-parameters
                                         :required #'process

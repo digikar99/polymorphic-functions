@@ -60,7 +60,10 @@
   "Returns two values: a form that has ASSERTs with SIMPLE-TYPE-ERROR to check the type
 as well as the type enhanced using TYPE."
   (declare (optimize debug))
-  (let* ((type (typexpand type env))
+  (let* ((type (cond ((parametric-type-specifier-p type)
+                      type)
+                     (t
+                      (typexpand type env))))
          (optional-position (when (listp type)
                               (position '&optional type)))
          (min-values (cond (optional-position
