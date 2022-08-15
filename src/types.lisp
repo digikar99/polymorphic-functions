@@ -58,7 +58,8 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
    (polymorphs  :initform nil
                 :accessor polymorphic-function-polymorphs)
    (documentation :initarg :documentation
-                  :type (or string null))
+                  :type (or string null)
+                  :accessor polymorphic-function-documentation)
    (invalidated-p :accessor polymorphic-function-invalidated-p
                   :initform nil)
    #+sbcl (%lock

@@ -61,18 +61,25 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
          (setf (compiler-macro-function ',name) #'pf-compiler-macro))
        (fdefinition ',name))))
 
-(defun extract-declarations (body)
-  "Returns two values: DECLARATIONS and remaining BODY"
-  (cond ((null body)
-         (values `(declare) nil))
-        ((and (listp (car body))
-              (eq 'declare (caar body)))
-         (multiple-value-bind (declarations rest-body) (extract-declarations (rest body))
-           (values (nconc (cons 'declare (cdar body))
-                          (rest declarations))
-                   rest-body)))
-        (t
-         (values `(declare) body))))
+(defun extract-declarations (body &key documentation)
+  "Returns two values: DECLARATIONS and remaining BODY
+If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BODY and DOC-STRING"
+  (multiple-value-bind (declarations body)
+      (cond ((null body)
+             (values `(declare) nil))
+            ((and (listp (car body))
+                  (eq 'declare (caar body)))
+             (multiple-value-bind (declarations rest-body) (extract-declarations (rest body))
+               (values (nconc (cons 'declare (cdar body))
+                              (rest declarations))
+                       rest-body)))
+            (t
+             (values `(declare) body)))
+    (if documentation
+        (if (stringp (first body))
+            (values declarations (rest body) (first body))
+            (values declarations body nil))
+        (values declarations body))))
 
 (defun ensure-unambiguous-call (name type-list effective-type-list)
   (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition name))
@@ -207,7 +214,7 @@ in the lambda list; the consequences of mutation are undefined."
       (declare (type typed-lambda-list typed-lambda-list))
       (multiple-value-bind (param-list type-list effective-type-list)
           (polymorph-effective-lambda-list parameters)
-        (multiple-value-bind (declarations body) (extract-declarations body)
+        (multiple-value-bind (declarations body doc) (extract-declarations body :documentation t)
           ;; USE OF INTERN BELOW:
           ;;   We do want STATIC-DISPATCH-NAME symbol collision to actually take place
           ;; when type lists of two polymorphs are "equivalent".
@@ -247,7 +254,7 @@ in the lambda list; the consequences of mutation are undefined."
                                  (block ,block-name
                                    ,(multiple-value-bind (form form-return-type)
                                         (ensure-type-form return-type
-                                                          `(progn ,@body)
+                                                          `(locally ,@body)
                                                           (augment-environment
                                                            env
                                                            :variable (remove-if
@@ -351,6 +358,7 @@ in the lambda list; the consequences of mutation are undefined."
                           `(handler-bind ((warning #'muffle-warning))
                              ,proclaimation)))
                    (register-polymorph ',name ',inline
+                                       ',doc
                                        ',typed-lambda-list
                                        ',type-list
                                        ',effective-type-list

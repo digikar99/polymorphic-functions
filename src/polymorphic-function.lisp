@@ -43,7 +43,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                   (mapcar #'first (subseq lambda-list (1+ key-pos))))
                           lambda-list)))
               (progn
-                (setf (documentation name 'cl:function) documentation)
+                (setf (polymorphic-function-documentation apf) documentation)
+                (update-polymorphic-function-documentation name)
                 (return-from register-polymorphic-function name))
               (cerror "Yes, delete existing POLYMORPHs to associate new ones"
                       'lambda-list-has-changed
@@ -68,9 +69,34 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                               :lambda-list-type (lambda-list-type untyped-lambda-list))))
       (invalidate-polymorphic-function-lambda apf)
       (setf (fdefinition name) apf)
-      (setf (documentation name 'cl:function) documentation)
+      (update-polymorphic-function-documentation name)
       #+ccl (setf (ccl:arglist name) effective-lambda-list)
       apf)))
+
+(defun update-polymorphic-function-documentation (name)
+  (setf (documentation name 'cl:function)
+        (let* ((pf         (fdefinition name))
+               (pf-doc     (polymorphic-function-documentation pf))
+               (polymorphs (polymorphic-function-polymorphs pf)))
+          (when (or pf-doc polymorphs)
+            (with-output-to-string (*standard-output*)
+              (pprint-logical-block (nil nil)
+                (write-string (or pf-doc ""))
+                (when polymorphs
+                  (write-string "Polymorphs:")
+                  (pprint-indent :block 2)
+                  (pprint-newline :mandatory)
+                  (loop :for polymorph :in polymorphs
+                        :do (with-slots (effective-type-list documentation) polymorph
+                              (write (cons name effective-type-list))
+                              (when documentation
+                                (pprint-newline :mandatory)
+                                (write-string "  Documentation:")
+                                (pprint-newline :mandatory)
+                                (pprint-logical-block (nil nil :per-line-prefix "    ")
+                                  (write-string documentation)))
+                              (pprint-newline :mandatory)))
+                  (pprint-indent :block -2))))))))
 
 (defun update-polymorphic-function-lambda (polymorphic-function &optional invalidate)
   (when (and invalidate (polymorphic-function-invalidated-p polymorphic-function))
@@ -139,13 +165,14 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                    (add-polymorph p-new polymorphs)))
            nil))))
 
-(defun register-polymorph (name inline-p typed-lambda-list type-list effective-type-list
-                           more-optimal-type-list suboptimal-note
+(defun register-polymorph (name inline-p documentation typed-lambda-list type-list
+                           effective-type-list more-optimal-type-list suboptimal-note
                            return-type inline-lambda-body static-dispatch-name
                            lambda-list-type runtime-applicable-p-form
                            compiler-applicable-p-lambda &optional source-location)
   (declare (type function-name  name)
            (type (member t nil :maybe) inline-p)
+           (type (or null string) documentation)
            (type typed-lambda-list typed-lambda-list)
            (type function-name  static-dispatch-name)
            (type type-list      type-list)
@@ -168,6 +195,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
             type-list untyped-lambda-list name)
     (ensure-unambiguous-call name type-list effective-type-list)
     (let ((polymorph (make-polymorph :name             name
+                                     :documentation    documentation
                                      :source           source-location
                                      :inline-p         inline-p
                                      :type-list        type-list
@@ -188,6 +216,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                       untyped-lambda-list typed-lambda-list))))
       (unless (add-or-update-polymorph apf polymorph)
         (invalidate-polymorphic-function-lambda apf))
+      (update-polymorphic-function-documentation name)
       polymorph)))
 
 (defvar *compiler-macro-expanding-p* nil
