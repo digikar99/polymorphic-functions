@@ -81,7 +81,9 @@ use by functions like TYPE-LIST-APPLICABLE-P")
           (when (or pf-doc polymorphs)
             (with-output-to-string (*standard-output*)
               (pprint-logical-block (nil nil)
-                (write-string (or pf-doc ""))
+                (when pf-doc
+                  (write-string pf-doc)
+                  (pprint-newline :mandatory))
                 (when polymorphs
                   (write-string "Polymorphs:")
                   (pprint-indent :block 2)
