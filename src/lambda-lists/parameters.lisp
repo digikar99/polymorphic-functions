@@ -661,13 +661,18 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
             (ignorable-type-parameters (set-difference (mapcar #'car *deparameterizer-alist*)
                                                        *type-parameter-ignored-list*)))
 
-        (setq *type-parameter-ignored-list*
-              (union *type-parameter-ignored-list*
-                     (mapcar #'car *deparameterizer-alist*)))
+
 
         (values `(declare ,@(set-difference type-forms lambda-list-keywords)
-                          (ignorable ,@ignorable-type-parameters))
-                (translate-body return-type *deparameterizer-alist*))))))
+                          (ignorable ,@ignorable-type-parameters)
+                          ,@(loop :for (type-parameter . value) :in *deparameterizer-alist*
+                                  :unless (member type-parameter *type-parameter-ignored-list*)
+                                  :collect `(type (eql ,value) ,type-parameter)))
+                (progn
+                  (setq *type-parameter-ignored-list*
+                        (union *type-parameter-ignored-list*
+                               (mapcar #'car *deparameterizer-alist*)))
+                  (translate-body return-type *deparameterizer-alist*)))))))
 
 (defun accepts-argument-of-type-p (polymorph-parameters type)
   (flet ((%subtypep (pp) (subtypep type (pp-value-type pp))))
