@@ -112,14 +112,17 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                                                     effective-lambda-list
                                                                     t)
                           (compute-polymorphic-function-lambda-body lambda-list-type
-                                                                    effective-lambda-list))))
-    (closer-mop:set-funcallable-instance-function
-     ;; A potentially relevant issue: https://github.com/Clozure/ccl/issues/361
-     ;; FIXME: Should we COMPILE this?
-     apf (eval `(list-named-lambda (polymorphic-function ,*name*)
-                    ,(symbol-package (if (atom *name*) *name* (second *name*)))
-                    ,effective-lambda-list
-                  ,@lambda-body)))
+                                                                    effective-lambda-list)))
+         ;; FIXME: Should we COMPILE this?
+         (function    (eval `(list-named-lambda (polymorphic-function ,*name*)
+                                 ,(symbol-package (if (atom *name*) *name* (second *name*)))
+                                 ,effective-lambda-list
+                               ,@lambda-body))))
+    (closer-mop:set-funcallable-instance-function apf function)
+    ;; Relevant issue: https://github.com/Clozure/ccl/issues/361
+    #+ccl (ccl::lfun-bits apf
+                          (logior (ccl::lfun-bits apf)
+                                  (logand (ccl::lfun-bits function) (1- (expt 2 16)))))
     (setf (polymorphic-function-invalidated-p apf) invalidate)
     apf))
 
