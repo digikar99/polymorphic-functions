@@ -278,7 +278,7 @@ in the lambda list; the consequences of mutation are undefined."
                                           ;; The RETURN-TYPE here would be augmented by
                                           ;; PF-COMPILER-MACRO
                                           (block ,block-name
-                                            ,@body))))
+                                            (locally ,@body)))))
                  #+sbcl
                  (sbcl-transform-body (make-sbcl-transform-body name
                                                                 typed-lambda-list
