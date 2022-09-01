@@ -4,12 +4,16 @@
   "If compile-time value is non-NIL, all polymorphic-functions are dispatched dynamically.")
 
 ;;; TODO: Allow user to specify custom optim-speed etc
-(defun pf-compiler-macro (form &optional env)
 
+(define-symbol-macro top-level-p t)
+
+;; Separate into a function and macro-function so that redefinitions during
+;; development are caught easily
+(defun pf-compiler-macro-function (form &optional env)
   (when (eq 'apply (first form))
     (format *error-output* "~A can optimize cases other than FUNCALL and raw call!~%Assk maintainer of ADHOC-POLYMORPHIC-FUNCTIONS to provide support for this case!"
             (lisp-implementation-type))
-    (return-from pf-compiler-macro form))
+    (return-from pf-compiler-macro-function form))
 
   (let* ((*environment*                 env)
          (*compiler-macro-expanding-p*    t)
@@ -25,6 +29,9 @@
                            :unwind-on-signal nil
                            :optimization-note-condition (and optim-speed
                                                              (not *disable-static-dispatch*)))
+
+      (unless (macroexpand 'top-level-p env)
+        (return-from pf-compiler-macro-function form))
 
       (let* ((arg-list  (mapcar (lambda (form)
                                   (with-output-to-string (*error-output*)
@@ -65,7 +72,7 @@
 
         (when (and optim-debug
                    (not (declaration-information 'pf-defined-before-use env)))
-          (return-from pf-compiler-macro original-form))
+          (return-from pf-compiler-macro-function original-form))
         (cond ((and (null polymorph)
                     optim-speed
                     ;; We can be sure that *something* will be printed
@@ -73,7 +80,7 @@
                     ;; *nothing* will be shown! And then we rely on the
                     ;; NO-APPLICABLE-POLYMORPH/COMPILER-NOTE below.
                     form-type-failures)
-               (return-from pf-compiler-macro original-form))
+               (return-from pf-compiler-macro-function original-form))
               (polymorph
                ;; We muffle, because unsuccessful searches could have resulted
                ;; in compiler notes
@@ -90,7 +97,7 @@
         (when (or (null polymorph)
                   (not optim-speed)
                   *disable-static-dispatch*)
-          (return-from pf-compiler-macro original-form))
+          (return-from pf-compiler-macro-function original-form))
 
         (with-slots (inline-p return-type type-list
                      more-optimal-type-list suboptimal-note
@@ -132,12 +139,22 @@
                                       `(,enhanced-decl
                                         ,more-decl
                                         (block ,block-name ,@body))))))
+                           ;; We need to expand here, because we want to report
+                           ;; that the notes generated from the result of this expansion
+                           ;; were actually generated from THIS PARTICULAR TOP-LEVEL FORM
                            (macroexpanded-form
-                             (handler-bind ((form-type-failure
+                             (handler-bind ((compiler-macro-notes:note
                                               (lambda (note)
+                                                (compiler-macro-notes::swank-signal note env)
                                                 (push note notes))))
-                               (macroexpand-all
-                                lambda-with-enhanced-declarations augmented-env))))
+                               (lastcar
+                                (macroexpand-all
+                                 `(cl:symbol-macrolet ((compiler-macro-notes::previous-form
+                                                      ,form)
+                                                    (compiler-macro-notes::parent-form
+                                                      ,lambda-with-enhanced-declarations))
+                                    ,lambda-with-enhanced-declarations)
+                                 augmented-env)))))
                       ;; MUFFLE because they would already have been reported!
                       (mapc #'compiler-macro-notes:muffle notes)
                       ;; Some macroexpand-all can produce a (function (lambda ...)) from (lambda ...)
@@ -164,10 +181,13 @@
                              (assoc 'inline-pf
                                     (nth-value 2 (function-information name env))))
                            (inline-dispatch-form
-                             `(the ,return-type (,inline-lambda-body ,@arg-list)))
+                             `(the ,return-type
+                                   (symbol-macrolet ((top-level-p nil))
+                                     (,inline-lambda-body ,@arg-list))))
                            (non-inline-dispatch-form
-                             `(the ,return-type (,static-dispatch-name
-                                                 ,@arg-list))))
+                             `(the ,return-type
+                                   (symbol-macrolet ((top-level-p nil))
+                                     (,static-dispatch-name ,@arg-list)))))
                        (ecase inline-p
                          ((t)
                           (assert inline-lambda-body)
@@ -190,7 +210,10 @@
                                 (t
                                  (error "Unexpected case in pf-compiler-macro!"))))))))
                   (t
-                   (return-from pf-compiler-macro form)))))))))
+                   (return-from pf-compiler-macro-function form)))))))))
+
+(defun pf-compiler-macro (form &optional env)
+  (pf-compiler-macro-function form env))
 
 (defmacro pflet (bindings &body body)
   ;; TODO: Should we just call ENHANCED-LAMBDA-DECLARATIONS in general?
