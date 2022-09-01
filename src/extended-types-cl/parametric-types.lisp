@@ -45,7 +45,7 @@ The expression will be compiled to a function and called with the appropriate *o
 at run-time. The function should return the value of the TYPE-PARAMETER corresponding
 to the *object* and the parametric type."))
 
-(defgeneric parametric-type-compile-time-lambda  (type-car type-cdr type-parameter)
+(defgeneric parametric-type-compile-time-lambda-body (type-car type-cdr type-parameter)
   (:documentation
    "Users are expected to specialize on the TYPE-CAR using an (EQL symbol) specializer.
 TYPE-CAR and TYPE-CDR together make up the parametric-type, while TYPE-PARAMETER
@@ -54,7 +54,7 @@ is one of the type parameter in the parametric-type.
 The methods implemented should return a one-argument lambda-*expression* (not function).
 The expression will be compiled to a function and called with the appropriate
 *form-type* at compile-time. The function should return the value of the TYPE-PARAMETER
-corresponding to the parametric type in the *form-type*.
+corresponding to the parametric-type in the *form-type*.
 
 If the *form-type* does not match the parametric-type, then NIL may be returned."))
 
@@ -68,7 +68,7 @@ If the *form-type* does not match the parametric-type, then NIL may be returned.
                                     :run-time-deparameterizer-lambda-body
                                     `(cl:lambda (o) (type-of o))
                                     :compile-time-deparameterizer-lambda
-                                    (cl:lambda (form-type) form-type)
+                                    (lambda (form-type) form-type)
                                     :compile-time-deparameterizer-lambda-body
                                     `(cl:lambda (form-type) form-type)))
          nil))
@@ -91,6 +91,28 @@ If the *form-type* does not match the parametric-type, then NIL may be returned.
                                         :compile-time-deparameterizer-lambda
                                         (compile nil compiler-body))))
                type-parameter-names)))))
+
+(defun array-type-element-type (type)
+  (destructuring-bind (array-base-type &optional (element-type 'cl:*) (dim/rank 'cl:*))
+      type
+    (declare (ignore array-base-type dim/rank))
+    element-type))
+
+(defun array-type-dimensions (type)
+  (destructuring-bind (array-base-type &optional (element-type 'cl:*) (dim/rank 'cl:*))
+      type
+    (declare (ignore array-base-type element-type))
+    (typecase dim/rank
+      (number (make-list dim/rank :initial-element 'cl:*))
+      (t dim/rank))))
+
+(defun array-type-rank (type)
+  (destructuring-bind (array-base-type &optional (element-type 'cl:*) (dim/rank 'cl:*))
+      type
+    (declare (ignore array-base-type element-type))
+    (typecase dim/rank
+      (list (length dim/rank))
+      (t dim/rank))))
 
 (defun parametric-type-run-time-lambda-body-for-array
     (type-car type-cdr parameter)
