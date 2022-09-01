@@ -131,6 +131,7 @@ as well as the type enhanced using TYPE."
          (form-rest-type (if (member '&rest form-types)
                              (lastcar form-types)
                              nil))
+         (form-rest-type-p (member '&rest form-types))
          (form-types (if (member '&rest form-types)
                          (butlast form-types 2)
                          form-types))
@@ -206,13 +207,14 @@ as well as the type enhanced using TYPE."
                                   (warn 'return-type-mismatch/warning
                                         :index i :actual form-type :declared rest-type)))
                           :finally
-                             (multiple-value-bind (subtypep knownp)
-                                 (subtypep form-rest-type rest-type)
-                               (when (and (not (type= t form-type))
-                                          knownp
-                                          (not subtypep))
-                                 (warn 'return-type-mismatch/warning
-                                       :index i :actual form-rest-type :declared rest-type))))
+                             (when form-rest-type-p
+                               (multiple-value-bind (nilp knownp)
+                                   (intersection-null-p env form-rest-type rest-type)
+                                 (when (and (not (type= t form-type))
+                                            knownp
+                                            nilp)
+                                   (warn 'return-type-mismatch/warning
+                                         :index i :actual form-rest-type :declared rest-type)))))
                     (with-gensyms (value i)
                       `(loop :for ,value :in (nthcdr ,num-types ,form-value-list)
                              :for ,i :from ,num-types
