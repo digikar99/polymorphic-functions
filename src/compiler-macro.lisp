@@ -5,8 +5,6 @@
 
 ;;; TODO: Allow user to specify custom optim-speed etc
 
-(define-symbol-macro top-level-p t)
-
 ;; Separate into a function and macro-function so that redefinitions during
 ;; development are caught easily
 (defun pf-compiler-macro-function (form &optional env)
@@ -150,9 +148,9 @@
                                (lastcar
                                 (macroexpand-all
                                  `(cl:symbol-macrolet ((compiler-macro-notes::previous-form
-                                                      ,form)
-                                                    (compiler-macro-notes::parent-form
-                                                      ,lambda-with-enhanced-declarations))
+                                                         ,form)
+                                                       (compiler-macro-notes::parent-form
+                                                         ,lambda-with-enhanced-declarations))
                                     ,lambda-with-enhanced-declarations)
                                  augmented-env)))))
                       ;; MUFFLE because they would already have been reported!
