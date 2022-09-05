@@ -1,7 +1,8 @@
 (in-package :polymorphic-functions)
 
 (defvar *disable-static-dispatch* nil
-  "If compile-time value is non-NIL, all polymorphic-functions are dispatched dynamically.")
+  "If value at the time of compilation of the call-site is non-NIL,
+the polymorphic-function being called at the call-site is dispatched dynamically.")
 
 ;;; TODO: Allow user to specify custom optim-speed etc
 

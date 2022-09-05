@@ -6,14 +6,20 @@
 #+BEGIN_QUOTE
   This library is still unstable, albeit the main interface comprising of the below symbols hasn't changed in at least the last six months. Users are also recommended to avoid non-trivial uses of &rest type-lists:
 
-  - define-polymorphic-function
-  - undefine-polymorphic-function
-  - defpolymorph
-  - defpolymorph-compiler-macro
-  - undefpolymorph
-  - find-polymorph
-  - polymorph-apropos-list-type
+  - [[#define-polymorphic-function][define-polymorphic-function]]
+  - [[#undefine-polymorphic-function][undefine-polymorphic-function]]
+  - [[#defpolymorph][defpolymorph]]
+  - [[#defpolymorph-compiler-macro][defpolymorph-compiler-macro]]
+  - [[#undefpolymorph][undefpolymorph]]
+  - [[#find-polymorph][find-polymorph]]
+  - [[#polymorph-apropos-list-type][polymorph-apropos-list-type]]
 #+END_QUOTE
+
+The core goal of this library is to provide a function type to dispatch on types rather than classes, for dispatching on specialized array types such as =(simple-array single-float)= or =(simple-array double-float)= or =(simple-array (signed-byte 32))= in [[https://github.com/digikar99/numericals][numericals]]. (See [[#basic-usage][Basic Usage]].)
+
+Support for optional and keyword arguments, as well as heterogeneous lambda lists is also provided. Runtime dispatch is the default, compile-time dispatch is provided through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]], and takes place when the call-site is compiled with =(declare (optimize speed (debug 1)))= declaration in place. 
+
+If you'd like to use this library on your favourite implementation, push its developers to provide support for CLTL2. [[https://github.com/kaveh808/kons-9/discussions/41#discussioncomment-3534558][Without CLTL2, there isn't much hope for a numerical computing library in Common Lisp!]] Currently, only SBCL provides a good-enough support for CLTL2, and that too has bugs; cl-environments has to work hard to provide support on other implementations. Continuous Integration through Github Actions tests this library on SBCL, CCL, and ECL. 
 
 The library provides all of
 
@@ -21,14 +27,14 @@ The library provides all of
 - [[https://en.wikipedia.org/wiki/Subtyping][Subtype Polymorphism]]
 - [[https://en.wikipedia.org/wiki/Parametric_polymorphism][Parametric Polymorphism]] (in a very limited sense; see [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]]!)
 
-to dispatch on the basis of types rather than classes. Compile-time dispatch is also provided but this requires support for CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. In addition, [[#and-about-extended-types][extended types]] are also provided through two means:
+Besides the standard Common Lisp types, [[#and-about-extended-types][extended types]] are also provided through two means:
 
 1. [[https://github.com/s-expressionists/ctype/][ctype]], and the system =polymorphic-functions=
-2. [[https://github.com/digikar99/extensible-compound-types][extensible-compound-types]], recommended usage is =(cl:pushnew :extensible-compound-types cl:*features*)= and then =(asdf:compile-system ... :force t)=. You may optionally need to recompile dependencies, and it might be recommendable to force compile "extensible-compound-types" itself, so that others are recompiled automagically.
+2. [[https://github.com/digikar99/extensible-compound-types][extensible-compound-types]], recommended usage is =(cl:pushnew :extensible-compound-types cl:*features*)= and then =(asdf:compile-system ... :force t)=. You may optionally need to recompile dependencies, and it might be recommendable to force compile "extensible-compound-types" itself, so that others are recompiled automagically. Until the PR gets merged [[https://github.com/digikar99/cl-form-types/][digikar99/cl-form-types]] may be used.
 
-The library was primarily made to dispatch on specialized-arrays for use in [[https://github.com/digikar99/numericals][numericals]], since CLHS does not enable generic-functions for specialized-arrays. But has also been put to use in [[https://github.com/lisp-polymorph/][lisp-polymorph]].
+Besides numericals, this library has also been put to use in [[https://github.com/lisp-polymorph/][lisp-polymorph]].
 
-See also: [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-while-using-pf][pitfalls]].
+See the [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-while-using-pf][pitfalls]] before using this library in a production environment!
 
 * Table of Contents
 :PROPERTIES:
@@ -60,7 +66,32 @@ See also: [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-whil
 - [[#tests][Tests]]
 - [[#related-projects][Related Projects]]
 - [[#acknowledgements][Acknowledgements]]
-:END:
+- [[#api-reference][API Reference]]
+  - [[#deparameterize-type][%deparameterize-type]]
+  - [[#compiler-macro-expanding-p][compiler-macro-expanding-p]]
+  - [[#disable-static-dispatch][disable-static-dispatch]]
+  - [[#parametric-type-symbol-predicates][parametric-type-symbol-predicates]]
+  - [[#define-polymorphic-function][define-polymorphic-function]]
+  - [[#defpolymorph][defpolymorph]]
+  - [[#defpolymorph-compiler-macro][defpolymorph-compiler-macro]]
+  - [[#find-polymorph][find-polymorph]]
+  - [[#inline-pf][inline-pf]]
+  - [[#more-optimal-polymorph-inapplicable][more-optimal-polymorph-inapplicable]]
+  - [[#no-applicable-polymorph][no-applicable-polymorph]]
+  - [[#not-pf-defined-before-use][not-pf-defined-before-use]]
+  - [[#notinline-pf][notinline-pf]]
+  - [[#parametric-type-compile-time-lambda-body][parametric-type-compile-time-lambda-body]]
+  - [[#parametric-type-run-time-lambda-body][parametric-type-run-time-lambda-body]]
+  - [[#pf-defined-before-use][pf-defined-before-use]]
+  - [[#pflet][pflet]]
+  - [[#pflet][pflet*]]
+  - [[#polymorph][polymorph]]
+  - [[#polymorph-apropos-list-type][polymorph-apropos-list-type]]
+  - [[#polymorphic-function][polymorphic-function]]
+  - [[#polymorphic-function-type-lists][polymorphic-function-type-lists]]
+  - [[#suboptimal-polymorph-note][suboptimal-polymorph-note]]
+  - [[#undefine-polymorphic-function][undefine-polymorphic-function]]
+  - [[#undefpolymorph][undefpolymorph]]
 
 * Usage
    :PROPERTIES:
@@ -72,10 +103,9 @@ See also: [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-whil
     :CUSTOM_ID: basic-usage
     :END:
 
-- Users are expected to define a =polymorphic-function= (analogous to =cl:generic-function=) with one or more =polymorph= (similar to =cl:method=). These may be dispatched at runtime or at compile time if optimization policy is ~(and (= speed 3) (/= debug 3))~ abbreviated as  =optim-speed=.
+- Users are expected to define a =polymorphic-function= (analogous to =cl:generic-function=) with one or more =polymorph= (similar to =cl:method=). These may be dispatched at runtime or at compile time if optimization policy at the compilation of the call-site is ~(and (= speed 3) (/= debug 3))~ abbreviated as  =optim-speed=.
 - Adhoc Polymorphism is supported in the sense that different polymorphs can have different implementations.
-- Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced using the more specific type declarations in the environment. Thus, a
-  polymorph that was defined for =vector= when compiled with arguments declared to be =simple-string=, then the body is made aware at /compiler/macroexpansion time/ that the arguments are actually =simple-string= rather than just =vector=. Code further in the succeeding compiler/macroexpansion phases can then make use of this information. This requires that the parameters to the polymorph be treated as read-only variables; otherwise the consequences can be undefined because code might have been initially written assuming the parameter/variable to be a =vector= and not merely a =simple-string=. 
+- Subtype Polymorphism is supported in the sense that once a polymorph is defined, then when a call to it is being compiled, then the type declarations inside the lambda-body of the polymorph are enhanced (declaration propagation) using the more specific type declarations in the environment. Thus, a polymorph that was defined for =vector= when compiled with arguments declared to be =simple-string=, then the body is made aware at /compiler/macroexpansion time/ that the arguments are actually =simple-string= rather than just =vector=. Code further in the succeeding compiler/macroexpansion phases can then make use of this information. This requires that the parameters to the polymorph be treated as read-only variables; otherwise the consequences can be undefined because code might have been initially written assuming the parameter/variable to be a =vector= and not merely a =simple-string=. 
 - Individual polymorphs may also additionally have compiler macros. However, the policy under which these may be invoked is undefined. In essence, user code must not rely on compiler macros for /correctness/.
 - See [[#discussion-and-advanced-usage][Discussion and Advanced Usage]] for parametric polymorphism. Adhoc and Subtype polymorphisms should suffice in most cases for optimization; parametric polymorphism can aid in further type safety.
 
@@ -664,11 +694,7 @@ Yes, there are quite a few:
    :CUSTOM_ID: dependencies-outside-quicklisp
    :END:
 
-- SBCL 2.0.9+
-- [[https://github.com/alex-gutev/cl-form-types][cl-form-types]]
-  - [[https://github.com/alex-gutev/cl-environments][cl-environments]]
-- [[https://github.com/digikar99/compiler-macro-notes][compiler-macro-notes]]
-- and more... better use ultralisp until then!
+=polymorphic-functions= has been added to quicklisp, but if you want to use the latest, get it from ultralisp! Make sure you have SBCL 2.0.9+.
 
 ** Getting it from ultralisp
     :PROPERTIES:
@@ -717,9 +743,9 @@ Once the function is pushed, install the dist:
 
 ** Getting it from clpm
 
-Recently, clpm support was also added.
+Recently, clpm support also exists.
 
-TODO: Elaborate.
+TODO: Elaborate, and perhaps update.
 * Tests
    :PROPERTIES:
    :CUSTOM_ID: tests
@@ -749,3 +775,358 @@ Tests are distributed throughout the system. Run
 - [[https://github.com/alex-gutev/][Alex Gutev]] for an extensive [[https://github.com/alex-gutev/cl-form-types][cl-form-types]]!
 - [[https://github.com/commander-trashdin/][Andrew]] for extensively putting polymorphic-functions to test at a brewing project on
   [[https://github.com/lisp-polymorph/][lisp-polymorph]]!
+* API Reference
+
+** %deparameterize-type
+    :PROPERTIES:
+    :CUSTOM_ID: deparameterize-type
+    :END:
+
+#+BEGIN_SRC lisp
+  Generic Function: (%deparameterize-type type-specifier-car type-specifier
+                     &optional env)
+#+END_SRC
+
+%DEPARAMETERIZE-TYPE is called when the argument to DEPARAMETERIZE-TYPE
+is a list.
+
+** =*compiler-macro-expanding-p*=
+    :PROPERTIES:
+    :CUSTOM_ID: compiler-macro-expanding-p
+    :END:
+
+#+BEGIN_SRC lisp
+  Variable
+  Default Value: NIL
+#+END_SRC
+
+Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH
+
+** =*disable-static-dispatch*=
+    :PROPERTIES:
+    :CUSTOM_ID: disable-static-dispatch
+    :END:
+
+#+BEGIN_SRC lisp
+  Variable
+  Default Value: NIL
+#+END_SRC
+
+If value at the time of compilation of the call-site is non-NIL, 
+the polymorphic-function being called at the call-site is dispatched dynamically.
+
+** =*parametric-type-symbol-predicates*=
+    :PROPERTIES:
+    :CUSTOM_ID: parametric-type-symbol-predicates
+    :END:
+
+#+BEGIN_SRC lisp
+  Variable
+  Default Value: NIL
+#+END_SRC
+
+A type-specifier in the type-list of a polymorph qualifies as
+parametric-type-specifier if there exists a symbol in the list, which
+when tested against the functions (predicates) in this list, returns
+non-NIL for at least one predicate
+
+** define-polymorphic-function
+    :PROPERTIES:
+    :CUSTOM_ID: define-polymorphic-function
+    :END:
+
+#+BEGIN_SRC lisp
+  Macro: (define-polymorphic-function name untyped-lambda-list &key overwrite
+          (documentation NIL)
+          (default (quote (function no-applicable-polymorph))))
+#+END_SRC
+
+Define a function named =name= that can then be used for
+[[#defpolymorph][defpolymorph]] for specializing on various argument
+types.
+
+If =overwrite= is T, all the existing polymorphs associated with =name=
+are deleted, and new polymorphs will be ready to be installed. If
+=overwrite= is NIL, a continuable error is raised if the LAMBDA-LIST has
+changed.
+
+=default= should be a FUNCTION that can be called with two arguments at
+run-time and compile-time in case no polymorph is applicable. - the
+first of these arguments is the =name=, while - the second argument is
+the argument list with which the polymorphic-function was called or
+compiled. At compile-time
+[[#compiler-macro-expanding-p][*compiler-macro-expanding-p*]] is bound
+to non-NIL.
+
+** defpolymorph
+    :PROPERTIES:
+    :CUSTOM_ID: defpolymorph
+    :END:
+
+#+BEGIN_SRC lisp
+  Macro: (defpolymorph name typed-lambda-list return-type &body body)
+#+END_SRC
+
+Expects OPTIONAL or KEY args to be in the form
+
+#+BEGIN_EXAMPLE
+  ((A TYPE) DEFAULT-VALUE) or ((A TYPE) DEFAULT-VALUE AP).
+#+END_EXAMPLE
+
+- =name= could also be (=name= &KEY (INLINE T) STATIC-DISPATCH-NAME
+  MORE-OPTIMAL-TYPE-LIST SUBOPTIMAL-NOTE)
+- Possible values for INLINE are T, NIL and :MAYBE
+- STATIC-DISPATCH-NAME could be useful for tracing or profiling
+- SUBOPTIMAL-NOTE and MORE-OPTIMAL-TYPE-LIST are useful for signalling
+  that the [[#polymorph][polymorph]] chosen for static-dispatch,
+  inlining, or compiler-macro is not the most optimal. It is recommended
+  that SUBOPTIMAL-NOTE should be the name of a subclass of
+  [[#suboptimal-polymorph-note][suboptimal-polymorph-note]] - the
+  condition class should have a slot to accept the TYPE-LIST of the
+  currently chosen [[#polymorph][polymorph]]
+
+*Note*: - INLINE T or :MAYBE can result in infinite expansions for
+recursive polymorphs. Proceed at your own risk. - Also, because inlining
+results in type declaration upgradation for purposes of subtype
+polymorphism, it is recommended to not mutate the variables used in the
+lambda list; the consequences of mutation are undefined.
+
+** defpolymorph-compiler-macro
+    :PROPERTIES:
+    :CUSTOM_ID: defpolymorph-compiler-macro
+    :END:
+
+#+BEGIN_SRC lisp
+  Macro: (defpolymorph-compiler-macro name type-list compiler-macro-lambda-list
+          &body body)
+#+END_SRC
+
+Example TYPE-LISTs: (NUMBER NUMBER) (STRING &OPTIONAL INTEGER) (STRING
+&KEY (:ARG INTEGER)) (NUMBER &REST)
+
+** find-polymorph
+    :PROPERTIES:
+    :CUSTOM_ID: find-polymorph
+    :END:
+
+#+BEGIN_SRC lisp
+  Function: (find-polymorph name type-list)
+#+END_SRC
+
+Returns two values: If a [[#polymorphic-function][polymorphic-function]]
+by =name= does not exist, returns NIL NIL. If it exists, the second
+value is T and the first value is a possibly empty list of
+[[#polymorph][polymorph]]s associated with =name=.
+
+** inline-pf
+    :PROPERTIES:
+    :CUSTOM_ID: inline-pf
+    :END:
+
+No documentation found for =inline-pf=
+
+** more-optimal-polymorph-inapplicable
+    :PROPERTIES:
+    :CUSTOM_ID: more-optimal-polymorph-inapplicable
+    :END:
+
+#+BEGIN_SRC lisp
+  Condition
+#+END_SRC
+
+** no-applicable-polymorph
+    :PROPERTIES:
+    :CUSTOM_ID: no-applicable-polymorph
+    :END:
+
+#+BEGIN_SRC lisp
+  Function: (no-applicable-polymorph name env args &optional arg-types)
+#+END_SRC
+
+#+BEGIN_SRC lisp
+  Condition
+#+END_SRC
+
+** not-pf-defined-before-use
+    :PROPERTIES:
+    :CUSTOM_ID: not-pf-defined-before-use
+    :END:
+
+No documentation found for =not-pf-defined-before-use=
+
+** notinline-pf
+    :PROPERTIES:
+    :CUSTOM_ID: notinline-pf
+    :END:
+
+No documentation found for =notinline-pf=
+
+** parametric-type-compile-time-lambda-body
+    :PROPERTIES:
+    :CUSTOM_ID: parametric-type-compile-time-lambda-body
+    :END:
+
+#+BEGIN_SRC lisp
+  Generic Function: (parametric-type-compile-time-lambda-body type-car type-cdr
+                     type-parameter)
+#+END_SRC
+
+Users are expected to specialize on the =type-car= using an (EQL symbol)
+specializer. =type-car= and =type-cdr= together make up the
+parametric-type, while =type-parameter= is one of the type parameter in
+the parametric-type.
+
+The methods implemented should return a one-argument lambda-/expression/
+(not function). The expression will be compiled to a function and called
+with the appropriate /form-type/ at compile-time. The function should
+return the value of the =type-parameter= corresponding to the
+parametric-type in the /form-type/.
+
+If the /form-type/ does not match the parametric-type, then NIL may be
+returned.
+
+** parametric-type-run-time-lambda-body
+    :PROPERTIES:
+    :CUSTOM_ID: parametric-type-run-time-lambda-body
+    :END:
+
+#+BEGIN_SRC lisp
+  Generic Function: (parametric-type-run-time-lambda-body type-car type-cdr
+                     type-parameter)
+#+END_SRC
+
+Users are expected to specialize on the =type-car= using an (EQL symbol)
+specializer. =type-car= and =type-cdr= together make up the
+parametric-type, while =type-parameter= is one of the type parameter in
+the parametric-type.
+
+The methods implemented should return a one-argument lambda-/expression/
+(not function). The expression will be compiled to a function and called
+with the appropriate /object/ at run-time. The function should return
+the value of the =type-parameter= corresponding to the /object/ and the
+parametric type.
+
+** pf-defined-before-use
+    :PROPERTIES:
+    :CUSTOM_ID: pf-defined-before-use
+    :END:
+
+No documentation found for =pf-defined-before-use=
+
+** pflet
+    :PROPERTIES:
+    :CUSTOM_ID: pflet
+    :END:
+
+#+BEGIN_SRC lisp
+  Macro: (pflet bindings &body body)
+#+END_SRC
+
+Like LET but when expanded inside PF-COMPILER-MACRO, this uses
+information in /DEPARAMETERIZER-ALIST/ to deparameterize types.
+
+** pflet*
+    :PROPERTIES:
+    :CUSTOM_ID: pflet-1
+    :END:
+
+#+BEGIN_SRC lisp
+  Macro: (pflet* bindings &body body)
+#+END_SRC
+
+Like LET* but when expanded inside PF-COMPILER-MACRO, this uses
+information in /DEPARAMETERIZER-ALIST/ to deparameterize types.
+
+** polymorph
+    :PROPERTIES:
+    :CUSTOM_ID: polymorph
+    :END:
+
+#+BEGIN_SRC lisp
+  Structure
+#+END_SRC
+
+- If RUNTIME-APPLICABLE-P-FORM returns true when evaluated inside the
+  lexical environment of the polymorphic-function, then the dispatch is
+  done on LAMBDA. The prioritization is done by ADD-OR-UPDATE-POLYMORPH
+  so that a more specialized polymorph is checked for compatibility
+  before a less specialized polymorph.
+
+- The PF-COMPILER-MACRO calls the COMPILER-APPLICABLE-P-LAMBDA with the
+  FORM-TYPEs of the arguments derived at compile time. The compiler
+  macro dispatches on the polymorph at compile time if the
+  COMPILER-APPLICABLE-P-LAMBDA returns true.
+
+- If this POLYMORPH is used for INLINE-ing or STATIC-DISPATCH and if
+  MORE-OPTIMAL-TYPE-LIST or SUBOPTIMAL-NOTE is non-NIL, then emits a
+  OPTIMIZATION-FAILURE-NOTE
+
+** polymorph-apropos-list-type
+    :PROPERTIES:
+    :CUSTOM_ID: polymorph-apropos-list-type
+    :END:
+
+#+BEGIN_SRC lisp
+  Function: (polymorph-apropos-list-type type &key (name NIL namep)
+             (package NIL packagep))
+#+END_SRC
+
+** polymorphic-function
+    :PROPERTIES:
+    :CUSTOM_ID: polymorphic-function
+    :END:
+
+#+BEGIN_SRC lisp
+  Class
+#+END_SRC
+
+*Direct Slots*
+
+*documentation*
+
+#+BEGIN_SRC lisp
+#+END_SRC
+
+** polymorphic-function-type-lists
+    :PROPERTIES:
+    :CUSTOM_ID: polymorphic-function-type-lists
+    :END:
+
+#+BEGIN_SRC lisp
+  Function: (polymorphic-function-type-lists polymorphic-function)
+#+END_SRC
+
+** suboptimal-polymorph-note
+    :PROPERTIES:
+    :CUSTOM_ID: suboptimal-polymorph-note
+    :END:
+
+#+BEGIN_SRC lisp
+  Condition
+#+END_SRC
+
+** undefine-polymorphic-function
+    :PROPERTIES:
+    :CUSTOM_ID: undefine-polymorphic-function
+    :END:
+
+#+BEGIN_SRC lisp
+  Function: (undefine-polymorphic-function name)
+#+END_SRC
+
+Remove the [[#polymorph][polymorph]](-WRAPPER) defined by
+DEFINE-POLYMORPH
+
+** undefpolymorph
+    :PROPERTIES:
+    :CUSTOM_ID: undefpolymorph
+    :END:
+
+#+BEGIN_SRC lisp
+  Function: (undefpolymorph name type-list)
+#+END_SRC
+
+Remove the [[#polymorph][polymorph]] associated with =name= with
+=type-list=
+
+
