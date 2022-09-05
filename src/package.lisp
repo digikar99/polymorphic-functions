@@ -62,6 +62,7 @@
                 #:variable-information
                 #:declaration-information
                 #:define-declaration
+                #-extensible-compound-types
                 #:augment-environment)
   (:export #:define-polymorphic-function
            #:undefine-polymorphic-function
