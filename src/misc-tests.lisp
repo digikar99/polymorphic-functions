@@ -6,7 +6,7 @@
   #+sbcl
   `(defun ,name ,lambda-list ,@body)
   #-sbcl
-  `(compile ',name (lambda ,lambda-list ,@body)))
+  `(compile ',name '(lambda ,lambda-list ,@body)))
 
 (defmacro ignoring-error-output (&body body)
   `(let ((*error-output* (make-string-output-stream))
@@ -460,9 +460,16 @@
   #+(or sbcl ccl)
   (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller 2 3))))
   ;; On SBCL this passed after incorporating compiler macro inside deftransform
-  ;; > Don't ask me why it works
-  #+(or sbcl ccl)
+  ;;   > Don't ask me why it works
+  ;; On CCL, this works in the absence of EXTENSIBLE-COMPOUND-TYPES
+  ;; because EXTENSIBLE-COMPOUND-TYPES wraps around CL-ENVIRONMENTS-CL,
+  ;; which does not seem to propagate the declarations. FIXME: Debug this.
+  #+(or sbcl
+        (and ccl (not extensible-compound-types)))
   (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller-direct 2 3))))
+  #-(or sbcl
+        (and ccl extensible-compound-types))
+  (is (equalp '(5 3) (eval `(setf-foo-caller-direct 2 3))))
   (fmakunbound 'setf-foo-caller)
   (fmakunbound 'setf-foo-caller-direct)
   (undefine-polymorphic-function '(setf foo)))
@@ -538,7 +545,7 @@
                   (defpolymorph (outer :inline t) ((a array)) t
                     (inner a))))
          (is (eq 'string (funcall (compile nil
-                                           `(cl:lambda (a)
+                                           `(lambda (a)
                                               (declare (optimize speed (debug 1))
                                                        (type string a))
                                               (outer a)))
@@ -549,7 +556,7 @@
                     (declare (type array b))
                     (inner b))))
          (is (eq 'array (funcall (compile nil
-                                          `(cl:lambda (a)
+                                          `(lambda (a)
                                              (declare (optimize speed (debug 1))
                                                       (type string a))
                                              (outer a)))
@@ -560,8 +567,8 @@
                     (declare (type-like a b))
                     (inner b))))
          (is (eq 'string (funcall (compile nil
-                                           `(cl:lambda (a)
-                                              (declare (optimize speed)
+                                           '(lambda (a)
+                                              (declare (optimize speed (debug 1))
                                                        (type string a))
                                               (outer a)))
                                   "hello"))))
@@ -598,7 +605,7 @@
 
            ;; Compile-time tests
            (5am:is-true  (eval `(funcall (lambda (a b)
-                                           (declare (optimize speed)
+                                           (declare (optimize speed (debug 1))
                                                     (type (simple-array single-float) a)
                                                     (type single-float b))
                                            (foo a b))

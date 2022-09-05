@@ -23,10 +23,11 @@
        (not :travis))
 (def-test performance ()
   (unwind-protect (progn
-                    (eval `(locally (declare (optimize (debug 1) (speed 1)))
-                             (define-polymorphic-function my= (a b) :overwrite t)
-                             (defpolymorph my= ((a string) (b string)) t
-                               (string= a b))))
+                    (ignoring-error-output
+                      (eval `(locally (declare (optimize (debug 1) (speed 1)))
+                               (define-polymorphic-function my= (a b) :overwrite t)
+                               (defpolymorph my= ((a string) (b string)) t
+                                 (string= a b)))))
 
                     (eval
 
@@ -46,7 +47,7 @@
                                             "Expected: ~D~%Actual:   ~D~%%diff:    ~D%"
                                             ,expected-sym ,actual-sym ,percent-diff)))))
 
-                          #-extensible-compound-types
+                          #-extensible-compound-types ; too slow
                           (expect-time (#+sbcl 5.1
                                         #+ccl  2.47)
                                        (locally (declare (optimize (debug 1) (speed 1)))

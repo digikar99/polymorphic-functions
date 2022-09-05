@@ -407,8 +407,13 @@ If it exists, the second value is T and the first value is a possibly empty
 
 #-extensible-compound-types
 (define-declaration type-like (vars env)
-  ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
-  (destructuring-bind (original &rest similar) #+ccl (rest vars) #-ccl vars
+  ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined.
+  ;; On CCL, args starts with DECL-NAME while not using CL-ENVIRONMENTS-CL
+  ;; Other times, it starts with the appropriate args
+  (destructuring-bind (original &rest similar) (optima:match vars
+                                                 ((list* 'type-like vars)
+                                                  vars)
+                                                 (_ vars))
     (values :variable
             (loop :with type
                     := (rest (assoc 'cl:type
@@ -419,7 +424,12 @@ If it exists, the second value is T and the first value is a possibly empty
 #+extensible-compound-types
 (define-declaration type-like (vars env)
   ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
-  (destructuring-bind (original &rest similar) #+ccl (rest vars) #-ccl vars
+  ;; On CCL, args starts with DECL-NAME while not using CL-ENVIRONMENTS-CL
+  ;; Other times, it starts with the appropriate args
+  (destructuring-bind (original &rest similar) (optima:match vars
+                                                 ((list* 'type-like vars)
+                                                  vars)
+                                                 (_ vars))
     (values :variable
             (loop :with type
                     := (rest (assoc 'extensible-compound-types:extype
