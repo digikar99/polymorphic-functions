@@ -150,7 +150,9 @@
                                       ((list* name _)
                                        (cond ((listp name)
                                               form)
-                                             ((compiler-macro-function name env)
+                                             ((and (compiler-macro-function name env)
+                                                   (not (eq (find-package :cl)
+                                                            (symbol-package name))))
                                               (funcall (compiler-macro-function name env)
                                                        form
                                                        env))

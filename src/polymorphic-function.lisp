@@ -408,7 +408,7 @@ If it exists, the second value is T and the first value is a possibly empty
 #-extensible-compound-types
 (define-declaration type-like (vars env)
   ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
-  (destructuring-bind (original &rest similar) vars
+  (destructuring-bind (original &rest similar) #+ccl (rest vars) #-ccl vars
     (values :variable
             (loop :with type
                     := (rest (assoc 'cl:type
@@ -419,7 +419,7 @@ If it exists, the second value is T and the first value is a possibly empty
 #+extensible-compound-types
 (define-declaration type-like (vars env)
   ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
-  (destructuring-bind (original &rest similar) vars
+  (destructuring-bind (original &rest similar) #+ccl (rest vars) #-ccl vars
     (values :variable
             (loop :with type
                     := (rest (assoc 'extensible-compound-types:extype
