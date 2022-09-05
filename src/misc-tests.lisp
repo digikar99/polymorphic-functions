@@ -464,12 +464,11 @@
   ;; On CCL, this works in the absence of EXTENSIBLE-COMPOUND-TYPES
   ;; because EXTENSIBLE-COMPOUND-TYPES wraps around CL-ENVIRONMENTS-CL,
   ;; which does not seem to propagate the declarations. FIXME: Debug this.
-  #+(or sbcl
-        (and ccl (not extensible-compound-types)))
-  (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller-direct 2 3))))
-  #-(or sbcl
-        (and ccl extensible-compound-types))
-  (is (equalp '(5 3) (eval `(setf-foo-caller-direct 2 3))))
+  (when (featurep `(:or :sbcl
+                        (:and :ccl (:not :extensible-compound-types))))
+    (is (equalp '(compiler-macro 5 3) (eval `(setf-foo-caller-direct 2 3)))))
+  (when (featurep `(:and :ccl :extensible-compound-types))
+    (is (equalp '(5 3) (eval `(setf-foo-caller-direct 2 3)))))
   (fmakunbound 'setf-foo-caller)
   (fmakunbound 'setf-foo-caller-direct)
   (undefine-polymorphic-function '(setf foo)))
