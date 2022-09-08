@@ -3,9 +3,6 @@
 (defvar *deparameterizer-alist* nil
   "(Re)Bound in PF-COMPILER-MACRO, modified by ENHANCED-LAMBDA-DECLARATIONS.")
 
-(defvar *type-parameter-ignored-list* nil
-  "(Re)Bound in PF-COMPILER-MACRO, modified by ENHANCED-LAMBDA-DECLARATIONS
-to avoid multiple IGNORABLE declarations.")
 ;; FIXME: Clarify the above usage
 
 (defun deparameterize-type (type-specifier)

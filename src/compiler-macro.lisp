@@ -121,7 +121,6 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                            (notes nil)
                            ;; The source of compile-time subtype-polymorphism
                            (*deparameterizer-alist* (copy-alist *deparameterizer-alist*))
-                           (*type-parameter-ignored-list* (copy-list *type-parameter-ignored-list*))
                            (lambda-with-enhanced-declarations
                              (destructuring-bind (lambda args declarations
                                                    more-decl (block block-name &body body))
