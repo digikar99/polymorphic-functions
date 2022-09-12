@@ -19,6 +19,7 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
   (return-type)
   (type-list nil)
   (lambda-list-type nil)
+  (typed-lambda-list nil)
   (effective-type-list nil)
   (more-optimal-type-list nil)
   (suboptimal-note nil)

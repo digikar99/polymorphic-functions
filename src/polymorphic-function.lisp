@@ -205,6 +205,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
                                      :inline-p         inline-p
                                      :type-list        type-list
                                      :return-type      return-type
+                                     :typed-lambda-list typed-lambda-list
                                      :lambda-list-type lambda-list-type
                                      :effective-type-list effective-type-list
                                      :more-optimal-type-list more-optimal-type-list
