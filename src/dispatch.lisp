@@ -64,22 +64,27 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
 (defun extract-declarations (body &key documentation)
   "Returns two values: DECLARATIONS and remaining BODY
 If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BODY and DOC-STRING"
-  (multiple-value-bind (declarations body)
-      (cond ((null body)
-             (values `(declare) nil))
-            ((and (listp (car body))
-                  (eq 'declare (caar body)))
-             (multiple-value-bind (declarations rest-body) (extract-declarations (rest body))
-               (values (nconc (cons 'declare (cdar body))
-                              (rest declarations))
-                       rest-body)))
-            (t
-             (values `(declare) body)))
-    (if documentation
-        (if (stringp (first body))
-            (values declarations (rest body) (first body))
-            (values declarations body nil))
-        (values declarations body))))
+  (labels ((%extract-declarations (body)
+             (cond ((null body)
+                    (values `(declare) nil))
+                   ((and (listp (car body))
+                         (eq 'declare (caar body)))
+                    (multiple-value-bind (declarations rest-body)
+                        (%extract-declarations (rest body))
+                      (values (nconc (cons 'declare (cdar body))
+                                     (rest declarations))
+                              rest-body)))
+                   (t
+                    (values `(declare) body)))))
+    (multiple-value-bind (declarations rest-body)
+        (if (and documentation
+                 (stringp (first body)))
+            (%extract-declarations (rest body))
+            (%extract-declarations body))
+      (if (and documentation
+               (stringp (first body)))
+          (values declarations rest-body (first body))
+          (values declarations rest-body)))))
 
 (defun ensure-unambiguous-call (name type-list effective-type-list)
   (loop :for polymorph :in (polymorphic-function-polymorphs (fdefinition name))
