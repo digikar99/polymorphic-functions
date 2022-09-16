@@ -155,6 +155,15 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                                  augmented-env)))))
                       ;; MUFFLE because they would already have been reported!
                       (mapc #'compiler-macro-notes:muffle notes)
+                      (let ((enhanced-return-type
+                              (lastcar
+                               (cl-form-types:form-type macroexpanded-form
+                                                        augmented-env))))
+                        (setq return-type
+                              (if (subtypep enhanced-return-type return-type)
+                                  enhanced-return-type
+                                  (cl-form-types::combine-values-types
+                                   'and return-type enhanced-return-type))))
                       ;; Some macroexpand-all can produce a (function (lambda ...)) from (lambda ...)
                       ;; Some others do not
                       (if (eq 'cl:function (first macroexpanded-form))
