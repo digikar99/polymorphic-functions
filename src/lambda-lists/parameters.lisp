@@ -442,36 +442,39 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
 
 (defun compiler-applicable-p-lambda-body (polymorph-parameters)
 
-  ;; TODO: Handle parametric-types
-
-  (let ((type-parameters-alist ()))
+  (let ((type-parameters-alist ())
+        (may-be-null-forms ()))
 
     (with-gensyms (form form-type)
       (flet ((app-p-form (param pp)
                (let ((type (pp-value-effective-type pp))
                      (type-parameters (pp-type-parameters pp)))
-                 (if (and (null type-parameters)
-                          (type= t type))
-                     t
-                     `(let ((,form      (car ,param))
-                            (,form-type (cdr ,param)))
-                        (cond ((type= t ,form-type)
-                               (signal 'form-type-failure :form ,form))
-                              (t
-                               ,(if type-parameters
-                                    (loop :for type-parameter :in type-parameters
-                                          :do (with-slots (name
-                                                           compile-time-deparameterizer-lambda-body)
-                                                  type-parameter
-                                                (push `(,compile-time-deparameterizer-lambda-body
-                                                        (cdr ,param))
-                                                      (assoc-value type-parameters-alist name)))
-                                          :finally (return t))
-                                    `(if ,form-type ; FORM is supplied
-                                         (subtypep ,form-type ',type)
-                                         ;; If FORM is not supplied, then PP-VALUE-EFFECTIVE-TYPE
-                                         ;; determines whether polymorph is applicable
-                                         ,(subtypep 'null type))))))))))
+                 (cond ((and (null type-parameters)
+                             (type= t type))
+                        t)
+                       (t
+                        (let ((deparameterized-type (deparameterize-type type)))
+                          (when type-parameters
+                            (loop :for type-parameter :in type-parameters
+                                  :do (with-slots (name
+                                                   compile-time-deparameterizer-lambda-body)
+                                          type-parameter
+                                        (push `(,compile-time-deparameterizer-lambda-body
+                                                (cdr ,param))
+                                              (assoc-value type-parameters-alist name)))
+                                  :finally (return t)))
+                          (when (subtypep 'null deparameterized-type)
+                            (pushnew `(cdr ,param) may-be-null-forms :test #'equal))
+                          `(let ((,form      (car ,param))
+                                 (,form-type (cdr ,param)))
+                             (cond ((type= t ,form-type)
+                                    (signal 'form-type-failure :form ,form))
+                                   (t
+                                    (if ,form-type ; FORM is supplied
+                                        (subtypep ,form-type ',deparameterized-type)
+                                        ;; If FORM is not supplied, then PP-VALUE-EFFECTIVE-TYPE
+                                        ;; determines whether polymorph is applicable
+                                        ,(subtypep 'null deparameterized-type)))))))))))
 
         (let* ((lambda-list
                  (map-polymorph-parameters polymorph-parameters
@@ -533,11 +536,28 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                                                (list (first elt))))
                                            (set-difference lambda-list lambda-list-keywords))))
              (and ,@(set-difference lambda-body-forms lambda-list-keywords)
-                  ,@(loop :for (param . forms) :in type-parameters-alist
-                          :collect `(and ,@forms
-                                         ,@(loop :for form :in (rest forms)
-                                                 :collect `(equalp ,(first forms)
-                                                                   ,form)))))))))))
+                  ,@(loop :for (type-param . forms) :in type-parameters-alist
+                          :collect
+                          (let* ((non-null-form-pos (position-if-not (lambda (form)
+                                                                       (member form
+                                                                               may-be-null-forms
+                                                                               :test #'equal))
+                                                                     forms :key #'second))
+                                 (non-null-form (when non-null-form-pos
+                                                  (nth non-null-form-pos forms))))
+                            (if (null non-null-form-pos)
+                                'cl:t
+                                `(and ,@(loop :for pos :from 0
+                                              :for form :in forms
+                                              :if (/= pos non-null-form-pos)
+                                                :collect (if (member (second form)
+                                                                     may-be-null-forms
+                                                                     :test #'equal)
+                                                             `(or (null ,form)
+                                                                  (equalp ,non-null-form
+                                                                          ,form))
+                                                             `(equalp ,non-null-form
+                                                                      ,form))))))))))))))
 
 
 (defun run-time-applicable-p-form (polymorph-parameters)
