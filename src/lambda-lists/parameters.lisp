@@ -577,17 +577,20 @@ COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
                                                                           may-be-null-forms-in-pf
                                                                           :test #'equal))
                                                                 form-specs :key #'car))
-                             (non-null-form (cdr (nth non-null-form-pos form-specs))))
-                        `(and ,@(loop :for pos :from 0
-                                      :for (form-in-pf . form) :in form-specs
-                                      :if (/= pos non-null-form-pos)
-                                        :collect (if (member form-in-pf may-be-null-forms-in-pf
-                                                             :test #'equal)
-                                                     `(or (null ,form-in-pf)
-                                                          (equalp ,non-null-form
-                                                                  ,form))
-                                                     `(equalp ,non-null-form
-                                                              ,form)))))))))))
+                             (non-null-form (when non-null-form-pos
+                                              (cdr (nth non-null-form-pos form-specs)))))
+                        (if (null non-null-form-pos)
+                            'cl:t
+                            `(and ,@(loop :for pos :from 0
+                                          :for (form-in-pf . form) :in form-specs
+                                          :if (/= pos non-null-form-pos)
+                                            :collect (if (member form-in-pf may-be-null-forms-in-pf
+                                                                 :test #'equal)
+                                                         `(or (null ,form-in-pf)
+                                                              (equalp ,non-null-form
+                                                                      ,form))
+                                                         `(equalp ,non-null-form
+                                                                  ,form))))))))))))
 
 
 
