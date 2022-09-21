@@ -26,7 +26,7 @@
                (= a b))
              (defpolymorph-compiler-macro my= (number number) (&whole form a b)
                (declare (ignore b))
-               (if (= 0 a)
+               (if (and (numberp a) (= 0 a))
                    ''zero
                    form))
              ;; Fix ECL: 21.2.1 does not respect
