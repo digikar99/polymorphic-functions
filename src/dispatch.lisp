@@ -256,20 +256,20 @@ in the lambda list; the consequences of mutation are undefined."
                                    ,param-list
                                  ,lambda-declarations
                                  ,declarations
-                                 (block ,block-name
-                                   ,(multiple-value-bind (form form-return-type)
-                                        (ensure-type-form return-type
-                                                          `(locally ,@body)
-                                                          (augment-environment
-                                                           env
-                                                           :variable (remove-if
-                                                                      #'null
-                                                                      (mapcar #'third
-                                                                              (rest lambda-declarations)))
-                                                           :declare (rest lambda-declarations)))
-                                      (unless (parametric-type-specifier-p return-type)
-                                        (setq return-type form-return-type))
-                                      form))))
+                                 ,(multiple-value-bind (form form-return-type)
+                                      (ensure-type-form return-type
+                                                        `(block ,block-name
+                                                           (locally ,@body))
+                                                        (augment-environment
+                                                         env
+                                                         :variable (remove-if
+                                                                    #'null
+                                                                    (mapcar #'third
+                                                                            (rest lambda-declarations)))
+                                                         :declare (rest lambda-declarations)))
+                                    (unless (parametric-type-specifier-p return-type)
+                                      (setq return-type form-return-type))
+                                    form)))
                  ;; Currently we need INLINE-LAMBDA-BODY and the checks in M-V-B
                  ;; below for DEFTRANSFORM; as well as to avoid the ASSERTs in
                  ;; pf-compiler-macro emitted by ENSURE-TYPE-FORM used for LAMBDA-BODY
