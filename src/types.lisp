@@ -1,5 +1,46 @@
 (in-package polymorphic-functions)
 
+(defstruct polymorph-parameters
+  required
+  optional
+  rest
+  keyword
+  min-args
+  max-args
+  validator-form)
+
+(defstruct (polymorph-parameter (:conc-name pp-))
+  "
+LOCAL-NAME : Name inside the body of the polymorph
+FORM-IN-PF : The form which yields the parameter's value inside the lexical
+  environment of the polymorphic-function
+
+Note: Only LOCAL-NAME and FORM-IN-PF are relevant for &REST parameter
+"
+  local-name
+  form-in-pf
+  value-type
+  default-value-form
+  supplied-p-name
+  type-parameters
+  value-effective-type)
+
+(defstruct type-parameter
+  "
+RUN-TIME-DEPARAMETERIZERS-LAMBDA-BODY :
+  A lambda *expression*, which when compiled produces a one argument function.
+  The function is called at run-time with the value bound to the parameter
+  (not type-parameter) to obtain the value of the TYPE-PARAMETER.
+COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
+  A lambda *expression*, which when compiled produces a one argument function.
+  The function is called at compile-time with the type of the value bound
+  to the parameter (not type-parameter) to obtain the value of the TYPE-PARAMETER.
+"
+  name
+  run-time-deparameterizer-lambda-body
+  compile-time-deparameterizer-lambda
+  compile-time-deparameterizer-lambda-body)
+
 (defstruct polymorph
   "
 - If RUNTIME-APPLICABLE-P-FORM returns true when evaluated inside the lexical environment
@@ -137,3 +178,32 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
                 (sort (copy-list (subseq type-list (1+ key-position))) #'string< :key #'first))
         type-list)))
 
+(define-constant +lambda-list-types+
+    (list 'required
+          'required-optional
+          'required-key
+          'rest)
+  :test #'equalp)
+
+(defun lambda-list-type-p (object)
+  "Checks whhether the OBJECT is in +LAMBDA-LIST-TYPES+"
+  (member object +lambda-list-types+))
+
+(deftype lambda-list-type () `(satisfies lambda-list-type-p))
+
+(defun untyped-lambda-list-p (lambda-list)
+  (ignore-errors (lambda-list-type lambda-list)))
+(defun typed-lambda-list-p (lambda-list)
+  (ignore-errors (lambda-list-type lambda-list :typed t)))
+(deftype untyped-lambda-list ()
+  "Examples:
+  (a b)
+  (a b &optional c)
+Non-examples:
+  ((a string))"
+  `(satisfies untyped-lambda-list-p))
+(deftype typed-lambda-list ()
+  "Examples:
+  ((a integer) (b integer))
+  ((a integer) &optional ((b integer) 0 b-supplied-p))"
+  `(satisfies typed-lambda-list-p))

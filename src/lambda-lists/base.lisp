@@ -11,19 +11,6 @@
 
 ;; THE BASICS ==================================================================
 
-(define-constant +lambda-list-types+
-    (list 'required
-          'required-optional
-          'required-key
-          'rest)
-  :test #'equalp)
-
-(defun lambda-list-type-p (object)
-  "Checks whhether the OBJECT is in +LAMBDA-LIST-TYPES+"
-  (member object +lambda-list-types+))
-
-(deftype lambda-list-type () `(satisfies lambda-list-type-p))
-
 (5am:def-suite lambda-list :in :polymorphic-functions)
 
 (defun valid-parameter-name-p (name)
@@ -100,23 +87,6 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
     (lambda-list-type  #.+lambda-list-type-doc+)
     (%lambda-list-type "Checks whether LAMBDA-LIST is of type POTENTIAL-LAMBDA-LIST-TYPE")
   *potential-type*)
-
-(defun untyped-lambda-list-p (lambda-list)
-  (ignore-errors (lambda-list-type lambda-list)))
-(defun typed-lambda-list-p (lambda-list)
-  (ignore-errors (lambda-list-type lambda-list :typed t)))
-(deftype untyped-lambda-list ()
-  "Examples:
-  (a b)
-  (a b &optional c)
-Non-examples:
-  ((a string))"
-  `(satisfies untyped-lambda-list-p))
-(deftype typed-lambda-list ()
-  "Examples:
-  ((a integer) (b integer))
-  ((a integer) &optional ((b integer) 0 b-supplied-p))"
-  `(satisfies typed-lambda-list-p))
 
 ;; COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY ====================================
 
@@ -249,6 +219,7 @@ Non-examples:
 ;; FTYPE-FOR-STATIC-DISPATCH ================================================
 
 (defun ftype-for-static-dispatch (static-dispatch-name effective-type-list return-type env)
+  (declare (ignorable env))
   `(ftype (function ,(let ((type-list (loop :with state := :required
                                             :for type-spec :in effective-type-list
                                             :with processed-type-spec := nil

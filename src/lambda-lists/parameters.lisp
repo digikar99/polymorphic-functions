@@ -121,47 +121,6 @@
   (is (equalp '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
   (is (equalp '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
 
-(defstruct polymorph-parameters
-  required
-  optional
-  rest
-  keyword
-  min-args
-  max-args
-  validator-form)
-
-(defstruct (polymorph-parameter (:conc-name pp-))
-  "
-LOCAL-NAME : Name inside the body of the polymorph
-FORM-IN-PF : The form which yields the parameter's value inside the lexical
-  environment of the polymorphic-function
-
-Note: Only LOCAL-NAME and FORM-IN-PF are relevant for &REST parameter
-"
-  local-name
-  form-in-pf
-  value-type
-  default-value-form
-  supplied-p-name
-  type-parameters
-  value-effective-type)
-
-(defstruct type-parameter
-  "
-RUN-TIME-DEPARAMETERIZERS-LAMBDA-BODY :
-  A lambda *expression*, which when compiled produces a one argument function.
-  The function is called at run-time with the value bound to the parameter
-  (not type-parameter) to obtain the value of the TYPE-PARAMETER.
-COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
-  A lambda *expression*, which when compiled produces a one argument function.
-  The function is called at compile-time with the type of the value bound
-  to the parameter (not type-parameter) to obtain the value of the TYPE-PARAMETER.
-"
-  name
-  run-time-deparameterizer-lambda-body
-  compile-time-deparameterizer-lambda
-  compile-time-deparameterizer-lambda-body)
-
 (declaim (ftype (function (list list) polymorph-parameters)
                 make-polymorph-parameters-from-lambda-lists))
 (defun make-polymorph-parameters-from-lambda-lists (polymorphic-function-lambda-list
