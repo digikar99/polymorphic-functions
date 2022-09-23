@@ -1,6 +1,6 @@
 (asdf:defsystem "polymorphic-functions"
   :license "MIT"
-  :version "0.2.3" ; beta
+  :version "0.2.4" ; beta
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
@@ -53,6 +53,7 @@
                                                                 "conditions"
                                                                 "compiler-macro"
                                                                 #+sbcl "sbcl-transform"))
+               (:file "specializing"               :depends-on ("dispatch"))
                (:file "misc-tests"                 :depends-on ("dispatch"))
                (:file "benchmark"                  :depends-on ("misc-tests")))
   :perform (test-op (o c)

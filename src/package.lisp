@@ -93,6 +93,9 @@
            #:suboptimal-polymorph-note
            #:more-optimal-polymorph-inapplicable
 
+           #:specializing
+           #:specializing-type-of
+
            #:pflet
            #:pflet*))
 
