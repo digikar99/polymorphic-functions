@@ -17,7 +17,7 @@
 
 The core goal of this library is to provide a function type to dispatch on types rather than classes, for dispatching on specialized array types such as =(simple-array single-float)= or =(simple-array double-float)= or =(simple-array (signed-byte 32))= in [[https://github.com/digikar99/numericals][numericals]]. (See [[#basic-usage][Basic Usage]].)
 
-Support for optional and keyword arguments, as well as heterogeneous lambda lists is also provided. Runtime dispatch is the default, compile-time dispatch is provided through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]], and takes place when the call-site is compiled with =(declare (optimize speed (debug 1)))= declaration in place. The newly added (= unstable) [[specializing]]
+Support for optional and keyword arguments, as well as heterogeneous lambda lists is also provided. Runtime dispatch is the default, compile-time dispatch is provided through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]], and takes place when the call-site is compiled with =(declare (optimize speed (debug 1)))= declaration in place. The newly added (= unstable) [[#specializing][specializing]]
 macro also provides runtime numcl/julia-like JAOT dispatch analogous to [[https://github.com/numcl/specialized-function][specialized-function]].
 
 If you'd like to use this library on your favourite implementation, push its developers to provide support for CLTL2. [[https://github.com/kaveh808/kons-9/discussions/41#discussioncomment-3534558][Without CLTL2, there isn't much hope for a numerical computing library in Common Lisp!]] Currently, only SBCL provides a good-enough support for CLTL2, and that too has bugs; cl-environments has to work hard to provide support on other implementations. Continuous Integration through Github Actions tests this library on SBCL, CCL, and ECL. 
@@ -69,9 +69,9 @@ See the [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-while-
 - [[#acknowledgements][Acknowledgements]]
 - [[#api-reference][API Reference]]
   - [[#deparameterize-type][%deparameterize-type]]
-  - [[#compiler-macro-expanding-p][compiler-macro-expanding-p]]
-  - [[#disable-static-dispatch][disable-static-dispatch]]
-  - [[#parametric-type-symbol-predicates][parametric-type-symbol-predicates]]
+  - [[#compiler-macro-expanding-p][*compiler-macro-expanding-p*]]
+  - [[#disable-static-dispatch][*disable-static-dispatch*]]
+  - [[#parametric-type-symbol-predicates][*parametric-type-symbol-predicates*]]
   - [[#define-polymorphic-function][define-polymorphic-function]]
   - [[#defpolymorph][defpolymorph]]
   - [[#defpolymorph-compiler-macro][defpolymorph-compiler-macro]]
@@ -90,9 +90,12 @@ See the [[#thank-you-so-much-are-there-any-pitfalls-i-need-to-be-aware-of-while-
   - [[#polymorph-apropos-list-type][polymorph-apropos-list-type]]
   - [[#polymorphic-function][polymorphic-function]]
   - [[#polymorphic-function-type-lists][polymorphic-function-type-lists]]
+  - [[#specializing][specializing]]
+  - [[#specializing-type-of][specializing-type-of]]
   - [[#suboptimal-polymorph-note][suboptimal-polymorph-note]]
   - [[#undefine-polymorphic-function][undefine-polymorphic-function]]
   - [[#undefpolymorph][undefpolymorph]]
+:END:
 
 * Usage
    :PROPERTIES:
