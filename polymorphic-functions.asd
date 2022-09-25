@@ -12,7 +12,8 @@
                "cl-form-types"
                "introspect-environment"
                "optima"
-               "split-sequence")
+               "split-sequence"
+               "trivial-garbage")
   :pathname #P"src/"
   :components ((:file "pre-package")
                (:file "package"                    :depends-on ("pre-package"))
