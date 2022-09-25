@@ -17,7 +17,8 @@
 
 The core goal of this library is to provide a function type to dispatch on types rather than classes, for dispatching on specialized array types such as =(simple-array single-float)= or =(simple-array double-float)= or =(simple-array (signed-byte 32))= in [[https://github.com/digikar99/numericals][numericals]]. (See [[#basic-usage][Basic Usage]].)
 
-Support for optional and keyword arguments, as well as heterogeneous lambda lists is also provided. Runtime dispatch is the default, compile-time dispatch is provided through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]], and takes place when the call-site is compiled with =(declare (optimize speed (debug 1)))= declaration in place. 
+Support for optional and keyword arguments, as well as heterogeneous lambda lists is also provided. Runtime dispatch is the default, compile-time dispatch is provided through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]], and takes place when the call-site is compiled with =(declare (optimize speed (debug 1)))= declaration in place. The newly added (= unstable) [[specializing]]
+macro also provides runtime numcl/julia-like JAOT dispatch analogous to [[https://github.com/numcl/specialized-function][specialized-function]].
 
 If you'd like to use this library on your favourite implementation, push its developers to provide support for CLTL2. [[https://github.com/kaveh808/kons-9/discussions/41#discussioncomment-3534558][Without CLTL2, there isn't much hope for a numerical computing library in Common Lisp!]] Currently, only SBCL provides a good-enough support for CLTL2, and that too has bugs; cl-environments has to work hard to provide support on other implementations. Continuous Integration through Github Actions tests this library on SBCL, CCL, and ECL. 
 
@@ -274,7 +275,7 @@ The library was primarily made to dispatch on specialized-arrays for use in [[ht
 TODO: Answer What's wrong with typecase? if anything other than non-extensibility.
 
 The closest pre-existing library to polymorphic-functions at the time of writing is
-- [[https://github.com/numcl/specialized-function][specialized-function]]: sf has a JIT philosophy, while pf has a AOT philosophy
+- [[https://github.com/numcl/specialized-function][specialized-function]]: sf has a JIT philosophy, while pf has a default AOT philosophy
 - [[https://github.com/cosmos72/cl-parametric-types][cl-parametric-types]]: I'm not a fan of the calling syntax for cl-parametric-types
 
 *** Wait, doesn't pf's use of AOT imply 2500 specialized variants as sf says?
@@ -297,7 +298,7 @@ Thanks to [[https://en.wikipedia.org/wiki/Subtyping][Subtype Polymorphism]], pf'
 
   (defun sf-dot-original (a b c)
     (declare (optimize (speed 3) (debug 0)))
-    (specialized-function:specializing (a b c) ()
+    (specializing (a b c)
       (loop
         for i below (array-total-size a)
         do (incf c (* (aref a i) (aref b i))))
@@ -407,13 +408,13 @@ One observation that might sound useful is the following: the faster the code, t
 
 #+BEGIN_SRC lisp
   (defun sf-pf-dot-original-100 (a b c)
-    (specialized-function:specializing (a b c) ()
+    (specializing (a b c)
       (declare (optimize speed))
       (loop repeat 100 do (pf-dot-original a b c))
       c))
 
   (defun sf-pf-dot-original-100000 (a b c)
-    (specialized-function:specializing (a b c) ()
+    (specializing (a b c)
       (declare (optimize speed))
       (loop repeat 100000 do (pf-dot-original a b c))
       c))
@@ -674,20 +675,21 @@ Yes, there are quite a few:
   - CLTL2 environment API: this is used through [[https://github.com/alex-gutev/cl-environments][cl-environments]] (and [[https://github.com/Bike/introspect-environment][introspect-environments]])
     - For *form-type-inference*, polymorphic-functions depends on cl-form-types. Thus, this works as long as cl-form-types succeeds, and [[https://github.com/alex-gutev/cl-form-types][cl-form-types]] does get pretty extensive. In cases wherein it does fail, we also rely on =sb-c:deftransform= on SBCL.
   - [[https://github.com/pcostanza/closer-mop][closer-mop]]; if someone needs a reduced feature version within the bounds of ANSI standard, please raise an issue!
-    - A [[https://github.com/Clozure/ccl/pull/369][*bug on CCL*]] may not let PF work as correctly on CCL; subjectively dirty workarounds are possible until it gets fixed.
+    - A [[https://github.com/Clozure/ccl/pull/369][*bug on CCL*]] may not let PF work as correctly on CCL.
   - [[https://github.com/s-expressionists/ctype][ctype]]: =typexpand= functionality and =polymorphic-functions.extended-types= package
     - A =polymorphic-functions.extended-types= package (not system!) is also provided based on [[https://github.com/s-expressionists/ctype][ctype]]. This allows one to extend the CL type system to define types beyond what =cl:deftype= can do to some extent. While these *cannot be used inside an arbitrary CL form* with =cl:declare=, these can be used in the type lists of polymorphs. See [[file:src/extended-types/type=.lisp]] for an example put to use in [[https://github.com/digikar99/trivial-coerce][trivial-coerce]].
-- The variables used in the *parameters of the polymorphs should be treated as read-only variables*. This is important for inlining with subtype polymorphism, because inlining involves upgrading the declaration of the parameters to the type of the argument declared at the call site, and this type can be more specific than the types of the parameters specified during the compilation of the polymorph itself.
+    - A cleaner alternative might be [[https://github.com/digikar99/extensible-compound-types][extensible-compound-types]], but that itself depends on CLTL2.
+- The variables used in the *parameters of the polymorphs should be treated as read-only variables*. This is important for inlining with subtype polymorphism, because inlining not only involves emitting the =(lambda ...)= form at the call-site, but also involves propagating the type declarations of the arguments to the parameters inside the lambda. Such inlining and type-declaration propagation occurs only when the declared/derived types of the arguments are subtypes of the parameter-types of the polymorph under consideration. But because the type-declarations of the arguments can be subtypes of the types that were declared while defining the polymorph, mutating the parameter bindings may lead to bindings that do not respect the propagated types. Thus, to err on the side of caution and avoid unexpected errors, the polymorph's parameters should be treated as read-only variables. Type declaration propagation essentially supercharges common lisp's compiler macros, since they now have access to type declaration at compiler macro expansion time itself!
 - Static dispatch relies on =policy-quality= working as expected, and compiler-macros being called. As a result, it may not work on all implementations.
 - Some implementations produce interpreted functions some times while compiled functions other times; and accordingly differ if or not compiler-macros are called.
 - Currently *inlining uses the lexical environment of the call-site*
   rather than the definition-site as is the usual case. To work around
   this, users should avoid shadowing global lexical elements.
-- Parametric-polymorphism is in a very limited sense. See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]] for parametric-types.
-- Avoid using =&rest= lambda-lists if you are aiming for stability. The algorithms for heterogeneous-type-lists methods for specialization and ambiguity detection implemented at file:src/lambda-lists/rest.lisp are non-trivial; PRs with more simplistic algorithms would be much welcome :D!
-- This library is not meant to compete against [[https://github.com/coalton-lang/coalton/][Coalton]]; because safety-wise, CLHS leaves it unspecified about what happens when the type declared at compile time (using =declare= or =the=) differs from the actual runtime type of the form or variable, compile time safety only exists on implementations that already provide it, and that too to a lesser extent that a fully static language. But on other implementations this is non-existent. However, an effort is certainly made to use the derived/declared types at the polymorph boundaries when compiled with =(debug 3)= or =(safety 3)= to ensure that the runtime types match these declared types, independent of the implementation support.
+- Parametric-polymorphism is in a very limited sense. See [[https://www.reddit.com/r/lisp/comments/qmrycl/comment/hjd3rkc/?utm_source=share&utm_medium=web2x&context=3][the discussion here]] for parametric-types. Even then, it can be a treat to see [[https://github.com/digikar99/extensible-compound-types#parametric-types][what is possible]].
+- Avoid using =&rest= lambda-lists if you are aiming for stability. The algorithms for heterogeneous-type-lists methods for specialization and ambiguity detection implemented at file:src/lambda-lists/rest.lisp are fairly adhoc and non-trivial; PRs with more simplistic algorithms would be much welcome :D!
+- This library is not meant to compete against [[https://github.com/coalton-lang/coalton/][Coalton]]: safety-wise, CLHS leaves it unspecified about what happens when the type declared at compile time (using =declare= or =the=) differs from the actual runtime type of the form or variable, compile time safety only exists on implementations that already provide it, and that too to a lesser extent that a fully static language. But on other implementations this is non-existent. However, an effort is certainly made to use the derived/declared types at the polymorph boundaries when compiled with =(debug 3)= or =(safety 3)= to ensure that the runtime types match these declared types, independent of the implementation support.
 
-*If someone would want a reduced-feature ANSI-compatible library, feel free to raise an issue. However, even with ANSI, one needs =cl:subtypep= working correctly, for instance, on Allegro CL 10.1: =(subtypep `(and (or string number) (or string symbol)) nil)= returns =T T=. CI is run on SBCL and ECL.
+*If someone would want a reduced-feature ANSI-compatible library, feel free to raise an issue. However, even with ANSI, one needs =cl:subtypep= working correctly, for instance, on Allegro CL 10.1: =(subtypep `(and (or string number) (or string symbol)) nil)= returns =T T=, but should be =NIL T=. CI is run on SBCL and ECL.
 
 * Dependencies outside quicklisp
    :PROPERTIES:
@@ -1095,6 +1097,106 @@ information in /DEPARAMETERIZER-ALIST/ to deparameterize types.
 #+BEGIN_SRC lisp
   Function: (polymorphic-function-type-lists polymorphic-function)
 #+END_SRC
+
+** specializing
+    :PROPERTIES:
+    :CUSTOM_ID: specializing
+    :END:
+
+#+BEGIN_SRC lisp
+  Macro: (specializing vars &body body)
+#+END_SRC
+
+Analogous to SPECIALIZED-FUNCTION:SPECIALIZING.
+
+At runtime, compiles and caches a function corresponding to the runtime
+types of =vars=, with =(optimize speed)= declaration. Uses
+[[#specializing-type-of][specializing-type-of]] to avoid
+overspecializing types.
+
+#+BEGIN_SRC lisp
+  POLYMORPHIC-FUNCTIONS> (defun dot-original (a b c)
+                           (declare (optimize (speed 3)))
+                           (loop
+                             for ai across a
+                             for bi across b
+                             do (incf c (* ai bi)))
+                           c)
+  DOT-ORIGINAL
+  POLYMORPHIC-FUNCTIONS> (let ((a (aops:rand* 'single-float 10000))
+                               (b (aops:rand* 'single-float 10000)))
+                           (time (loop repeat 1000 do (dot-original a b 0.0f0))))
+  Evaluation took:
+    0.516 seconds of real time
+    0.515704 seconds of total run time (0.515704 user, 0.000000 system)
+    100.00% CPU
+    1,138,873,226 processor cycles
+    0 bytes consed
+
+  NIL
+  POLYMORPHIC-FUNCTIONS> (defun dot-specialized (a b c)
+                           (specializing (a b c)
+                             (declare (optimize (speed 3)))
+                             (loop
+                               for ai across a
+                               for bi across b
+                               do (incf c (* ai bi)))
+                             c))
+  DOT-SPECIALIZED
+  POLYMORPHIC-FUNCTIONS> (let ((a (aops:rand* 'single-float 10000))
+                               (b (aops:rand* 'single-float 10000)))
+                           (time (loop repeat 1000 do (dot-specialized a b 0.0f0))))
+  Evaluation took:
+    0.076 seconds of real time
+    0.076194 seconds of total run time (0.076194 user, 0.000000 system)
+    100.00% CPU
+    4 forms interpreted
+    27 lambdas converted
+    168,267,912 processor cycles
+    1,502,576 bytes consed
+
+  NIL
+  POLYMORPHIC-FUNCTIONS> (let ((a (aops:rand* 'single-float 10000))
+                               (b (aops:rand* 'single-float 10000)))
+                           (time (loop repeat 1000 do (dot-specialized a b 0.0f0))))
+  Evaluation took:
+    0.080 seconds of real time
+    0.078954 seconds of total run time (0.078954 user, 0.000000 system)
+    98.75% CPU
+    174,478,140 processor cycles
+    0 bytes consed
+
+  NIL
+#+END_SRC
+
+Note that as of this writing, compiling a specialized variant still
+requires at least one runtime dispatch to take place; as such this
+is only useful if the specialized variant offsets the cost of dispatch,
+and may not be useful for wrapping around simple functions such as addition
+of two numbers, but only for more expensive functions such as element-wise
+addition of two 10000-sized vectors.
+
+** specializing-type-of
+    :PROPERTIES:
+    :CUSTOM_ID: specializing-type-of
+    :END:
+
+#+BEGIN_SRC lisp
+  Function: (specializing-type-of object)
+#+END_SRC
+
+A clean wrapper around CL:TYPE-OF to deal with overspecialized types
+returned by CL:TYPE-OF. For instance, often times knowing an array is
+(ARRAY SINGLE-FLOAT) can be enough for optimization, (ARRAY SINGLE-FLOAT
+(2 3 4)) is an overspecialized type in this sense.
+
+Polymorphs:
+- (specializing-type-of SIMPLE-ARRAY)
+- (specializing-type-of ARRAY)
+- (specializing-type-of (SIGNED-BYTE 32))
+- (specializing-type-of FIXNUM)
+- (specializing-type-of ABSTRACT-ARRAY)
+- (specializing-type-of T)
 
 ** suboptimal-polymorph-note
     :PROPERTIES:

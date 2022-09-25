@@ -78,6 +78,72 @@ and the specializations as the CDR.")
 (defvar *specialization-count* 0)
 
 (defmacro specializing (vars &body body)
+  "Analogous to SPECIALIZED-FUNCTION:SPECIALIZING.
+
+At runtime, compiles and caches a function corresponding to the
+runtime types of VARS, with (OPTIMIZE SPEED) declaration.
+Uses SPECIALIZING-TYPE-OF to avoid overspecializing types.
+
+    POLYMORPHIC-FUNCTIONS> (defun dot-original (a b c)
+                             (declare (optimize (speed 3)))
+                             (loop
+                               for ai across a
+                               for bi across b
+                               do (incf c (* ai bi)))
+                             c)
+    DOT-ORIGINAL
+    POLYMORPHIC-FUNCTIONS> (let ((a (aops:rand* 'single-float 10000))
+                                 (b (aops:rand* 'single-float 10000)))
+                             (time (loop repeat 1000 do (dot-original a b 0.0f0))))
+    Evaluation took:
+      0.516 seconds of real time
+      0.515704 seconds of total run time (0.515704 user, 0.000000 system)
+      100.00% CPU
+      1,138,873,226 processor cycles
+      0 bytes consed
+
+    NIL
+    POLYMORPHIC-FUNCTIONS> (defun dot-specialized (a b c)
+                             (specializing (a b c)
+                               (declare (optimize (speed 3)))
+                               (loop
+                                 for ai across a
+                                 for bi across b
+                                 do (incf c (* ai bi)))
+                               c))
+    DOT-SPECIALIZED
+    POLYMORPHIC-FUNCTIONS> (let ((a (aops:rand* 'single-float 10000))
+                                 (b (aops:rand* 'single-float 10000)))
+                             (time (loop repeat 1000 do (dot-specialized a b 0.0f0))))
+    Evaluation took:
+      0.076 seconds of real time
+      0.076194 seconds of total run time (0.076194 user, 0.000000 system)
+      100.00% CPU
+      4 forms interpreted
+      27 lambdas converted
+      168,267,912 processor cycles
+      1,502,576 bytes consed ; runtime compilation overhead on first call
+
+    NIL
+    POLYMORPHIC-FUNCTIONS> (let ((a (aops:rand* 'single-float 10000))
+                                 (b (aops:rand* 'single-float 10000)))
+                             (time (loop repeat 1000 do (dot-specialized a b 0.0f0))))
+    Evaluation took:
+      0.080 seconds of real time
+      0.078954 seconds of total run time (0.078954 user, 0.000000 system)
+      98.75% CPU
+      174,478,140 processor cycles
+      0 bytes consed
+
+    NIL
+
+Note that as of this writing, compiling a specialized variant still
+requires at least one runtime dispatch to take place; as such this
+is only useful if the specialized variant offsets the cost of dispatch,
+and may not be useful for wrapping around simple functions such as addition
+of two numbers, but only for more expensive functions such as element-wise
+addition of two 10000-sized vectors.
+"
   (assert (every #'symbolp vars))
   (let ((specialization-idx *specialization-count*))
     (incf *specialization-count*)
