@@ -23,20 +23,6 @@
   (declare (ignore object))
   '(signed-byte 32))
 
-(defun add-specialization (new-specialization table)
-  "NEW-SPECIALIZATION should be a list of three elements
-    SPECIALIZATION-APPLICABLE-P-LAMBDA SPECIALIZED-LAMBDA TYPE-LIST"
-  (let* ((new-type-list (third new-specialization))
-         (specialization-position
-           (loop :for position :from 0
-                 :for old-specialization :in table
-                 :for old-type-list := (third old-specialization)
-                 :while (type-list-more-specific-p old-type-list new-type-list)
-                 :finally (return position))))
-    (nconc (subseq table 0 specialization-position)
-           (list new-specialization)
-           (subseq table specialization-position))))
-
 (defun add-specialization (new-specialization table &rest arg-values)
   "NEW-SPECIALIZATION should be a list of two elements
      TYPE-LIST SPECIALIZED-LAMBDA"
