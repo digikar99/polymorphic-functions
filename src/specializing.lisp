@@ -69,6 +69,8 @@ and the specializations as the CDR.")
 At runtime, compiles and caches a function corresponding to the
 runtime types of VARS, with (OPTIMIZE SPEED) declaration.
 Uses SPECIALIZING-TYPE-OF to avoid overspecializing types.
+The function is compiled in a null lexical environment, with
+only access to variables specified in VARS.
 
     POLYMORPHIC-FUNCTIONS> (defun dot-original (a b c)
                              (declare (optimize (speed 3)))
