@@ -42,9 +42,9 @@
 (polymorphic-functions.defpackage:defpackage :polymorphic-functions
   (:shadowing-import-exported-symbols :polymorphic-functions.extended-types)
   #+extensible-compound-types
-  (:use :cl-form-types :alexandria :extensible-compound-types-cl)
+  (:use :alexandria :extensible-compound-types-cl)
   #-extensible-compound-types
-  (:use :cl-form-types :alexandria :cl)
+  (:use :alexandria :cl)
   #-extensible-compound-types
   (:import-from :ctype
                 #:ctype
@@ -192,3 +192,20 @@
   ;; Doesn't work great with subtypep
   "Ref: http://www.lispworks.com/documentation/HyperSpec/Body/26_glo_f.htm#function_name"
   `(or symbol (satisfies setf-function-name-p)))
+
+(defun form-type (form env &key (return-default-type t) expand-compiler-macros constant-eql-types)
+  (handler-bind ((cl-form-types:unknown-special-operator
+                   (lambda (c)
+                     (declare (ignore c))
+                     (invoke-restart 'cl-form-types:return-default-type return-default-type))))
+    (cl-form-types:form-type form env
+                             :expand-compiler-macros expand-compiler-macros
+                             :constant-eql-types constant-eql-types)))
+
+(defun nth-form-type (form env
+                      &optional n constant-eql-types expand-compiler-macros (return-default-type t))
+  (handler-bind ((cl-form-types:unknown-special-operator
+                   (lambda (c)
+                     (declare (ignore c))
+                     (invoke-restart 'cl-form-types:return-default-type return-default-type))))
+    (cl-form-types:nth-form-type form env n constant-eql-types expand-compiler-macros)))

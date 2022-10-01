@@ -122,8 +122,9 @@ as well as the type enhanced using TYPE."
          (form-value-list (gensym "FORM-VALUE-LIST"))
          (num-values (gensym "NUM-VALUES"))
 
-         (form-types (let ((may-be-list (cl-form-types:form-type form env
-                                                                 :expand-compiler-macros t)))
+         (form-types (let ((may-be-list (form-type form env
+                                                   :expand-compiler-macros t
+                                                   :constant-eql-types t)))
                        (if (and (listp may-be-list)
                                 (eql 'values (first may-be-list)))
                            (remove '&optional (rest may-be-list))
@@ -232,4 +233,4 @@ as well as the type enhanced using TYPE."
 
         (values-list ,form-value-list))
 
-     (cl-form-types:form-type `(the ,(deparameterize-type type) ,form) env :expand-compiler-macros t))))
+     (form-type `(the ,(deparameterize-type type) ,form) env :expand-compiler-macros t))))
