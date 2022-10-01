@@ -26,7 +26,7 @@ while it gets invoked for standard definitions.
 (defun extend-swank ()
   (eval
    `(defun swank/backend:find-definitions (name)
-      #.(documentation 'swank/backend:find-definitions 'function)
+      #.(documentation 'swank/backend:find-definitions 'cl:function)
       (apply #'append
              (funcall *swank-find-standard-definitions* name)
              (mapcar (lambda (deffn) (funcall deffn name))
