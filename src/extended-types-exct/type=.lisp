@@ -1,6 +1,7 @@
 (in-package :polymorphic-functions.extended-types)
 
-(define-compound-type extensible-compound-types:type= (object type-specifier)
+(define-compound-type (extensible-compound-types:type= :specializing nil)
+    (object type-specifier)
   "Denotes the set of type specifiers that are TYPE= to TYPE-SPECIFIER"
   (and (or (symbolp object)
            (listp   object))

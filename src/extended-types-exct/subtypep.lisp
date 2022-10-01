@@ -1,6 +1,7 @@
 (in-package :polymorphic-functions.extended-types)
 
-(define-compound-type extensible-compound-types:subtypep (symbol-or-list type-specifier)
+(define-compound-type (extensible-compound-types:subtypep :specializing nil)
+    (symbol-or-list type-specifier)
   "Denotes the set of type specifiers that are a SUBTYPE of TYPE-SPECIFIER"
   (and (or (symbolp symbol-or-list)
            (listp   symbol-or-list))
