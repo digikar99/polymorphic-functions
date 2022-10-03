@@ -26,6 +26,45 @@ in this list, returns non-NIL for at least one predicate")
 (deftype parametric-type-specifier ()
   `(satisfies parametric-type-specifier-p))
 
+(defun parametric-type-specifiers (type-list)
+  (declare (type type-list type-list))
+  (let ((parametric-types nil)
+        (list type-list))
+    (loop :for elt := (first list)
+          :while list     ; we don't want list to be empty
+          :until (member elt '(&key &rest))
+          :do (when (parametric-type-specifier-p elt)
+                (push elt parametric-types))
+              (setq list (rest list)))
+    (when (and list
+               (eq '&key (first list)))
+      (loop :for param-type :in (rest list)
+            :do (let ((type (optima:match param-type
+                              ((list (list _ type))
+                               type)
+                              ((list (list _ type) _)
+                               `(or ,type null))
+                              ((list _ _)
+                               t)
+                              (_ t))))
+                  (when (parametric-type-specifier-p type)
+                    (push type parametric-types)))))
+    parametric-types))
+
+(defun parametric-type-specifiers-are-significant-p (type-list)
+  "Returns T if there exist at least two parametric-type-specifiers in the type-list
+which have type parameters that depend on each other."
+  (declare (type type-list type-list))
+  (let* ((parametric-types (parametric-type-specifiers type-list))
+         (parametric-type-parameters
+           (mapcar #'parametric-type-parameters parametric-types)))
+    (loop :for (p1 . remaining) :on parametric-type-parameters
+          :with intersect-p := nil
+          :do (loop :for p2 :in remaining
+                    :do (when (intersection p1 p2)
+                          (return-from parametric-type-specifiers-are-significant-p t)))
+          :finally (return-from parametric-type-specifiers-are-significant-p nil))))
+
 (defun parametric-type-parameters (parametric-type-spec)
   (remove-duplicates
    (remove-if-not

@@ -171,16 +171,33 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
 (defvar *environment*)
 
 
-;; type-list-more-specific-p =========================================================
+;; TYPE-LIST-MORE-SPECIFIC-P =========================================================
 
 (defun type-list-more-specific-p (type-list-1 type-list-2)
   #.+type-list-more-specific-p+
   (declare (type type-list type-list-1 type-list-2))
   (let ((*lambda-list-typed-p* nil))
-    (%type-list-more-specific-p (potential-type-of-lambda-list type-list-1)
-                                (potential-type-of-lambda-list type-list-2)
-                                type-list-1
-                                type-list-2)))
+    (if (equal type-list-1 type-list-2)
+        t
+        (and (%type-list-more-specific-p (potential-type-of-lambda-list type-list-1)
+                                         (potential-type-of-lambda-list type-list-2)
+                                         type-list-1
+                                         type-list-2)
+             (if (%type-list-more-specific-p (potential-type-of-lambda-list type-list-2)
+                                             (potential-type-of-lambda-list type-list-1)
+                                             type-list-2
+                                             type-list-1)
+                 (cond ((parametric-type-specifiers-are-significant-p type-list-1)
+                        (if (parametric-type-specifiers-are-significant-p type-list-2)
+                            nil
+                            t))
+                       ((parametric-type-specifiers-are-significant-p type-list-2)
+                        (if (parametric-type-specifiers-are-significant-p type-list-1)
+                            nil
+                            nil))
+                       (t
+                        t))
+                 t)))))
 
 (defgeneric %type-list-more-specific-p (type-1 type-2 type-list-1 type-list-2)
   (:documentation #.+type-list-more-specific-p+))
