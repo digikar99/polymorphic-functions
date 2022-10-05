@@ -19,13 +19,23 @@
            (append (subseq untyped-lambda-list 0 optional-position)
                    '(&optional)
                    (mapcar (lambda (elt)
-                             (list elt nil (gensym (symbol-name elt))))
+                             (multiple-value-bind (var default-value-form)
+                                 (optima:match elt
+                                   ((list name value-form)
+                                    (values name value-form))
+                                   (variable (values variable nil)))
+                               (list var default-value-form (gensym (symbol-name var)))))
                            (subseq untyped-lambda-list (1+ optional-position)))))
           (keyword-position
            (append (subseq untyped-lambda-list 0 keyword-position)
                    (list '&rest (gensym "ARGS") '&key)
                    (mapcar (lambda (elt)
-                             (list elt nil (gensym (symbol-name elt))))
+                             (multiple-value-bind (var default-value-form)
+                                 (optima:match elt
+                                   ((list name value-form)
+                                    (values name value-form))
+                                   (variable (values variable nil)))
+                               (list var default-value-form (gensym (symbol-name var)))))
                            (subseq untyped-lambda-list (1+ keyword-position)))))
           (t
            (error "Unexpected")))))
@@ -642,7 +652,10 @@
                  (declare (ignore pp))
                  nil))))
 
-        (values `(declare ,@(set-difference type-forms lambda-list-keywords)
+        (values `(declare ,@(loop :for type-form :in type-forms
+                                  :if (not (member type-form lambda-list-keywords))
+                                    ;; LOOP instead of SET-DIFFERENCE to preserver order
+                                    :collect type-form)
                           (ignorable ,@new-type-parameters)
                           ,@(loop :for (type-parameter . value) :in *deparameterizer-alist*
                                   :if (member type-parameter new-type-parameters)
