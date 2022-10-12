@@ -41,19 +41,20 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
   (when (and docp (symbolp documentation) (constantp documentation))
     (setq documentation (constant-form-value documentation env)))
   (when docp (check-type documentation string))
-  (let ((*name*        name)
-        (*environment*  env)
-        (untyped-lambda-list (if (member '&key untyped-lambda-list)
-                                 (let* ((key-position (position '&key untyped-lambda-list)))
-                                   (append (subseq untyped-lambda-list 0 key-position)
-                                           '(&key)
-                                           (sort (subseq untyped-lambda-list (1+ key-position))
-                                                 #'string<
-                                                 :key (lambda (param)
-                                                        (optima:ematch param
-                                                          ((list name _) name)
-                                                          (variable variable))))))
-                                 untyped-lambda-list)))
+  (let* ((*name*        name)
+         (*environment*  env)
+         (untyped-lambda-list (normalize-untyped-lambda-list untyped-lambda-list))
+         (untyped-lambda-list (if (member '&key untyped-lambda-list)
+                                  (let* ((key-position (position '&key untyped-lambda-list)))
+                                    (append (subseq untyped-lambda-list 0 key-position)
+                                            '(&key)
+                                            (sort (subseq untyped-lambda-list (1+ key-position))
+                                                  #'string<
+                                                  :key (lambda (param)
+                                                         (optima:ematch param
+                                                           ((list name _) name)
+                                                           (variable variable))))))
+                                  untyped-lambda-list)))
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
          ,(when overwrite

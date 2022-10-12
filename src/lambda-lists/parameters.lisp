@@ -14,8 +14,7 @@
     (cond ((and (null optional-position)
                 (null keyword-position))
            (copy-list untyped-lambda-list))
-          ;; FIXME: Should handle default arguments easily
-          (optional-position
+          ((and optional-position (nthcdr optional-position untyped-lambda-list))
            (append (subseq untyped-lambda-list 0 optional-position)
                    '(&optional)
                    (mapcar (lambda (elt)
@@ -26,7 +25,7 @@
                                    (variable (values variable nil)))
                                (list var default-value-form (gensym (symbol-name var)))))
                            (subseq untyped-lambda-list (1+ optional-position)))))
-          (keyword-position
+          ((and keyword-position (nthcdr keyword-position untyped-lambda-list))
            (append (subseq untyped-lambda-list 0 keyword-position)
                    (list '&rest (gensym "ARGS") '&key)
                    (mapcar (lambda (elt)
@@ -74,25 +73,44 @@
 (defun normalize-typed-lambda-list (typed-lambda-list)
   (let ((state           'required)
         (normalized-list ()))
-    (dolist (elt typed-lambda-list)
-      (if (member elt lambda-list-keywords)
-          (progn
-            (setq state elt)
-            (push elt normalized-list))
-          (push (case state
-                  (required
-                   (if (listp elt)
-                       elt
-                       (list elt t)))
-                  ((&optional &key)
-                   (cond ((not (listp elt))
-                          (list (list elt t) nil))
-                         ((not (listp (first elt)))
-                          (list (list (first elt) t)
-                                (second elt)))
-                         (t elt)))
-                  (&rest elt))
-                normalized-list)))
+    (loop :for (elt . rest) :on typed-lambda-list
+          :do (if (member elt lambda-list-keywords)
+                  (progn
+                    (setq state elt)
+                    (when rest (push elt normalized-list)))
+                  (push (case state
+                          (required
+                           (if (listp elt)
+                               elt
+                               (list elt t)))
+                          ((&optional &key)
+                           (cond ((not (listp elt))
+                                  (list (list elt t) nil))
+                                 ((not (listp (first elt)))
+                                  (list (list (first elt) t)
+                                        (second elt)))
+                                 (t elt)))
+                          (&rest elt))
+                        normalized-list)))
+    (nreverse normalized-list)))
+
+(defun normalize-untyped-lambda-list (untyped-lambda-list)
+  (let ((state           'required)
+        (normalized-list ()))
+    (loop :for (elt . rest) :on untyped-lambda-list
+          :do (if (member elt lambda-list-keywords)
+                  (progn
+                    (setq state elt)
+                    (when rest (push elt normalized-list)))
+                  (push (case state
+                          (required
+                           elt)
+                          ((&optional &key)
+                           (optima:match elt
+                             ((list _ _) elt)
+                             (variable (list variable nil))))
+                          (&rest elt))
+                        normalized-list)))
     (nreverse normalized-list)))
 
 (def-test normalize-typed-lambda-list (:suite lambda-list)
