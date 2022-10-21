@@ -227,8 +227,8 @@
                (list 'array a))
              (defpolymorph sbcl-transform ((a string)) t
                (list 'string a))
-             (defpolymorph-compiler-macro sbcl-transform (string) (&whole form a)
-               `(list ',(sb-c::type-specifier (sb-c::%lvar-derived-type a)) ,form)))))
+             (defpolymorph-compiler-macro sbcl-transform (string) (&whole form a &environment env)
+               `(list ',(form-type a env) ,form)))))
   (is (= 2 (length
             (sb-c::fun-info-transforms
              (sb-c::fun-info-or-lose 'sbcl-transform)))))
@@ -245,7 +245,7 @@
                       (type string b))
              (sbcl-transform b))))
   (is (equalp #-extensible-compound-types
-              '((values string &optional) (string "string"))
+              '(string (string "string"))
               #+extensible-compound-types
               '((values (or base-string (vector character)) &optional) (string "string"))
               (eval `(sbcl-transform-compiler-macro-caller "string"))))

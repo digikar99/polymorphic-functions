@@ -19,7 +19,8 @@
           (transform-lambda-list (untyped-lambda-list typed-lambda-list)))
       (with-gensyms (node env arg arg-lvar-alist compiler-macro-lambda
                           inline-lambda-body-sym param-list-sym lambda declarations body
-                          arg-types-alist arg-types type arg-syms lvar lvars arg-sym)
+                          arg-types-alist arg-types type arg-syms lvar lvars lvar-syms lvar-sym
+                          arg-sym lvar-types lvar-type compiler-macro-env sym)
 
         ;; For the polymorph compiler macro:
         ;; Firstly, call the COMPILER-MACRO-LAMBDA with SB-C::LVARs
@@ -44,7 +45,19 @@
                     ,(sbcl-transform-arg-lvars-from-lambda-list-form
                       transform-lambda-list :typed nil))
                   ;; Although we call it LVARS, these may also contain KEYWORDs
-                  (,lvars    (mapcar #'rest  ,arg-lvar-alist))
+                  (,lvars      (mapcar #'rest  ,arg-lvar-alist))
+                  (,lvar-syms  (make-gensym-list (length ,lvars)))
+                  (,lvar-types (loop :for ,lvar :in ,lvars
+                                     :for ,lvar-type
+                                       := (if (typep ,lvar 'sb-c::lvar)
+                                              (sb-c::type-specifier
+                                               (sb-c::%lvar-derived-type ,lvar))
+                                              (nth-form-type ,lvar nil 0))
+                                     :collect (optima:match ,lvar-type
+                                                ((list* 'values ,type _)
+                                                 ,type)
+                                                (_
+                                                 ,lvar-type))))
                   (,arg-syms (mapcar #'first ,arg-lvar-alist))
                   (,arg-types-alist
                     (mapcar (lambda (,arg)
@@ -58,7 +71,19 @@
                                               t
                                               (nth 1 ,type))))))
                             ,lvars))
-                  (,arg-types (mapcar #'rest ,arg-types-alist)))
+                  (,arg-types (mapcar #'rest ,arg-types-alist))
+
+                  (,compiler-macro-lambda (polymorph-compiler-macro-lambda
+                                           (find-polymorph ',name ',type-list)))
+                  (,env                   (sb-c::node-lexenv ,node))
+                  (,compiler-macro-env    (augment-environment
+                                           (augment-environment
+                                            ,env
+                                            :variable ,lvar-syms)
+                                           :declare (mapcar (lambda (,type ,sym)
+                                                              (list 'type ,type ,sym))
+                                                            ,lvar-types
+                                                            ,lvar-syms))))
 
              (unless (most-specialized-applicable-transform-p
                       ',name ,arg-types-alist ',type-list)
@@ -79,28 +104,23 @@
                ,(if (eq 'rest lambda-list-type)
                     ;; Yes, we are returning a LAMBDA-FORM below
                     ``(cl:lambda ,,arg-syms
-                        ,(if-let ((,compiler-macro-lambda
-                                   (polymorph-compiler-macro-lambda
-                                    (find-polymorph ',name ',type-list)))
-                                  (,env (sb-c::node-lexenv ,node)))
-                           (translate-body (macroexpand-all
-                                            (funcall ,compiler-macro-lambda
-                                                     (cons ,inline-lambda-body-sym ,lvars)
-                                                     ,env))
-                                           (mapcar (lambda (,lvar ,arg-sym)
-                                                     (cons ,lvar ,arg-sym))
-                                                   ,lvars ,arg-syms))
-                           `(funcall ,,inline-lambda-body-sym ,@,arg-syms)))
-                    `(if-let ((,compiler-macro-lambda
-                               (polymorph-compiler-macro-lambda
-                                (find-polymorph ',name ',type-list)))
-                              (,env (sb-c::node-lexenv ,node)))
-                       (translate-body (macroexpand-all
-                                        (funcall ,compiler-macro-lambda
-                                                 (cons ,inline-lambda-body-sym
-                                                       ,lvars)
-                                                 ,env))
-                                       (mapcar (lambda (,lvar ,arg-sym)
-                                                 (cons ,lvar ,arg-sym))
-                                               ,lvars ,arg-syms))
-                       `(funcall ,,inline-lambda-body-sym ,@,arg-syms))))))))))
+                        ,(if ,compiler-macro-lambda
+                             (translate-body
+                              (macroexpand-all
+                               (funcall ,compiler-macro-lambda
+                                        (cons ,inline-lambda-body-sym ,lvar-syms)
+                                        ,compiler-macro-env))
+                              (mapcar (lambda (,lvar-sym ,arg-sym)
+                                        (cons ,lvar-sym ,arg-sym))
+                                      ,lvar-syms ,arg-syms))
+                             `(funcall ,,inline-lambda-body-sym ,@,arg-syms)))
+                    `(if ,compiler-macro-lambda
+                         (translate-body (macroexpand-all
+                                          (funcall ,compiler-macro-lambda
+                                                   (cons ,inline-lambda-body-sym
+                                                         ,lvar-syms)
+                                                   ,compiler-macro-env))
+                                         (mapcar (lambda (,lvar-sym ,arg-sym)
+                                                   (cons ,lvar-sym ,arg-sym))
+                                                 ,lvar-syms ,arg-syms))
+                         `(funcall ,,inline-lambda-body-sym ,@,arg-syms))))))))))
