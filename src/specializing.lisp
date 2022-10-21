@@ -5,6 +5,7 @@
   types returned by CL:TYPE-OF. For instance, often times knowing an array is
   (ARRAY SINGLE-FLOAT) can be enough for optimization, (ARRAY SINGLE-FLOAT (2 3 4))
   is an overspecialized type in this sense.")
+(declaim (notinline specializing-type-of))
 
 (defpolymorph specializing-type-of (object) (or list symbol)
   (type-of object))
@@ -131,6 +132,9 @@ is only useful if the specialized variant offsets the cost of dispatch,
 and may not be useful for wrapping around simple functions such as addition
 of two numbers, but only for more expensive functions such as element-wise
 addition of two 10000-sized vectors.
+
+In addition, this is not suitable for mutating variables outside the
+SPECIALIZING form.
 "
   (assert (every #'symbolp vars))
   (let ((specialization-idx *specialization-count*))
@@ -159,7 +163,10 @@ addition of two 10000-sized vectors.
                   ,specialized-lambda)))
          (let* ((,specialized-lambda
                   (if (gethash ,specialization-idx *specialization-table*)
-                      (or (funcall (car (gethash ,specialization-idx *specialization-table*)) ,@vars)
+                      (or (funcall (the cl:function
+                                        (car (gethash ,specialization-idx *specialization-table*)))
+                                   ,@vars)
                           (,add-new-specialization))
                       (,add-new-specialization))))
+           (declare (type cl:function ,specialized-lambda))
            (funcall ,specialized-lambda ,@vars))))))
