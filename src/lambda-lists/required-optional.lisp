@@ -217,12 +217,9 @@
                     (if (type= type-1 type-2)
                         t
                         (return-from %type-list-intersection-null-p
-                          #+extensible-compound-types
-                          (definitive-intersection-null-p (when (boundp '*environment*)
-                                                            *environment*)
-                            type-1 type-2)
-                          #-extensible-compound-types
-                          (definitive-subtypep `(and ,type-1 ,type-2) nil))))
+                          (definitive-intersection-null-p type-1 type-2
+                            (when (boundp '*environment*)
+                              *environment*)))))
               :finally (return t)))))
 
 (def-test type-list-intersection-null-optional

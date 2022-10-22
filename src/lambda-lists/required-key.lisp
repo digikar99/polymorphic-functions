@@ -228,13 +228,9 @@
               ;; without a definite direction of SUBTYPEP
               :do (if (type= type-1 type-2)
                       t
-                      #+extensible-compound-types
-                      (when (definitive-intersection-null-p (when (boundp '*environment*)
-                                                              *environment*)
-                              type-1 type-2)
-                        (return-from %type-list-intersection-null-p t))
-                      #-extensible-compound-types
-                      (when (definitive-subtypep `(and ,type-1 ,type-2) nil)
+                      (when (definitive-intersection-null-p type-1 type-2
+                              (when (boundp '*environment*)
+                                *environment*))
                         (return-from %type-list-intersection-null-p t)))
               :finally (return nil))
         (let ((list-1 (subseq list-1 (1+ key-position-1)))
@@ -256,13 +252,9 @@
                                  ;; If there exist at least one &KEY argument which need
                                  ;; to be compulsorily supplied, and both types are different,
                                  ;; then there intersection is NULL
-                                 #+extensible-compound-types
-                                 (when (definitive-intersection-null-p (when (boundp '*environment*)
-                                                                         *environment*)
-                                         type-1 type-2)
-                                   (return-from %type-list-intersection-null-p t))
-                                 #-extensible-compound-types
-                                 (when (definitive-subtypep `(and ,type-1 ,type-2) nil)
+                                 (when (definitive-intersection-null-p
+                                           type-1 type-2 (when (boundp '*environment*)
+                                                           *environment*))
                                    (return-from %type-list-intersection-null-p t))))))
                     (setq list-1 (rest list-1)
                           list-2 (rest list-2))

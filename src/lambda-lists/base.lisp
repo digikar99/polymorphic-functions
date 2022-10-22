@@ -206,17 +206,22 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
 
 ;; TYPE-LIST-INTERSECTION-NULL-P ===============================================
 
-#+extensible-compound-types
-(defun definitive-intersection-null-p (env &rest type-specifiers)
-  (multiple-value-bind (intersection-null-p knownp)
-      (apply #'intersection-null-p env type-specifiers)
-    (cond ((not knownp)
-           (cerror "Retry"
-                   "Please implement appropriate %SUBTYPEP and %INTERSECT-TYPE-P methods to check for the intersection of the following types:~{~%  ~S~}"
-                   type-specifiers)
-           (apply #'definitive-subtypep env type-specifiers))
-          (t
-           intersection-null-p))))
+(defun definitive-intersection-null-p (type1 type2 &optional env)
+  (let ((type1 (deparameterize-type type1))
+        (type2 (deparameterize-type type2)))
+    #+extensible-compound-types
+    (multiple-value-bind (intersection-null-p knownp)
+        (apply #'intersection-null-p env type1 type2)
+      (cond ((not knownp)
+             (cerror "Retry"
+                     "Please implement appropriate %SUBTYPEP and %INTERSECT-TYPE-P methods to check for the intersection of the following types:~%  ~S~%  ~S"
+                     type1 type2)
+             (apply #'definitive-subtypep env type1 type2))
+            (t
+             intersection-null-p)))
+    #-extensible-compound-types
+    (when (definitive-subtypep `(and ,type1 ,type2) nil env)
+      (return-from definitive-intersection-null-p t))))
 
 (defun type-list-intersection-null-p (type-list-1 type-list-2)
   #.+type-list-intersection-null-p+

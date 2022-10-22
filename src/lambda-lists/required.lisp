@@ -103,13 +103,9 @@
 
             :do (if (type= type-1 type-2)
                     t
-                    #+extensible-compound-types
-                    (when (definitive-intersection-null-p (when (boundp '*environment*)
-                                                            *environment*)
-                            type-1 type-2)
-                      (return-from %type-list-intersection-null-p t))
-                    #-extensible-compound-types
-                    (when (definitive-subtypep `(and ,type-1 ,type-2) nil)
+                    (when (definitive-intersection-null-p type-1 type-2
+                            (when (boundp '*environment*)
+                              *environment*))
                       (return-from %type-list-intersection-null-p t)))
             :finally (return nil))))
 
