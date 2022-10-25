@@ -121,6 +121,11 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                            (notes nil)
                            ;; The source of compile-time subtype-polymorphism
                            (*deparameterizer-alist* (copy-alist *deparameterizer-alist*))
+                           (compiler-macro-notes:*muffled-notes-type*
+                             `(or ,compiler-macro-notes:*muffled-notes-type*
+                                  ,@(declaration-information
+                                     'compiler-macro-notes:muffle
+                                     env)))
                            (lambda-with-enhanced-declarations
                              (destructuring-bind (lambda args declarations
                                                    more-decl (block block-name &body body))
@@ -143,8 +148,11 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                            (macroexpanded-form
                              (handler-bind ((compiler-macro-notes:note
                                               (lambda (note)
-                                                (compiler-macro-notes::swank-signal note env)
-                                                (push note notes))))
+                                                (unless
+                                                    (typep note
+                                                           compiler-macro-notes:*muffled-notes-type*)
+                                                  (compiler-macro-notes::swank-signal note env)
+                                                  (push note notes)))))
                                (lastcar
                                 (macroexpand-all
                                  `(cl:symbol-macrolet ((compiler-macro-notes::previous-form
