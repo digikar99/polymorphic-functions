@@ -211,12 +211,12 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
         (type2 (deparameterize-type type2)))
     #+extensible-compound-types
     (multiple-value-bind (intersection-null-p knownp)
-        (apply #'intersection-null-p env type1 type2)
+        (intersection-null-p env type1 type2)
       (cond ((not knownp)
              (cerror "Retry"
                      "Please implement appropriate %SUBTYPEP and %INTERSECT-TYPE-P methods to check for the intersection of the following types:~%  ~S~%  ~S"
                      type1 type2)
-             (apply #'definitive-subtypep env type1 type2))
+             (definitive-intersection-null-p type1 type2 env))
             (t
              intersection-null-p)))
     #-extensible-compound-types

@@ -247,7 +247,7 @@
   (is (equalp #-extensible-compound-types
               '(string (string "string"))
               #+extensible-compound-types
-              '((values (or base-string (vector character)) &optional) (string "string"))
+              '((or base-string (vector character)) (string "string"))
               (eval `(sbcl-transform-compiler-macro-caller "string"))))
   (eval `(undefpolymorph 'sbcl-transform '(string)))
   (is (= 1 (length
