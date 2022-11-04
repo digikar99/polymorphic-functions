@@ -56,7 +56,6 @@
                                     (untyped-lambda-list list))
   (length= type-list untyped-lambda-list))
 
-;; FIXME: Rename type-list-more-specific-p to TYPE-LIST-MORE-SPECIFIC-P
 (defmethod %type-list-more-specific-p ((type-1 (eql 'required))
                                        (type-2 (eql 'required))
                                        list-1

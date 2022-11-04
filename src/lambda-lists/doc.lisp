@@ -52,7 +52,17 @@ be a TYPED-LAMBDA-LIST"
 ;; type-list-more-specific-p =========================================================
 
 (define-constant +type-list-more-specific-p+
-  "Returns T if TYPE-LIST-1 is more specialized than TYPE-LIST-2"
+  "Returns T if TYPE-LIST-1 is more specialized than TYPE-LIST-2.
+If TYPE-LIST-1 is more specialized than TYPE-LIST-2, then that means
+that *if* both the type lists were applicable, then the polymorph
+with TYPE-LIST-1 list will be chosen over the polymorph with TYPE-LIST-2.
+More specialized does not mean all the types in TYPE-LIST-1
+are SUBTYPEP of the corresponding types in TYPE-LIST-2.
+
+For instance, (STRING ARRAY) is more specialized than (ARRAY STRING).
+
+See the tests under the suite POLYMORPHIC-FUNCTIONS::TYPE-LIST-MORE-SPECIFIC-P
+for more examples."
   :test 'string=)
 
 ;; TYPE-LIST-CAUSES-AMBIGUOUS-CALL-P ===========================================

@@ -41,7 +41,7 @@ the list only if the second return value is NIL."
                                           env))))
 
 (defun type-specifier-p (object &optional env)
-  (or (extensible-compound-types:type-specifier-p object)
+  (or (extensible-compound-types:type-specifier-p object env)
       (parametric-type-specifier-p object)))
 
 (defun subtypep (type1 type2 &optional environment)
