@@ -4,15 +4,17 @@
   :END:
 
 #+BEGIN_QUOTE
-  This library is still unstable, albeit the main interface comprising of the below symbols hasn't changed in at least the last six months. Users are also recommended to avoid non-trivial uses of &rest type-lists:
+BIG CAVEAT: This will especially fail with multiple inheritance, because I thought subtyping is the same as subclassing! But [[https://www.cmi.ac.in/~madhavan/courses/pl2009/lecturenotes/lecture-notes/node28.html][subtyping is different from subclassing]]. (Also [[https://www.cs.princeton.edu/courses/archive/fall98/cs441/mainus/node12.html][this]].)
 
-  - [[#define-polymorphic-function][define-polymorphic-function]]
-  - [[#undefine-polymorphic-function][undefine-polymorphic-function]]
-  - [[#defpolymorph][defpolymorph]]
-  - [[#defpolymorph-compiler-macro][defpolymorph-compiler-macro]]
-  - [[#undefpolymorph][undefpolymorph]]
-  - [[#find-polymorph][find-polymorph]]
-  - [[#polymorph-apropos-list-type][polymorph-apropos-list-type]]
+This library is declared to be unstable, albeit the main interface comprising of the below symbols hasn't changed in at least the last six months. Users are also recommended to avoid non-trivial uses of &rest type-lists:
+
+- [[#define-polymorphic-function][define-polymorphic-function]]
+- [[#undefine-polymorphic-function][undefine-polymorphic-function]]
+- [[#defpolymorph][defpolymorph]]
+- [[#defpolymorph-compiler-macro][defpolymorph-compiler-macro]]
+- [[#undefpolymorph][undefpolymorph]]
+- [[#find-polymorph][find-polymorph]]
+- [[#polymorph-apropos-list-type][polymorph-apropos-list-type]]
 #+END_QUOTE
 
 The core goal of this library is to provide a function type to dispatch on types rather than classes, for dispatching on specialized array types such as =(simple-array single-float)= or =(simple-array double-float)= or =(simple-array (signed-byte 32))= in [[https://github.com/digikar99/numericals][numericals]]. (See [[#basic-usage][Basic Usage]].)
