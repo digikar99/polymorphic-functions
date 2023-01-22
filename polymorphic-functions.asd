@@ -6,6 +6,7 @@
   :depends-on ("alexandria"
                "closer-mop"
                "compiler-macro-notes"
+               "extensible-compound-types"
                (:feature :extensible-compound-types "extensible-compound-types-cl")
                (:feature (:not :extensible-compound-types) "ctype")
                "fiveam" ;; just keep tests together!

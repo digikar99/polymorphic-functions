@@ -102,8 +102,7 @@ neither is a EXTENDED-TYPE-SPECIFIER."
                 (cl-type-specifier-p type2))
            (cl:subtypep type1 type2 environment))
           (t
-           (ctype:subctypep (ctype:specifier-ctype type1 environment)
-                            (ctype:specifier-ctype type2 environment))))))
+           (extensible-compound-types:subtypep type1 type2 environment)))))
 
 (define-compiler-macro subtypep
     (&whole form type1-form type2-form &optional env-form &environment env)
@@ -122,8 +121,7 @@ neither is a EXTENDED-TYPE-SPECIFIER."
               ((and (extended-type-specifier-p (constant-form-value type1-form env))
                     (extended-type-specifier-p (constant-form-value type2-form env)))
                (once-only (env-form)
-                 `(ctype:subctypep (ctype:specifier-ctype ,type1-form ,env-form)
-                                   (ctype:specifier-ctype ,type2-form ,env-form))))
+                 `(extensible-compound-types:subtypep type1 type2 environment)))
               (t
                form)))
       form))

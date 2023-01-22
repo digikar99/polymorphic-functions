@@ -155,7 +155,7 @@
                (apply 'append l lists))
              (defpolymorph my+ ((str string) (num number) &key ((coerce t) nil)) string
                (if coerce
-                   (concatenate 'string str (write-to-string num))
+                   (uiop:strcat str (write-to-string num))
                    str)))))
   (is (eq 9 (eval `(my+ 2 3 4))))
   (is (equalp '(1 2 3) (eval `(my+ '(1 2) '(3)))))

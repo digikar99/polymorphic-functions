@@ -6,7 +6,7 @@
   (and (or (symbolp object)
            (listp   object))
        (type-specifier-p object)
-       (type= object type-specifier)))
+       (extensible-compound-types:type= object type-specifier)))
 
 (defmethod %upgraded-cl-type ((name (eql 'extensible-compound-types:type=)) type &optional env)
   (declare (ignore env))

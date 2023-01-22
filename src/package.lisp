@@ -41,14 +41,20 @@
 
 (polymorphic-functions.defpackage:defpackage :polymorphic-functions
   (:shadowing-import-exported-symbols :polymorphic-functions.extended-types)
-  #+extensible-compound-types
-  (:use :alexandria :extensible-compound-types-cl)
-  #-extensible-compound-types
-  (:use :alexandria :cl)
+  (:use :alexandria
+        #+extensible-compound-types
+        :extensible-compound-types-cl
+        #-extensible-compound-types
+        :cl)
+  ;; #+extensible-compound-types
+  ;; (:use :cl-form-types :alexandria :cl-environments-cl)
   #-extensible-compound-types
   (:import-from :ctype
                 #:ctype
                 #:cons-specifier-ctype)
+  (:import-from :extensible-compound-types
+                #:orthogonally-specializing-type-specifier-p
+                #:specializing)
   (:import-from :5am #:is #:def-test)
   (:import-from :polymorphic-functions.extended-types
                 #:*extended-type-specifiers*

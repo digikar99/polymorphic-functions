@@ -71,32 +71,61 @@ which have type parameters that depend on each other."
     #'parametric-type-symbol-p
     (flatten (ensure-list parametric-type-spec)))))
 
-;; TODO: Documentation
+(defvar *ocs-run-time-lambda-body-lambda-table* (make-hash-table))
 
-(defgeneric parametric-type-run-time-lambda-body (type-car type-cdr type-parameter)
-  (:documentation
-   "Users are expected to specialize on the TYPE-CAR using an (EQL symbol) specializer.
-TYPE-CAR and TYPE-CDR together make up the parametric-type, while TYPE-PARAMETER
-is one of the type parameter in the parametric-type.
+(defun parametric-type-run-time-lambda-body (type-car type-cdr type-parameter)
+  (assert (orthogonally-specializing-type-specifier-p
+           (extensible-compound-types:typexpand
+            (deparameterize-type `(,type-car ,@type-cdr)))))
+  (let* ((type-spec  (extensible-compound-types:typexpand `(,type-car ,@type-cdr)))
+         (class-name (second type-spec)))
+    (unless (nth-value 1 (gethash class-name *ocs-run-time-lambda-body-lambda-table*))
+      (setf (gethash class-name *ocs-run-time-lambda-body-lambda-table*)
+            (compile
+             nil
+             (let* ((ocs (extensible-compound-types.impl::class-specializer class-name))
+                    (slots (extensible-compound-types.impl::ocs-slots ocs))
+                    (arg-list (extensible-compound-types.impl::ocs-arg-list ocs)))
+               (with-gensyms (p o)
+                 `(cl:lambda (,p ,@arg-list)
+                    (cond
+                      ,@(loop :for slot :in slots
+                              :nconcing
+                              (destructuring-bind
+                                  (name &key accessor nested)
+                                  slot
+                                (if nested
+                                    `(((and (atom ,name)
+                                            (equal ,name ,p))
+                                       ',accessor)
+                                      ((and (consp ,name)
+                                            (position ,p (flatten ,name)))
+                                       `(cl:lambda (,',o)
+                                          ,(let ((,name (flatten ,name)))
+                                             `(nth ,(position ,p ,name)
+                                                   (flatten (,',accessor ,',o)))))))
+                                    `(((and (atom ,name)
+                                            (equal ,name ,p))
+                                       ',accessor))))))))))))
+    (apply (gethash class-name *ocs-run-time-lambda-body-lambda-table*)
+           type-parameter
+           (nthcdr 2 type-spec))))
 
-The methods implemented should return a one-argument lambda-*expression* (not function).
-The expression will be compiled to a function and called with the appropriate *object*
-at run-time. The function should return the value of the TYPE-PARAMETER corresponding
-to the *object* and the parametric type."))
-
-(defgeneric parametric-type-compile-time-lambda-body (type-car type-cdr type-parameter)
-  (:documentation
-   "Users are expected to specialize on the TYPE-CAR using an (EQL symbol) specializer.
-TYPE-CAR and TYPE-CDR together make up the parametric-type, while TYPE-PARAMETER
-is one of the type parameter in the parametric-type.
-
-The methods implemented should return a one-argument lambda-*expression* (not function).
-The expression will be compiled to a function and called with the appropriate
-*form-type* at compile-time. The function should return the value of the TYPE-PARAMETER
-corresponding to the parametric-type in the *form-type*.
-
-If the *form-type* does not match the parametric-type, then NIL may be returned."))
-
+(defun parametric-type-compile-time-lambda-body (type-car type-cdr type-parameter)
+  (assert (orthogonally-specializing-type-specifier-p
+           (extensible-compound-types:typexpand
+            (deparameterize-type `(,type-car ,@type-cdr)))))
+  (with-gensyms (object-type p a)
+    (let* ((type-pattern (extensible-compound-types:typexpand `(,type-car ,@type-cdr))))
+      `(cl:lambda (,object-type)
+         (let ((,object-type (flatten (extensible-compound-types:typexpand ,object-type))))
+           (if (not (eq (second ,object-type)
+                        ',(second type-pattern)))
+               nil
+               (loop :for ,a :in (rest ,object-type)
+                     :for ,p :in ',(flatten (rest type-pattern))
+                     :do (when (eq ,p ',type-parameter)
+                           (return ,a)))))))))
 
 (defun type-parameters-from-parametric-type (parametric-type-spec)
   "Returns a list oF TYPE-PARAMETERS"
@@ -105,7 +134,7 @@ If the *form-type* does not match the parametric-type, then NIL may be returned.
      (if (parametric-type-symbol-p parametric-type-spec)
          (list (make-type-parameter :name parametric-type-spec
                                     :run-time-deparameterizer-lambda-body
-                                    `(cl:lambda (o) (type-of o))
+                                    `(cl:lambda (o) (class-name (class-of o)))
                                     :compile-time-deparameterizer-lambda
                                     (lambda (form-type) form-type)
                                     :compile-time-deparameterizer-lambda-body
@@ -130,85 +159,3 @@ If the *form-type* does not match the parametric-type, then NIL may be returned.
                                         :compile-time-deparameterizer-lambda
                                         (compile nil compiler-body))))
                type-parameter-names)))))
-
-(defun array-type-element-type (type)
-  (destructuring-bind (array-base-type &optional (element-type 'cl:*) (dim/rank 'cl:*))
-      type
-    (declare (ignore array-base-type dim/rank))
-    element-type))
-
-(defun array-type-dimensions (type)
-  (destructuring-bind (array-base-type &optional (element-type 'cl:*) (dim/rank 'cl:*))
-      type
-    (declare (ignore array-base-type element-type))
-    (typecase dim/rank
-      (number (make-list dim/rank :initial-element 'cl:*))
-      (t dim/rank))))
-
-(defun array-type-rank (type)
-  (destructuring-bind (array-base-type &optional (element-type 'cl:*) (dim/rank 'cl:*))
-      type
-    (declare (ignore array-base-type element-type))
-    (typecase dim/rank
-      (list (length dim/rank))
-      (t dim/rank))))
-
-(defun parametric-type-run-time-lambda-body-for-array
-    (type-car type-cdr parameter)
-  `(cl:lambda (array)
-     ,(optima:match type-cdr
-        ((list* (eql parameter) _)
-         `(array-element-type array))
-        ((list _ (eql parameter))
-         `(array-rank array))
-        ((optima:guard (list _ dimensions)
-                       (position parameter dimensions))
-         `(array-dimension array ,(position parameter dimensions)))
-        (otherwise
-         (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
-                parameter (cons type-car type-cdr))))))
-
-(defun parametric-type-compile-time-lambda-body-for-array
-    (type-car type-cdr parameter)
-  `(cl:lambda (type)
-     (optima:match type
-       ((optima:guard (list* ft-type-car _)
-                      (subtypep ft-type-car ',type-car))
-        ,(optima:match type-cdr
-           ((list* (eql parameter) _)
-            `(let ((elt-type (array-type-element-type type)))
-               (if (eq elt-type 'cl:*)
-                   nil
-                   elt-type)))
-           ((list _ (eql parameter))
-            `(let ((rank (array-type-rank type)))
-               (if (eq rank 'cl:*)
-                   nil
-                   rank)))
-           ((optima:guard (list _ dimensions)
-                          (position parameter dimensions))
-            (let ((pos (position parameter dimensions)))
-              `(let ((dimension (nth ,pos (array-type-dimensions type))))
-                 (if (eq dimension 'cl:*)
-                     nil
-                     dimension))))
-           (otherwise
-            (error "TYPE-PARAMETER ~S not in PARAMETRIC-TYPE ~S"
-                   parameter (cons type-car type-cdr)))))
-       (otherwise nil))))
-
-(defmethod parametric-type-run-time-lambda-body
-    ((type-car (eql 'array)) type-cdr parameter)
-  (parametric-type-run-time-lambda-body-for-array 'array type-cdr parameter))
-
-(defmethod parametric-type-run-time-lambda-body
-    ((type-car (eql 'simple-array)) type-cdr parameter)
-  (parametric-type-run-time-lambda-body-for-array 'simple-array type-cdr parameter))
-
-(defmethod parametric-type-compile-time-lambda-body
-    ((type-car (eql 'array)) type-cdr parameter)
-  (parametric-type-compile-time-lambda-body-for-array 'array type-cdr parameter))
-
-(defmethod parametric-type-compile-time-lambda-body
-    ((type-car (eql 'simple-array)) type-cdr parameter)
- (parametric-type-compile-time-lambda-body-for-array 'simple-array type-cdr parameter))
