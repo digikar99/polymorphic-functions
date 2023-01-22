@@ -1,4 +1,4 @@
-(in-package polymorphic-functions)
+(in-package :polymorphic-functions)
 
 ;; In this file, our main functions/macros are
 ;; - DEFINE-LAMBDA-LIST-HELPER
