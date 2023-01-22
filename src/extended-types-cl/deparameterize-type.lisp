@@ -59,7 +59,8 @@
 
 (defmethod %deparameterize-type ((car (eql 'function)) fun-type-specifier &optional env)
   (declare (ignore env))
-  (destructuring-bind (parameters return-type) (rest fun-type-specifier)
+  (destructuring-bind (&optional (parameters 'cl:*) (return-type 'cl:*))
+      (rest fun-type-specifier)
     `(function ,(cond ((and (atom parameters)
                             (eq 'cl:* parameters))
                        'cl:*)
@@ -101,4 +102,3 @@
                                 t)
                             return-type))
                   (list (%deparameterize-type (car return-type) return-type))))))
-
