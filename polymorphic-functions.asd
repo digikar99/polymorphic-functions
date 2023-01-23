@@ -12,6 +12,7 @@
                "fiveam" ;; just keep tests together!
                "cl-form-types"
                "introspect-environment"
+               "let-plus"
                "optima"
                "split-sequence"
                "trivial-garbage")

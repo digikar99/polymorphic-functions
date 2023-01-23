@@ -8,7 +8,7 @@
 
 (defun make-sbcl-transform-body (name typed-lambda-list inline-lambda-body polymorph-parameters)
   (declare (optimize debug))
-  (multiple-value-bind (param-list type-list effective-type-list)
+  (multiple-value-bind (param-list type-parameter-list type-list effective-type-list)
       (polymorph-effective-lambda-list polymorph-parameters)
     (declare (ignore effective-type-list))
     (when (or (some #'parametric-type-specifier-p type-list)
@@ -99,7 +99,8 @@
                                                           (find-polymorph ',name ',type-list))
                                                          ,arg-types)
                           ,,declarations
-                          ,@,body))))
+                          (let ,,type-parameter-list
+                            ,@,body)))))
 
                ,(if (eq 'rest lambda-list-type)
                     ;; Yes, we are returning a LAMBDA-FORM below

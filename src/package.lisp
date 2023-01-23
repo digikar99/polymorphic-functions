@@ -56,6 +56,7 @@
                 #:orthogonally-specializing-type-specifier-p
                 #:specializing)
   (:import-from :5am #:is #:def-test)
+  (:import-from :let-plus #:let+ #:&values)
   (:import-from :polymorphic-functions.extended-types
                 #:*extended-type-specifiers*
                 #:upgraded-extended-type)

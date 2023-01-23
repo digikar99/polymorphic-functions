@@ -338,18 +338,20 @@
                          (when keyword-fn (mapcar keyword-fn keyword)))))))
 
 (defun polymorph-effective-lambda-list (polymorph-parameters)
-  "Returns 3 values:
+  "Returns 4 values:
 - The first value is the LAMBDA-LIST suitable for constructing polymorph's lambda
-- The second value is the TYPE-LIST corresponding to the polymorph
-- The third value is the EFFECTIVE-TYPE-LIST corresponding to the polymorph"
-  (values (let ((type-parameter-name-deparameterizer-list))
-            (flet ((populate-type-parameters (pp)
+- The second value is the TYPE-PARAMETER binding list
+- The third value is the TYPE-LIST corresponding to the polymorph
+- The fourth value is the EFFECTIVE-TYPE-LIST corresponding to the polymorph"
+  (let ((type-parameter-name-deparameterizer-list))
+    (values (flet ((populate-type-parameters (pp)
                      (loop :for tp :in (pp-type-parameters pp)
                            :do (with-slots (name
                                             run-time-deparameterizer-lambda-body)
                                    tp
-                                 (unless (assoc-value type-parameter-name-deparameterizer-list
-                                                      name)
+                                 (unless (assoc-value
+                                          type-parameter-name-deparameterizer-list
+                                          name)
                                    (push `(,name
                                            (,run-time-deparameterizer-lambda-body
                                             ,(pp-local-name pp)))
@@ -377,31 +379,33 @@
                       pp
                     (if supplied-p-name
                         (list local-name default-value-form supplied-p-name)
-                        (list local-name default-value-form)))))
-               '(&aux)
-               type-parameter-name-deparameterizer-list)))
-          (map-polymorph-parameters polymorph-parameters
-                                    :required #'pp-value-type
-                                    :optional #'pp-value-type
-                                    :rest (lambda (arg)
-                                            (declare (ignore arg))
-                                            nil)
-                                    :keyword (lambda (pp)
-                                               (with-slots (local-name value-type) pp
-                                                 (list (intern (symbol-name local-name) :keyword)
-                                                       value-type))))
-          (map-polymorph-parameters polymorph-parameters
-                                    :required #'pp-value-effective-type
-                                    :optional #'pp-value-effective-type
-                                    :rest (lambda (arg)
-                                            (declare (ignore arg))
-                                            nil)
-                                    :keyword (lambda (pp)
-                                               (with-slots (local-name value-effective-type) pp
-                                                 (list (intern (symbol-name local-name) :keyword)
-                                                       value-effective-type))))))
+                        (list local-name default-value-form)))))))
+            type-parameter-name-deparameterizer-list
+            (map-polymorph-parameters polymorph-parameters
+                                      :required #'pp-value-type
+                                      :optional #'pp-value-type
+                                      :rest (lambda (arg)
+                                              (declare (ignore arg))
+                                              nil)
+                                      :keyword (lambda (pp)
+                                                 (with-slots (local-name value-type) pp
+                                                   (list (intern (symbol-name local-name) :keyword)
+                                                         value-type))))
+            (map-polymorph-parameters polymorph-parameters
+                                      :required #'pp-value-effective-type
+                                      :optional #'pp-value-effective-type
+                                      :rest (lambda (arg)
+                                              (declare (ignore arg))
+                                              nil)
+                                      :keyword (lambda (pp)
+                                                 (with-slots (local-name value-effective-type) pp
+                                                   (list (intern (symbol-name local-name) :keyword)
+                                                         value-effective-type)))))))
 
 (defun lambda-declarations (polymorph-parameters)
+  "Returns two values
+- The first value is the declaration for the actual polymorph parameters
+- The second value is the IGNORABLE declaration for the type parameters "
   (let ((type-parameter-names ()))
     (flet ((type-decl (pp)
              (with-slots (local-name value-type) pp
@@ -415,15 +419,16 @@
                         `(type ,value-type ,local-name))
                        (t
                         `(type ,(upgrade-extended-type value-type) ,local-name)))))))
-      `(declare ,@(set-difference (map-polymorph-parameters polymorph-parameters
-                                                            :required #'type-decl
-                                                            :optional #'type-decl
-                                                            :keyword  #'type-decl
-                                                            :rest (lambda (pp)
-                                                                    (declare (ignore pp))
-                                                                    nil))
-                                  lambda-list-keywords)
-                (ignorable ,@type-parameter-names)))))
+      (values
+       `(declare ,@(set-difference (map-polymorph-parameters polymorph-parameters
+                                                             :required #'type-decl
+                                                             :optional #'type-decl
+                                                             :keyword  #'type-decl
+                                                             :rest (lambda (pp)
+                                                                     (declare (ignore pp))
+                                                                     nil))
+                                   lambda-list-keywords))
+       `(declare (ignorable ,@type-parameter-names))))))
 
 
 
@@ -673,11 +678,11 @@
         (values `(declare ,@(loop :for type-form :in type-forms
                                   :if (not (member type-form lambda-list-keywords))
                                     ;; LOOP instead of SET-DIFFERENCE to preserver order
-                                    :collect type-form)
-                          (ignorable ,@new-type-parameters)
-                          ,@(loop :for (type-parameter . value) :in *deparameterizer-alist*
+                                    :collect type-form))
+                `(declare (ignorable ,@new-type-parameters))
+                `(declare ,@(loop :for (type-parameter . value) :in *deparameterizer-alist*
                                   :if (member type-parameter new-type-parameters)
-                                  :collect `(type (eql ,value) ,type-parameter)))
+                                    :collect `(type (eql ,value) ,type-parameter)))
                 (translate-body return-type *deparameterizer-alist*))))))
 
 (defun accepts-argument-of-type-p (polymorph-parameters type)
