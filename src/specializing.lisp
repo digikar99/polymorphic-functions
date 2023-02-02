@@ -40,7 +40,7 @@
                   (subseq table specialization-position)))
          (args (make-gensym-list (length arg-values))))
     (cons (compile nil
-                   `(lambda (,@args)
+                   `(cl:lambda (,@args)
                       (declare (optimize speed)
                                #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note)
                                (compiler-macro-notes:muffle
@@ -163,7 +163,7 @@ SPECIALIZING form.
                   ,specialized-lambda)))
          (let* ((,specialized-lambda
                   (if (gethash ,specialization-idx *specialization-table*)
-                      (or (funcall (the cl:function
+                      (or (funcall (cl:the cl:function
                                         (car (gethash ,specialization-idx *specialization-table*)))
                                    ,@vars)
                           (,add-new-specialization))
