@@ -8,9 +8,9 @@
                "compiler-macro-notes"
                "extensible-compound-types"
                (:feature :extensible-compound-types "extensible-compound-types-cl")
-               (:feature (:not :extensible-compound-types) "ctype")
                "fiveam" ;; just keep tests together!
                "cl-form-types"
+               "ctype"
                "introspect-environment"
                "let-plus"
                "optima"
@@ -21,16 +21,10 @@
                (:file "package"                    :depends-on ("pre-package"))
                (:file "types"                      :depends-on ("package"))
                (:module "extended-types"           :depends-on ("package")
-                :pathname
-                #+extensible-compound-types #P"extended-types-exct/"
-                #-extensible-compound-types #P"extended-types-cl/"
                 :components ((:file "parametric-types")
                              (:file "ensure-type-form" :depends-on ("parametric-types"))
                              (:file "core"         :depends-on ("parametric-types"))
-                             (:file "deparameterize-type" :depends-on ("parametric-types"))
-                             (:file "supertypep"   :depends-on ("core"))
-                             (:file "type="        :depends-on ("core"))
-                             (:file "subtypep"     :depends-on ("core"))))
+                             (:file "deparameterize-type" :depends-on ("parametric-types"))))
                (:module "lambda-lists"             :depends-on ("extended-types" "types")
                 :components ((:file "doc")
                              (:file "parameters")

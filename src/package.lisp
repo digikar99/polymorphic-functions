@@ -3,15 +3,10 @@
   #+extensible-compound-types
   (:use :extensible-compound-types-cl)
   #-extensible-compound-types
-  (:use :cl :ctype)
-  #-extensible-compound-types
-  (:import-from :ctype
-                #:cons-specifier-ctype
-                #:ctype)
+  (:use :cl)
   (:intern #:*extended-type-specifiers*
            #:upgraded-extended-type)
-  (:shadow #:ctype=
-           #:extended-type-specifier-p
+  (:shadow #:extended-type-specifier-p
            #:type-specifier-p
            #:supertypep
            #:subtypep
@@ -48,10 +43,6 @@
         :cl)
   ;; #+extensible-compound-types
   ;; (:use :cl-form-types :alexandria :cl-environments-cl)
-  #-extensible-compound-types
-  (:import-from :ctype
-                #:ctype
-                #:cons-specifier-ctype)
   (:import-from :extensible-compound-types
                 #:orthogonally-specializing-type-specifier-p
                 #:specializing)
@@ -195,7 +186,7 @@
        (eq 'setf (car object))
        (symbolp (cadr object))))
 
-(deftype function-name ()
+(extensible-compound-types:deftype function-name ()
   ;; Doesn't work great with subtypep
   "Ref: http://www.lispworks.com/documentation/HyperSpec/Body/26_glo_f.htm#function_name"
   `(or symbol (satisfies setf-function-name-p)))

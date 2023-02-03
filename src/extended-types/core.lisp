@@ -32,30 +32,99 @@ the list only if the second return value is NIL."
 ;;; - "extended-type-specifier-p"
 ;;; Shadowed: subtypep typep type=
 
+(defvar *extended-type-specifiers* nil)
+;; (declaim (inline extended-type-specifier-p))
 (defun extended-type-specifier-p (object &optional env)
-  "Returns T if OBJECT is a non-CL type specifier. This means that
-(UPGRADED-CL-TYPE OBJECT ENV) returns a different value than OBJECT."
-  (when (type-specifier-p object env)
-    (not (extensible-compound-types:type= (upgraded-cl-type object env)
-                                          object
-                                          env))))
+  "Returns T if OBJECT is a type specifier implemented using CTYPE and is a
+tree containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
+  (declare (ignore env))
+  (if (parametric-type-specifier-p object)
+      nil
+      (progn
+        (traverse-tree object
+                       (lambda (node)
+                         (typecase node
+                           (list (if (member (car node) *extended-type-specifiers*)
+                                     (return-from extended-type-specifier-p t)
+                                     node))
+                           (t node))))
+        nil)))
+
+(deftype extended-type-specifier ()
+  "These type specifiers are implemented using CTYPE and are a tree
+containing a list starting with an element in *EXTENDED-TYPE-SPECIFIERS*"
+  `(satisfies extended-type-specifier-p))
 
 (defun type-specifier-p (object &optional env)
-  (or (extensible-compound-types:type-specifier-p object env)
+  (or (cl-type-specifier-p object)
+      (extended-type-specifier-p object env)
       (parametric-type-specifier-p object)))
 
-(defun subtypep (type1 type2 &optional environment)
-  "Like EXTENDED-TYPE-SPECIFIER:SUBTYPEP but allows PARAMETRIC-TYPE-SPECIFIER."
-  (let ((type1 (deparameterize-type type1))
-        (type2 (deparameterize-type type2)))
-    (extensible-compound-types:subtypep type1 type2 environment)))
+(defgeneric upgraded-extended-type (type-car)
+  (:documentation "Used within POLYMORPHIC-FUNCTIONS to prepare a (CL:DECLARE (CL:TYPE ...))
+statement for further type-based optimization by the compiler. This is similar to
+CL:UPGRADED-ARRAY-ELEMENT-TYPE."))
 
-;; (define-compiler-macro subtypep (&whole form type1 type2 &optional env-form &environment env)
-;;   (if (and (constantp type1 env) (constantp type2 env))
-;;       (let ((type1 (deparameterize-type type1))
-;;             (type2 (deparameterize-type type2)))
-;;         `(extensible-compound-types:subtypep ,type1 ,type2 ,env-form))
-;;       form))
+
+(defmethod upgraded-extended-type ((type-car (eql 'type-like)))
+  ;; FIXME: Use FUNCTION-TYPE or something to extract appropriate type from TYPE-CDR
+  t
+  ;; (destructuring-bind (var type-parameterizer) type-cdr
+  ;;   (cdr (assoc 'cl:type (nth-value 2 (cltl2:variable-information var env)))))
+  )
+
+(defun upgrade-extended-type (extended-type-specifier &optional env)
+  (declare (ignore env))
+  (let ((upgradeable-cars (cons 'type-like *extended-type-specifiers*)))
+    (traverse-tree extended-type-specifier
+                   (lambda (node)
+                     (typecase node
+                       (list (if (member (car node) upgradeable-cars)
+                                 (upgraded-extended-type (car node))
+                                 node))
+                       (t node))))))
+
+(defun subtypep (type1 type2 &optional environment)
+  "Like CL:SUBTYPEP but allows PARAMETRIC-TYPE-SPECIFIER as well as EXTENDED-TYPE-SPECIFIERs
+COMPILER-MACROEXPANDs to CL:SUBTYPEP if both types are constant objects and
+neither is a EXTENDED-TYPE-SPECIFIER."
+  (let* ((type1 (deparameterize-type type1))
+         (type2 (deparameterize-type type2))
+         (values1p (and (listp type1) (eq 'cl:values (first type1))))
+         (values2p (and (listp type2) (eq 'cl:values (first type2)))))
+    (cond ((or values1p values2p)
+           (loop :for i :from 0
+                 :for ith-v1 := (cl-form-types:nth-value-type type1 i)
+                 :for ith-v2 := (cl-form-types:nth-value-type type2 i)
+                 :while (and ith-v1 ith-v2)
+                 :always (subtypep ith-v1 ith-v2 environment)))
+          ((and (cl-type-specifier-p type1)
+                (cl-type-specifier-p type2))
+           (cl:subtypep type1 type2 environment))
+          (t
+           (extensible-compound-types:subtypep type1 type2 environment)))))
+
+(define-compiler-macro subtypep
+    (&whole form type1-form type2-form &optional env-form &environment env)
+  (if (and (constantp type1-form env) (constantp type2-form env))
+      (let* ((type1-form (deparameterize-type type1-form))
+             (type2-form (deparameterize-type type2-form))
+             (type1 (constant-form-value type1-form env))
+             (type2 (constant-form-value type2-form env))
+             (values1p (and (listp type1) (eq 'cl:values (first type1))))
+             (values2p (and (listp type2) (eq 'cl:values (first type2)))))
+        (cond ((or values1p values2p)
+               form)
+              ((and (cl-type-specifier-p type1)
+                    (cl-type-specifier-p type2))
+               `(cl:subtypep ,type1-form ,type2-form ,env-form))
+              ((and (extended-type-specifier-p (constant-form-value type1-form env))
+                    (extended-type-specifier-p (constant-form-value type2-form env)))
+               (once-only (env-form)
+                 `(extensible-compound-types:subtypep type1 type2 environment)))
+              (t
+               form)))
+      form))
 
 (defvar *subtypep-alist* nil
   "An ALIST mapping a (CONS TYPE1 TYPE2) to a boolean indicating whether TYPE1
@@ -141,24 +210,25 @@ The function-order for determining the SUBTYPEP functions is undefined."
 ;;; TYPEP should return two values
 
 (defun typep (object type &optional environment)
-  "Like EXTENSIBLE-COMPOUND-TYPES:TYPEP but allows TYPE to be a PARAMETRIC-TYPE-SPECIFIER.
-COMPILER-MACROEXPANDs to EXTENSIBLE-COMPOUND-TYPES:TYPEP if TYPE is a constant object."
+  "Like CL:TYPEP but allows TYPE to be a PARAMETRIC-TYPE-SPECIFIER or EXTENDED-TYPE-SPECIFIER.
+COMPILER-MACROEXPANDs to CL:TYPEP if TYPE is a constant object not a EXTENDED-TYPE-SPECIFIER."
   (let ((type (deparameterize-type type)))
-    (extensible-compound-types:typep object type environment)))
+    (if (cl-type-specifier-p type)
+        (cl:typep object type)
+        (extensible-compound-types:typep object type environment))))
 
 (define-compiler-macro typep (&whole form object type &optional env-form &environment env)
   (if (constantp type env)
       (let* ((type (deparameterize-type type))
              (type (constant-form-value type env)))
-        `(extensible-compound-types:typep ,object ',type ,env-form))
+        (cond ((cl-type-specifier-p type)
+               `(cl:typep ,object ',type ,env-form))
+              ((extended-type-specifier-p type)
+               `(extensible-compound-types:typep ,object ',type ,env-form))
+              (t
+               form)))
       form))
 
 (defun type= (type1 type2 &optional env)
-  (multiple-value-bind (s1 k1) (subtypep type1 type2 env)
-    (multiple-value-bind (s2 k2) (subtypep type2 type1 env)
-      (cond ((and s1 k1 s2 k2)
-             (values t t))
-            ((and k1 k2)
-             (values nil t))
-            (t
-             (values nil nil))))))
+  (and (subtypep type1 type2 env)
+       (subtypep type2 type1 env)))
