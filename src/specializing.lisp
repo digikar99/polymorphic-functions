@@ -11,10 +11,10 @@
   (type-of object))
 
 (defpolymorph specializing-type-of ((object array)) (or list symbol)
-  `(array ,(array-element-type object)))
+  `(array ,(array-element-type object) ,(array-rank object)))
 
 (defpolymorph specializing-type-of ((object simple-array)) (or list symbol)
-  `(simple-array ,(array-element-type object)))
+  `(simple-array ,(array-element-type object) ,(array-rank object)))
 
 (defpolymorph specializing-type-of ((object fixnum)) (or list symbol)
   (declare (ignore object))
