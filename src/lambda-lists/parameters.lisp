@@ -406,29 +406,44 @@
   "Returns two values
 - The first value is the declaration for the actual polymorph parameters
 - The second value is the IGNORABLE declaration for the type parameters "
-  (let ((type-parameter-names ()))
+  (let ((type-parameter-names ())
+        (extype-decl-sym (when (find-package :extensible-compound-types)
+                           (find-symbol "EXTYPE" :extensible-compound-types))))
     (flet ((type-decl (pp)
              (with-slots (local-name value-type) pp
                (loop :for tp :in (pp-type-parameters pp)
                      :do (pushnew (type-parameter-name tp) type-parameter-names))
                (let ((value-type (deparameterize-type value-type)))
-                 #+extensible-compound-types
-                 `(type ,value-type ,local-name)
-                 #-extensible-compound-types
                  (cond ((cl-type-specifier-p value-type)
                         `(type ,value-type ,local-name))
                        (t
-                        `(type ,(upgrade-extended-type value-type) ,local-name)))))))
+                        `(type ,(upgrade-extended-type value-type) ,local-name))))))
+           (extype-decl (pp)
+             (when extype-decl-sym
+               (with-slots (local-name value-type) pp
+                 (loop :for tp :in (pp-type-parameters pp)
+                       :do (pushnew (type-parameter-name tp) type-parameter-names))
+                 (let ((value-type (deparameterize-type value-type)))
+                   `(,extype-decl-sym ,(upgrade-extended-type value-type) ,local-name))))))
       (values
-       `(declare ,@(set-difference (map-polymorph-parameters polymorph-parameters
-                                                             :required #'type-decl
-                                                             :optional #'type-decl
-                                                             :keyword  #'type-decl
-                                                             :rest (lambda (pp)
-                                                                     (declare (ignore pp))
-                                                                     nil))
+       `(declare ,@(set-difference (nconc
+                                    (map-polymorph-parameters polymorph-parameters
+                                                              :required #'type-decl
+                                                              :optional #'type-decl
+                                                              :keyword  #'type-decl
+                                                              :rest (lambda (pp)
+                                                                      (declare (ignore pp))
+                                                                      nil))
+                                    (map-polymorph-parameters polymorph-parameters
+                                                              :required #'extype-decl
+                                                              :optional #'extype-decl
+                                                              :keyword  #'extype-decl
+                                                              :rest (lambda (pp)
+                                                                      (declare (ignore pp))
+                                                                      nil)))
                                    lambda-list-keywords))
-       `(declare (ignorable ,@type-parameter-names))))))
+       (when type-parameter-names
+         `(declare (ignorable ,@type-parameter-names)))))))
 
 
 
@@ -609,7 +624,9 @@
 (defun enhanced-lambda-declarations (polymorph-parameters arg-types &optional return-type)
 
   (let* ((processed-for-keyword-arguments nil)
-         (new-type-parameters nil))
+         (new-type-parameters nil)
+         (extype-decl-sym (when (find-package :extensible-compound-types)
+                            (find-symbol "EXTYPE" :extensible-compound-types))))
 
     (flet ((populate-deparameterizer-alist (pp arg-type)
              (when-let (type-parameters (pp-type-parameters pp))
@@ -678,11 +695,23 @@
         (values `(declare ,@(loop :for type-form :in type-forms
                                   :if (not (member type-form lambda-list-keywords))
                                     ;; LOOP instead of SET-DIFFERENCE to preserver order
-                                    :collect type-form))
+                                    :collect type-form)
+                          ,@(when extype-decl-sym
+                              (loop :for type-form :in type-forms
+                                    :if (not (member type-form lambda-list-keywords))
+                                      ;; LOOP instead of SET-DIFFERENCE to preserver order
+                                      :collect `(,extype-decl-sym ,@(rest type-form)))))
                 `(declare (ignorable ,@new-type-parameters))
-                `(declare ,@(loop :for (type-parameter . value) :in *deparameterizer-alist*
+                `(declare ,@(loop :for (type-parameter . value)
+                                    :in *deparameterizer-alist*
                                   :if (member type-parameter new-type-parameters)
-                                    :collect `(type (eql ,value) ,type-parameter)))
+                                    :collect `(type (eql ,value) ,type-parameter))
+                          ,@(when extype-decl-sym
+                              (loop :for (type-parameter . value)
+                                      :in *deparameterizer-alist*
+                                    :if (member type-parameter new-type-parameters)
+                                      :collect `(,extype-decl-sym (eql ,value)
+                                                                  ,type-parameter))))
                 (translate-body return-type *deparameterizer-alist*))))))
 
 (defun accepts-argument-of-type-p (polymorph-parameters type)
