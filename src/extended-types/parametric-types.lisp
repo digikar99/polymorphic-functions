@@ -71,9 +71,17 @@ which have type parameters that depend on each other."
     #'parametric-type-symbol-p
     (flatten (ensure-list parametric-type-spec)))))
 
+;; Even though orthogonally specializing types from extensible-compound-types
+;; beautifully take care of single-level type parameters,
+;; this is only possible if implementations do not typexpand the types
+;; before the compiler macroexpansion stage. At least SBCL violates this
+;; assumption and typexpands them before compiler macroexpansion.
+;; As a result, while dealing with the absence of extensible-compound-types,
+;; one has to specialize appropriate methods for the below generic functions.
+
 (defvar *ocs-run-time-lambda-body-lambda-table* (make-hash-table))
 
-(defun parametric-type-run-time-lambda-body (type-car type-cdr type-parameter)
+(defmethod parametric-type-run-time-lambda-body (type-car type-cdr type-parameter)
   (assert (orthogonally-specializing-type-specifier-p
            (extensible-compound-types:typexpand
             (deparameterize-type `(,type-car ,@type-cdr)))))
@@ -111,21 +119,34 @@ which have type parameters that depend on each other."
            type-parameter
            (nthcdr 2 type-spec))))
 
-(defun parametric-type-compile-time-lambda-body (type-car type-cdr type-parameter)
+(defun search-token-in-equivalent-tree (token tree-with-token equivalent-tree)
+  (labels ((search-token (tree-with-token equivalent-tree)
+             (cond ((eq tree-with-token token)
+                    equivalent-tree)
+                   ((or (atom tree-with-token)
+                        (atom equivalent-tree))
+                    nil)
+                   (t
+                    (or (search-token (first tree-with-token)
+                                      (first equivalent-tree))
+                        (search-token (rest tree-with-token)
+                                      (rest equivalent-tree)))))))
+    (search-token tree-with-token equivalent-tree)))
+
+(defmethod parametric-type-compile-time-lambda-body (type-car type-cdr type-parameter)
   (assert (orthogonally-specializing-type-specifier-p
-           (extensible-compound-types:typexpand
-            (deparameterize-type `(,type-car ,@type-cdr)))))
-  (with-gensyms (object-type p a)
+           (deparameterize-type `(,type-car ,@type-cdr))))
+  (with-gensyms (object-type)
     (let* ((type-pattern (extensible-compound-types:typexpand `(,type-car ,@type-cdr))))
       `(cl:lambda (,object-type)
-         (let ((,object-type (flatten (extensible-compound-types:typexpand ,object-type))))
-           (if (not (eq (second ,object-type)
-                        ',(second type-pattern)))
-               nil
-               (loop :for ,a :in (rest ,object-type)
-                     :for ,p :in ',(flatten (rest type-pattern))
-                     :do (when (eq ,p ',type-parameter)
-                           (return ,a)))))))))
+         (if (orthogonally-specializing-type-specifier-p ,object-type)
+             (search-token-in-equivalent-tree
+              ',type-parameter
+              ',type-pattern
+              (extensible-compound-types:typexpand ,object-type))
+             (signal 'compiler-macro-notes:optimization-failure-note
+                     :datum "  ~S~%is not an ORTHOGONALLY-SPECIALIZING-TYPE.~%Consider implementing a method for PARAMETRIC-TYPE-COMPILE-TIME-LAMBDA-BODY with the EQL specializer ~S"
+                     :args (list ,object-type ',type-car)))))))
 
 (defun type-parameters-from-parametric-type (parametric-type-spec)
   "Returns a list oF TYPE-PARAMETERS"
