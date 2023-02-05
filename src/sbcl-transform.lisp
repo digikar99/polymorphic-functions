@@ -1,10 +1,12 @@
 (in-package :polymorphic-functions)
 
 (defun most-specialized-applicable-transform-p (name arg-types-alist type-list)
-  (let ((*compiler-macro-expanding-p* t))
-    (declare (optimize debug))
-    (equalp type-list
-            (polymorph-type-list (apply #'compiler-retrieve-polymorph name arg-types-alist)))))
+  (declare (optimize debug))
+  (let* ((*compiler-macro-expanding-p* t)
+         (polymorph-may-be (apply #'compiler-retrieve-polymorph name arg-types-alist)))
+    (when polymorph-may-be
+      (equalp type-list
+              (polymorph-type-list polymorph-may-be)))))
 
 (defun make-sbcl-transform-body (name typed-lambda-list inline-lambda-body polymorph-parameters)
   (declare (optimize debug))
