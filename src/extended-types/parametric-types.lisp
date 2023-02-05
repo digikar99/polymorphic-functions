@@ -122,7 +122,7 @@ which have type parameters that depend on each other."
 (defun search-token-in-equivalent-tree (token tree-with-token equivalent-tree)
   (labels ((search-token (tree-with-token equivalent-tree)
              (cond ((eq tree-with-token token)
-                    equivalent-tree)
+                    (values equivalent-tree t))
                    ((or (atom tree-with-token)
                         (atom equivalent-tree))
                     nil)

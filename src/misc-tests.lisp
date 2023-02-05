@@ -66,7 +66,7 @@
                `(list ,form)) ; This usage of FORM also tests infinite recursion
              (define-compiled-function bar-caller ()
                (declare (optimize speed (debug 1)))
-               (bar "hello" 9)))))
+               (bar "hello" 9 7)))))
   (is (equal (eval `(bar "hello"))
              '("hello" 5 7)))
   (is (equal (eval `(bar "hello" 6))
@@ -95,7 +95,7 @@
                `(list ,form))
              (define-compiled-function foobar-caller ()
                (declare (optimize speed (debug 1)))
-               (foobar 7 :key 10)))))
+               (foobar 7 :key 10 :b "world")))))
   (is (equal '(string 5 "world")    (eval `(foobar "hello"))))
   (is (equal '(string 5.6 "world")  (eval `(foobar "hello" :key 5.6))))
   (is (equal '(number 6 "world")    (eval `(foobar 5.6))))

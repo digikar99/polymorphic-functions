@@ -454,7 +454,14 @@
 
     (with-gensyms (form form-type)
       (flet ((app-p-form (param pp)
-               (let ((type (pp-value-effective-type pp))
+               (let ((param-supplied-p (etypecase param
+                                         (cons (third param))
+                                         (symbol nil)))
+                     (param (etypecase param
+                              (cons (first param))
+                              (symbol param)))
+                     (form-in-pf (pp-form-in-pf pp))
+                     (type            (pp-value-type pp))
                      (type-parameters (pp-type-parameters pp)))
                  (cond ((and (null type-parameters)
                              (type= t type))
@@ -476,12 +483,15 @@
                                  (,form-type (cdr ,param)))
                              (cond ((type= t ,form-type)
                                     (signal 'form-type-failure :form ,form))
+                                   ((and ',param-supplied-p
+                                         (null ,param-supplied-p))
+                                    (signal 'form-type-failure :form ',form-in-pf))
                                    (t
-                                    (if ,form-type ; FORM is supplied
-                                        (subtypep ,form-type ',deparameterized-type)
-                                        ;; If FORM is not supplied, then PP-VALUE-EFFECTIVE-TYPE
-                                        ;; determines whether polymorph is applicable
-                                        ,(subtypep 'null deparameterized-type)))))))))))
+                                    ,(if param-supplied-p
+                                         `(if ,param-supplied-p
+                                              (subtypep ,form-type ',deparameterized-type)
+                                              t)
+                                         `(subtypep ,form-type ',deparameterized-type)))))))))))
 
         (let* ((lambda-list
                  (map-polymorph-parameters polymorph-parameters
@@ -500,7 +510,11 @@
                                            (lambda (pp)
                                              (list (intern (symbol-name (pp-local-name pp))
                                                            :polymorphic-functions)
-                                                   nil))
+                                                   nil
+                                                   (gensym (concatenate 'string
+                                                                        (write-to-string
+                                                                         (pp-local-name pp))
+                                                                        "-SUPPLIED-P"))))
                                            :rest
                                            (lambda (pp)
                                              (gensym (write-to-string (pp-local-name pp))))))
@@ -518,23 +532,20 @@
                     (lambda (pp)
                       (loop :while (member (car ll) lambda-list-keywords)
                             :do (setq ll (cdr ll)))
-                      (let ((form `(or (not ,(third (car ll)))
-                                       ,(app-p-form (first (car ll))
-                                                    pp))))
+                      (let ((form (app-p-form (car ll) pp)))
                         (setq ll (cdr ll))
                         form))
                     :keyword
                     (lambda (pp)
                       (loop :while (member (car ll) lambda-list-keywords)
                             :do (setq ll (cdr ll)))
-                      (let ((form (app-p-form (first (car ll)) pp)))
+                      (let ((form (app-p-form (car ll) pp)))
                         (setq ll (cdr ll))
                         form))
                     :rest
                     (lambda (pp)
                       (declare (ignore pp))
                       nil)))))
-
           `(cl:lambda ,lambda-list
              (declare (optimize speed)
                       (ignorable ,@(mapcar (lambda (elt)
@@ -554,7 +565,8 @@
                                                   (nth non-null-form-pos forms))))
                             (if (null non-null-form-pos)
                                 'cl:t
-                                `(and ,@(loop :for pos :from 0
+                                `(and (nth-value 1 ,non-null-form)
+                                      ,@(loop :for pos :from 0
                                               :for form :in forms
                                               :if (/= pos non-null-form-pos)
                                                 :collect (if (member (second form)
@@ -600,10 +612,10 @@
               ,@(loop :for (name . form-specs) :in type-parameter-alist
                       :collect
                       (let* ((non-null-form-pos (position-if-not (lambda (form-in-pf)
-                                                                  (member form-in-pf
-                                                                          may-be-null-forms-in-pf
-                                                                          :test #'equal))
-                                                                form-specs :key #'car))
+                                                                   (member form-in-pf
+                                                                           may-be-null-forms-in-pf
+                                                                           :test #'equal))
+                                                                 form-specs :key #'car))
                              (non-null-form (when non-null-form-pos
                                               (cdr (nth non-null-form-pos form-specs)))))
                         (if (null non-null-form-pos)
