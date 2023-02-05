@@ -41,8 +41,8 @@
 
 (def-test effective-lambda-list-untyped (:suite effective-lambda-list)
 
-  (is (equalp '(a b &optional)
-              (polymorphic-function-make-effective-lambda-list '(a b &optional))))
+  (is (equal '(a b &optional)
+             (polymorphic-function-make-effective-lambda-list '(a b &optional))))
   (is-error (polymorphic-function-make-effective-lambda-list '(a b &optional &rest)))
   (destructuring-bind (first second third fourth)
       (polymorphic-function-make-effective-lambda-list '(a &optional c d))
@@ -61,8 +61,8 @@
     (is (eq 'c (first fifth)))
     (is (eq 'd (first sixth))))
 
-  (is (equalp '(a b &rest c)
-              (polymorphic-function-make-effective-lambda-list '(a b &rest c))))
+  (is (equal '(a b &rest c)
+             (polymorphic-function-make-effective-lambda-list '(a b &rest c))))
   (is-error (polymorphic-function-make-effective-lambda-list '(a b &rest)))
   (destructuring-bind (first second third)
       (polymorphic-function-make-effective-lambda-list '(a &rest c))
@@ -114,14 +114,14 @@
     (nreverse normalized-list)))
 
 (def-test normalize-typed-lambda-list (:suite lambda-list)
-  (5am:is-true (equalp '((a t))
-                       (normalize-typed-lambda-list '(a))))
-  (5am:is-true (equalp '(&optional ((a t) nil))
-                       (normalize-typed-lambda-list '(&optional a))))
-  (5am:is-true (equalp '(&key ((a t) nil))
-                       (normalize-typed-lambda-list '(&key a))))
-  (5am:is-true (equalp '(&rest a)
-                       (normalize-typed-lambda-list '(&rest a)))))
+  (5am:is-true (equal '((a t))
+                      (normalize-typed-lambda-list '(a))))
+  (5am:is-true (equal '(&optional ((a t) nil))
+                      (normalize-typed-lambda-list '(&optional a))))
+  (5am:is-true (equal '(&key ((a t) nil))
+                      (normalize-typed-lambda-list '(&key a))))
+  (5am:is-true (equal '(&rest a)
+                      (normalize-typed-lambda-list '(&rest a)))))
 
 (defun untyped-lambda-list (normalized-typed-lambda-list)
   (let ((typed-lambda-list   normalized-typed-lambda-list)
@@ -140,14 +140,14 @@
     (nreverse untyped-lambda-list)))
 
 (def-test untyped-lambda-list ()
-  (is (equalp '(a)   (untyped-lambda-list '((a string)))))
-  (is (equalp '(a b) (untyped-lambda-list '((a string) (b number)))))
-  (is (equalp '(&optional c)   (untyped-lambda-list '(&optional ((c string))))))
-  (is (equalp '(a &optional c) (untyped-lambda-list '((a number) &optional ((c string))))))
-  (is (equalp '(&key c)   (untyped-lambda-list '(&key ((c string))))))
-  (is (equalp '(&key c d)   (untyped-lambda-list '(&key ((c string)) ((d number))))))
-  (is (equalp '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
-  (is (equalp '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
+  (is (equal '(a)   (untyped-lambda-list '((a string)))))
+  (is (equal '(a b) (untyped-lambda-list '((a string) (b number)))))
+  (is (equal '(&optional c)   (untyped-lambda-list '(&optional ((c string))))))
+  (is (equal '(a &optional c) (untyped-lambda-list '((a number) &optional ((c string))))))
+  (is (equal '(&key c)   (untyped-lambda-list '(&key ((c string))))))
+  (is (equal '(&key c d)   (untyped-lambda-list '(&key ((c string)) ((d number))))))
+  (is (equal '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
+  (is (equal '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
 
 (declaim (ftype (function (list list) polymorph-parameters)
                 make-polymorph-parameters-from-lambda-lists))
@@ -561,10 +561,10 @@
                                                                      may-be-null-forms
                                                                      :test #'equal)
                                                              `(or (null ,form)
-                                                                  (equalp ,non-null-form
-                                                                          ,form))
-                                                             `(equalp ,non-null-form
-                                                                      ,form))))))))))))))
+                                                                  (equal ,non-null-form
+                                                                         ,form))
+                                                             `(equal ,non-null-form
+                                                                     ,form))))))))))))))
 
 
 (defun run-time-applicable-p-form (polymorph-parameters)
@@ -614,10 +614,10 @@
                                             :collect (if (member form-in-pf may-be-null-forms-in-pf
                                                                  :test #'equal)
                                                          `(or (null ,form-in-pf)
-                                                              (equalp ,non-null-form
-                                                                      ,form))
-                                                         `(equalp ,non-null-form
-                                                                  ,form))))))))))))
+                                                              (equal ,non-null-form
+                                                                     ,form))
+                                                         `(equal ,non-null-form
+                                                                 ,form))))))))))))
 
 
 
