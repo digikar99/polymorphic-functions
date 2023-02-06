@@ -154,7 +154,7 @@ which have type parameters that depend on each other."
   (with-gensyms (object-type)
     `(cl:lambda (,object-type)
        (orthogonally-specializing-type-compile-time-lambda-body
-        ',type-car ',type-cdr ',type-parameter ',object-type))))
+        ',type-car ',type-cdr ',type-parameter ,object-type))))
 
 (defun type-parameters-from-parametric-type (parametric-type-spec)
   "Returns a list oF TYPE-PARAMETERS"
