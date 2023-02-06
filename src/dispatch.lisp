@@ -263,9 +263,10 @@ in the lambda list; the consequences of mutation are undefined."
                               p-old))))
                     (if old-name
                         old-name
-                        (intern (write-to-string
-                                 `(polymorph ,name ,type-list))
-                                '#:polymorphic-functions.nonuser)))))
+                        (let ((*package* (find-package '#:polymorphic-functions.nonuser)))
+                          (intern (write-to-string
+                                   `(polymorph ,name ,type-list))
+                                  '#:polymorphic-functions.nonuser))))))
              ((&values lambda-declarations type-parameter-ignorable-declaration)
               (lambda-declarations parameters))
              (lambda-body
