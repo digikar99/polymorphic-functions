@@ -548,11 +548,12 @@
                       nil)))))
           `(cl:lambda ,lambda-list
              (declare (optimize speed)
-                      (ignorable ,@(mapcar (lambda (elt)
-                                             (etypecase elt
-                                               (atom elt)
-                                               (list (first elt))))
-                                           (set-difference lambda-list lambda-list-keywords))))
+                      (ignorable ,@(mappend (lambda (elt)
+                                              (etypecase elt
+                                                (atom (list elt))
+                                                (list (list (first elt)
+                                                            (third elt)))))
+                                            (set-difference lambda-list lambda-list-keywords))))
              (and ,@(set-difference lambda-body-forms lambda-list-keywords)
                   ,@(loop :for (type-param . forms) :in type-parameters-alist
                           :collect
