@@ -284,11 +284,15 @@ in the lambda list; the consequences of mutation are undefined."
                                           (augment-environment
                                            env
                                            :variable
-                                           (remove-if
-                                            #'null
-                                            (mapcar #'third
-                                                    (rest lambda-declarations)))
-                                           :declare (rest lambda-declarations)))
+                                           (remove-duplicates
+                                            (remove-if
+                                             #'null
+                                             (mapcar #'third
+                                                     (rest lambda-declarations))))
+                                           :declare
+                                           (remove-duplicates
+                                            (rest lambda-declarations)
+                                            :test #'equal)))
                       (unless (parametric-type-specifier-p return-type)
                         (setq return-type form-return-type))
                       form))))
