@@ -30,8 +30,9 @@ the polymorphic-function being called at the call-site is dispatched dynamically
       (compiler-macro-notes:with-notes
           (original-form env :name (fdefinition name)
                              :unwind-on-signal nil
-                             :optimization-note-condition (and optim-speed
-                                                               (not *disable-static-dispatch*)))
+                             :optimization-note-condition
+                             (and optim-speed
+                                  (not *disable-static-dispatch*)))
 
         (unless (macroexpand 'top-level-p env)
           (return-from pf-compiler-macro-function form))
@@ -182,11 +183,25 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                         (let ((enhanced-return-type
                                 (lastcar
                                  (form-type macroexpanded-form augmented-env))))
+                          ;; We can't just substitute the enhanced-return-type
+                          ;; because it is possible that the originally specified
+                          ;; return-type was more specific than what a derivation
+                          ;; could tell us.
                           (setq return-type
-                                (if (subtypep enhanced-return-type return-type)
-                                    enhanced-return-type
-                                    (cl-form-types::combine-values-types
-                                     'and return-type enhanced-return-type))))
+                                (cond ((subtypep enhanced-return-type return-type)
+                                       enhanced-return-type)
+                                      ((subtypep `(and ,enhanced-return-type
+                                                       ,return-type)
+                                                 nil)
+                                       (signal 'compile-time-return-type-mismatch
+                                               :derived enhanced-return-type
+                                               :declared return-type
+                                               :form lambda-with-enhanced-declarations)
+                                       (return-from pf-compiler-macro-function
+                                         original-form))
+                                      (t
+                                       (cl-form-types::combine-values-types
+                                        'and return-type enhanced-return-type)))))
                         ;; Some macroexpand-all can produce a (function (lambda ...)) from (lambda ...)
                         ;; Some others do not
                         (if (eq 'cl:function (first macroexpanded-form))

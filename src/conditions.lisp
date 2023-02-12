@@ -152,3 +152,13 @@ Do you want to delete these POLYMORPHs to associate a new ones?"
   (:report (lambda (condition stream)
              (format stream "More optimal POLYMORPH with TYPE-LIST~%  ~S~%was found to be inapplicable"
                      (more-optimal-type-list condition)))))
+
+(define-condition compile-time-return-type-mismatch
+    (compiler-macro-notes:optimization-failure-note)
+  ((derived :initarg :derived)
+   (declared :initarg :declared)
+   (form :initarg :form))
+  (:report (lambda (condition stream)
+             (with-slots (derived declared form) condition
+               (format stream "The declared return type~%  ~S~%does not match the derived return type~%  ~S~%of form~%  ~S"
+                       declared derived form)))))

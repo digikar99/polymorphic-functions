@@ -244,10 +244,7 @@
              (declare (optimize speed)
                       (type string b))
              (sbcl-transform b))))
-  (is (equal #-extensible-compound-types
-             '(string (string "string"))
-             #+extensible-compound-types
-             '((or base-string (vector character)) (string "string"))
+  (is (equal '(string (string "string"))
              (eval `(sbcl-transform-compiler-macro-caller "string"))))
   (eval `(undefpolymorph 'sbcl-transform '(string)))
   (is (= 1 (length
