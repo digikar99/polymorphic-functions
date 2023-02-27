@@ -337,6 +337,15 @@
                          (when keyword '(&key))
                          (when keyword-fn (mapcar keyword-fn keyword)))))))
 
+(defun enhance-run-time-deparameterizer-lambda-body (lambda-body local-name)
+  (optima:ematch lambda-body
+    ((list* lambda (list parameter) body-decl)
+     `(,lambda (,parameter)
+        (pflet ((,parameter ,parameter))
+          (declare (type-like ,local-name ,parameter))
+          ,@body-decl)))
+    (name name)))
+
 (defun polymorph-effective-lambda-list (polymorph-parameters)
   "Returns 4 values:
 - The first value is the LAMBDA-LIST suitable for constructing polymorph's lambda
@@ -353,7 +362,9 @@
                                           type-parameter-name-deparameterizer-list
                                           name)
                                    (push `(,name
-                                           (,run-time-deparameterizer-lambda-body
+                                           (,(enhance-run-time-deparameterizer-lambda-body
+                                              run-time-deparameterizer-lambda-body
+                                              (pp-local-name pp))
                                             ,(pp-local-name pp)))
                                          type-parameter-name-deparameterizer-list))))))
               (append
