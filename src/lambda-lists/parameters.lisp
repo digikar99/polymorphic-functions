@@ -149,6 +149,12 @@
   (is (equal '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
   (is (equal '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
 
+(defun ensure-default-form-type (default-form type &optional env)
+  (let ((default-form-type (nth-form-type default-form env 0 t t)))
+    (when (intersection-null-p default-form-type type)
+      (warn "The type of~%  ~S~%was expected to be~%  ~S~%but was derived to be~%  ~S~%which does not intersect with%  ~S"
+            default-form type default-form-type type))))
+
 (declaim (ftype (function (list list) polymorph-parameters)
                 make-polymorph-parameters-from-lambda-lists))
 (defun make-polymorph-parameters-from-lambda-lists (polymorphic-function-lambda-list
@@ -212,15 +218,19 @@
                                                      :value-effective-type type))
                      (setq untyped-lambda-list (cdr untyped-lambda-list))))
                   (&optional
-                   (destructuring-bind ((name type) &optional default supplied-p-name)
+                   (destructuring-bind ((name type)
+                                        &optional (default nil defaultp)
+                                          supplied-p-name)
                        parameter-specifier
+                     (when defaultp
+                       (ensure-default-form-type default type))
                      (setq parameter
                            (make-polymorph-parameter :local-name name
                                                      :form-in-pf (car untyped-lambda-list)
                                                      :value-type type
                                                      :default-value-form default
                                                      :value-effective-type
-                                                     (if default
+                                                     (if defaultp
                                                          `(or null ,type)
                                                          type)
                                                      :supplied-p-name supplied-p-name))
@@ -235,8 +245,13 @@
                          (incf rest-idx))
                        (if (listp (car parameter-specifier))
                            ;; LIST for &KEY parameter-specifier
-                           (destructuring-bind ((name type) &optional default supplied-p-name)
+                           (destructuring-bind
+                               ((name type)
+                                &optional (default nil defaultp)
+                                  supplied-p-name)
                                parameter-specifier
+                             (when defaultp
+                               (ensure-default-form-type default type))
                              (setq parameter
                                    (make-polymorph-parameter :local-name name
                                                              :form-in-pf
@@ -249,7 +264,7 @@
                                                              :value-type type
                                                              ;; only REQUIRED, KEY or REST
                                                              :value-effective-type
-                                                             (if default
+                                                             (if defaultp
                                                                  `(or null ,type)
                                                                  type)
                                                              :supplied-p-name supplied-p-name)))
@@ -264,15 +279,19 @@
                              (incf rest-idx))))
                    (setq untyped-lambda-list (cdr untyped-lambda-list)))
                   (&key
-                   (destructuring-bind ((name type) &optional default supplied-p-name)
+                   (destructuring-bind ((name type)
+                                        &optional (default nil defaultp)
+                                          supplied-p-name)
                        parameter-specifier
+                     (when defaultp
+                       (ensure-default-form-type default type))
                      (setq parameter
                            (make-polymorph-parameter :local-name name
                                                      :form-in-pf (car untyped-lambda-list)
                                                      :value-type type
                                                      :default-value-form default
                                                      :value-effective-type
-                                                     (if default
+                                                     (if defaultp
                                                          `(or null ,type)
                                                          type)
                                                      :supplied-p-name supplied-p-name))
