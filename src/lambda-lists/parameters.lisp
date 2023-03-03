@@ -489,39 +489,45 @@
                                          (symbol nil)))
                      (param (etypecase param
                               (cons (first param))
-                              (symbol param)))
-                     (form-in-pf (pp-form-in-pf pp))
-                     (type            (pp-value-type pp))
-                     (type-parameters (pp-type-parameters pp)))
-                 (cond ((and (null type-parameters)
-                             (type= t type))
-                        t)
-                       (t
-                        (let ((deparameterized-type (deparameterize-type type)))
-                          (when type-parameters
-                            (loop :for type-parameter :in type-parameters
-                                  :do (with-slots (name
-                                                   compile-time-deparameterizer-lambda-body)
-                                          type-parameter
-                                        (push `(,compile-time-deparameterizer-lambda-body
-                                                (cdr ,param))
-                                              (assoc-value type-parameters-alist name)))
-                                  :finally (return t)))
-                          (when (subtypep 'null deparameterized-type)
-                            (pushnew `(cdr ,param) may-be-null-forms :test #'equal))
-                          `(let ((,form      (car ,param))
-                                 (,form-type (cdr ,param)))
-                             (cond ((type= t ,form-type)
-                                    (signal 'form-type-failure :form ,form))
-                                   ((and ',param-supplied-p
-                                         (null ,param-supplied-p))
-                                    (signal 'form-type-failure :form ',form-in-pf))
-                                   (t
-                                    ,(if param-supplied-p
-                                         `(if ,param-supplied-p
-                                              (subtypep ,form-type ',deparameterized-type)
-                                              t)
-                                         `(subtypep ,form-type ',deparameterized-type)))))))))))
+                              (symbol param))))
+                 (with-slots (form-in-pf
+                              (type value-type)
+                              type-parameters
+                              default-value-form)
+                     pp
+                   (cond ((and (null type-parameters)
+                               (type= t type))
+                          t)
+                         (t
+                          (let ((deparameterized-type (deparameterize-type type)))
+                            (when type-parameters
+                              (loop :for type-parameter :in type-parameters
+                                    :do (with-slots
+                                              (name
+                                               compile-time-deparameterizer-lambda-body)
+                                            type-parameter
+                                          (push `(,compile-time-deparameterizer-lambda-body
+                                                  (cdr ,param))
+                                                (assoc-value type-parameters-alist name)))
+                                    :finally (return t)))
+                            (when (subtypep 'null deparameterized-type)
+                              (pushnew `(cdr ,param) may-be-null-forms :test #'equal))
+                            `(let ((,form      (car ,param))
+                                   (,form-type (cdr ,param)))
+                               (cond ((type= t ,form-type)
+                                      (signal 'form-type-failure :form ,form))
+                                     ((and ',param-supplied-p
+                                           (null ,param-supplied-p))
+                                      ,(if (null default-value-form)
+                                           (typep nil type)
+                                           `(signal 'form-type-failure :form ',form-in-pf)))
+                                     (t
+                                      ,(if param-supplied-p
+                                           `(if ,param-supplied-p
+                                                (subtypep ,form-type ',deparameterized-type)
+                                                t)
+                                           `(subtypep ,form-type
+                                                      ',deparameterized-type))))))))))))
 
         (let* ((lambda-list
                  (map-polymorph-parameters polymorph-parameters
