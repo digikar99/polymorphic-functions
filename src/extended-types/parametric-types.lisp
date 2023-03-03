@@ -132,10 +132,14 @@ which have type parameters that depend on each other."
     (type-car type-cdr type-parameter object-type)
   (let ((type-pattern (extensible-compound-types:typexpand `(,type-car ,@type-cdr))))
     (if (orthogonally-specializing-type-specifier-p object-type)
-        (search-token-in-equivalent-tree
-         type-parameter
-         type-pattern
-         (extensible-compound-types:typexpand object-type))
+        (multiple-value-bind (result knownp)
+            (search-token-in-equivalent-tree
+             type-parameter
+             type-pattern
+             (extensible-compound-types:typexpand object-type))
+          (if (and knownp (not (eq result 'cl:*)))
+              (values result t)
+              (values nil nil)))
         (signal 'compiler-macro-notes:optimization-failure-note
                 :datum "  ~S~%is not an ORTHOGONALLY-SPECIALIZING-TYPE.~%Consider implementing a method for PARAMETRIC-TYPE-COMPILE-TIME-LAMBDA-BODY with the EQL specializer ~S"
                 :args (list object-type type-car)))))
