@@ -206,6 +206,10 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
 
 ;; TYPE-LIST-INTERSECTION-NULL-P ===============================================
 
+#-extensible-compound-types
+(defun intersection-null-p (env &rest types)
+  (subtypep `(and ,types) nil env))
+
 (defun definitive-intersection-null-p (type1 type2 &optional env)
   (let ((type1 (deparameterize-type type1))
         (type2 (deparameterize-type type2)))

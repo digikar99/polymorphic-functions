@@ -151,7 +151,7 @@
 
 (defun ensure-default-form-type (default-form type &optional env)
   (let ((default-form-type (nth-form-type default-form env 0 t t)))
-    (when (intersection-null-p default-form-type type)
+    (when (intersection-null-p env default-form-type type)
       (warn "The type of~%  ~S~%was expected to be~%  ~S~%but was derived to be~%  ~S~%which does not intersect with%  ~S"
             default-form type default-form-type type))))
 
