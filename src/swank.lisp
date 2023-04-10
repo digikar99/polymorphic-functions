@@ -39,30 +39,34 @@ while it gets invoked for standard definitions.
                     'polymorphic-function))
     (let ((pf (fdefinition name)))
       (cons (list (list 'polymorphic-function name)
-                  (swank/sbcl::definition-source-for-emacs
-                   (sb-introspect::translate-source-location
-                    (polymorphic-function-source pf))
-                   'polymorphic-function
-                   name))
+                  (when (polymorphic-function-source pf)
+                    (swank/sbcl::definition-source-for-emacs
+                     (sb-introspect::translate-source-location
+                      (polymorphic-function-source pf))
+                     'polymorphic-function
+                     name)))
             (loop :for polymorph :in (polymorphic-function-polymorphs pf)
                   :appending
                   (list (list (list* 'polymorph
                                      name
                                      (polymorph-type-list polymorph))
-                              (let ((source (sb-introspect::translate-source-location
-                                             (polymorph-source polymorph))))
-                                (swank/sbcl::definition-source-for-emacs
-                                 source
-                                 'polymorph
-                                 name))))
+                              (when (polymorph-source polymorph)
+                                (let ((source (sb-introspect::translate-source-location
+                                               (polymorph-source polymorph))))
+                                  (swank/sbcl::definition-source-for-emacs
+                                   source
+                                   'polymorph
+                                   name)))))
                   :if (polymorph-compiler-macro-lambda polymorph)
                     :appending 
                     (list (list (list* 'polymorph-compiler-macro
                                        name
                                        (polymorph-type-list polymorph))
-                                (let ((source (sb-introspect::translate-source-location
-                                               (polymorph-compiler-macro-source polymorph))))
-                                  (swank/sbcl::definition-source-for-emacs
-                                   source
-                                   'polymorph-compiler-macro
-                                   name)))))))))
+                                (when (polymorph-compiler-macro-source polymorph)
+                                  (let ((source (sb-introspect::translate-source-location
+                                                 (polymorph-compiler-macro-source
+                                                  polymorph))))
+                                    (swank/sbcl::definition-source-for-emacs
+                                     source
+                                     'polymorph-compiler-macro
+                                     name))))))))))
