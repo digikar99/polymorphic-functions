@@ -112,8 +112,12 @@
   (declare (type list name)
            (ignorable env package))
   #+sbcl
-  `(sb-int:named-lambda ,name ,lambda-list
-     ,@body)
+  (if (member :extensible-compound-types cl:*features*)
+      `(sb-int:named-lambda ,name ,lambda-list
+         ,@(nthcdr 2 (macroexpand-1
+                      `(extensible-compound-types-cl:lambda ,lambda-list ,@body))))
+      `(sb-int:named-lambda ,name ,lambda-list
+         ,@body))
   #+ccl
   `(ccl:nfunction ,name
                   #+extensible-compound-types
