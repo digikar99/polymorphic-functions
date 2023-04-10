@@ -34,7 +34,7 @@
 
         `(sb-c:deftransform ,name (,transform-lambda-list
                                    ,(if (eq 'rest lambda-list-type)
-                                        (append type-list '(*))
+                                        (append type-list '(t))
                                         type-list)
                                    *
                                    :policy (< debug speed)
