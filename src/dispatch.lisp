@@ -357,13 +357,9 @@ in the lambda list; the consequences of mutation are undefined."
           ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
           ;; and "objects of type FUNCTION can't be dumped into fasl files"
           `(progn
-             (eval-when (:compile-toplevel :load-toplevel :execute)
-               (unless (and (fboundp ',name)
-                            (typep (function ,name) 'polymorphic-function))
-                 #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-                 (register-polymorphic-function ',name ',untyped-lambda-list nil
-                                                (function no-applicable-polymorph))
-                 (setf (compiler-macro-function ',name) #'pf-compiler-macro)))
+             (unless (and (fboundp ',name)
+                          (typep (function ,name) 'polymorphic-function))
+               (define-polymorphic-function ,name ,untyped-lambda-list))
              #+sbcl ,(when inline-safe-lambda-body
                        (if optim-debug
                            sbcl-transform-body
