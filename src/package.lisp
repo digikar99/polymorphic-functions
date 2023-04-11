@@ -112,12 +112,16 @@
   (declare (type list name)
            (ignorable env package))
   #+sbcl
-  (if (member :extensible-compound-types cl:*features*)
-      `(sb-int:named-lambda ,name ,lambda-list
-         ,@(nthcdr 2 (macroexpand-1
-                      `(extensible-compound-types-cl:lambda ,lambda-list ,@body))))
-      `(sb-int:named-lambda ,name ,lambda-list
-         ,@body))
+  (progn
+    #+extensible-compound-types
+    `(sb-int:named-lambda ,name ,lambda-list
+       ,@(nthcdr 2 (let ((*disable-extype-checks* t))
+                     (macroexpand-1
+                      `(,(find-symbol "LAMBDA" :extensible-compound-types-cl)
+                        ,lambda-list ,@body)))))
+    #-extensible-compound-types
+    `(sb-int:named-lambda ,name ,lambda-list
+       ,@body))
   #+ccl
   `(ccl:nfunction ,name
                   #+extensible-compound-types

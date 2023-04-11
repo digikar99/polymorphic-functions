@@ -170,14 +170,16 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                                           (compiler-macro-notes::swank-signal note env)
                                           (push note notes)))))
                                  (lastcar
-                                  (macroexpand-all
-                                   `(cl:symbol-macrolet
-                                        ((compiler-macro-notes::previous-form
-                                           ,form)
-                                         (compiler-macro-notes::parent-form
-                                           ,lambda-with-enhanced-declarations))
-                                      ,lambda-with-enhanced-declarations)
-                                   augmented-env)))))
+                                  (let (#+extensible-compound-types
+                                        (*disable-extype-checks* t))
+                                    (macroexpand-all
+                                     `(cl:symbol-macrolet
+                                          ((compiler-macro-notes::previous-form
+                                             ,form)
+                                           (compiler-macro-notes::parent-form
+                                             ,lambda-with-enhanced-declarations))
+                                        ,lambda-with-enhanced-declarations)
+                                     augmented-env))))))
                         ;; MUFFLE because they would already have been reported!
                         (mapc #'compiler-macro-notes:muffle notes)
                         (let ((enhanced-return-type
