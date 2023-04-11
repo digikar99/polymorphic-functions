@@ -50,14 +50,14 @@
                   '(string number &rest))))))
 
 (defmethod compute-polymorphic-function-lambda-body
-    ((type (eql 'rest)) (untyped-lambda-list list) &optional invalidated-p)
+    ((type (eql 'rest)) (untyped-lambda-list list) declaration &optional invalidated-p)
   (let* ((rest-position       (position '&rest untyped-lambda-list))
          (rest-args           (nth (1+ rest-position) untyped-lambda-list))
          (required-parameters (subseq untyped-lambda-list 0 rest-position))
          (block-name          (blockify-name *name*)))
     `((declare (ignorable ,@required-parameters)
                (dynamic-extent ,rest-args)
-               ,+optimize-speed-or-compilation-speed+)
+               ,declaration)
       (block ,block-name
         ,(if invalidated-p
              `(progn

@@ -22,6 +22,8 @@
                                        &key overwrite
                                          (documentation nil docp)
                                          (default '(function no-applicable-polymorph))
+                                         (dispatch-declaration
+                                          ''#.+optimize-speed-or-compilation-speed+)
                                        &environment env)
   "Define a function named NAME that can then be used for DEFPOLYMORPH
 for specializing on various argument types.
@@ -61,7 +63,8 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
             `(undefine-polymorphic-function ',name))
          (register-polymorphic-function ',name ',untyped-lambda-list ,documentation
                                         ,default
-                                        :source #+sbcl (sb-c:source-location) #-sbcl nil)
+                                        :source #+sbcl (sb-c:source-location) #-sbcl nil
+                                        :declaration ,dispatch-declaration)
          #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
          (setf (compiler-macro-function ',name) #'pf-compiler-macro))
        (fdefinition ',name))))

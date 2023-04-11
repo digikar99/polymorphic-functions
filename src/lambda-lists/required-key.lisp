@@ -95,7 +95,8 @@
                   '(string number &key (:c (or null number))))))))
 
 (defmethod compute-polymorphic-function-lambda-body
-    ((type (eql 'required-key)) (untyped-lambda-list list) &optional invalidated-p)
+    ((type (eql 'required-key)) (untyped-lambda-list list) declaration
+     &optional invalidated-p)
   (let* ((rest-position       (position '&rest untyped-lambda-list))
          (required-parameters (subseq untyped-lambda-list 0 rest-position))
          (keyword-parameters  (subseq untyped-lambda-list (+ 3 rest-position)))
@@ -104,7 +105,7 @@
     `((declare (ignorable ,@(mapcar #'first keyword-parameters)
                           ,@(mapcar #'third keyword-parameters))
                (dynamic-extent ,rest-args)
-               ,+optimize-speed-or-compilation-speed+)
+               ,declaration)
       (block ,block-name
         ,(if invalidated-p
              `(progn

@@ -25,8 +25,9 @@
       "Bound inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH for
 use by functions like TYPE-LIST-APPLICABLE-P")
 
-(defun register-polymorphic-function (name untyped-lambda-list documentation default
-                                      &key overwrite source)
+(defun register-polymorphic-function
+    (name untyped-lambda-list documentation default
+     &key overwrite source declaration)
   (declare (type function-name       name)
            (type function            default)
            (type (or null string)    documentation)
@@ -53,6 +54,8 @@ use by functions like TYPE-LIST-APPLICABLE-P")
               (progn
                 (setf (polymorphic-function-documentation apf) documentation)
                 (update-polymorphic-function-documentation name)
+                (setf (polymorphic-function-dispatch-declaration apf) declaration)
+                (invalidate-polymorphic-function-lambda apf)
                 (return-from register-polymorphic-function name))
               (cerror "Yes, delete existing POLYMORPHs to associate new ones"
                       'lambda-list-has-changed
@@ -69,6 +72,7 @@ use by functions like TYPE-LIST-APPLICABLE-P")
     ;; to construct apf
     (let ((apf (make-instance 'polymorphic-function
                               :name name
+                              :dispatch-declaration declaration
                               :source source
                               :documentation documentation
                               :lambda-list untyped-lambda-list
@@ -115,12 +119,15 @@ use by functions like TYPE-LIST-APPLICABLE-P")
          (*name*                (polymorphic-function-name apf))
          (effective-lambda-list (polymorphic-function-effective-lambda-list apf))
          (lambda-list-type      (polymorphic-function-lambda-list-type apf))
+         (declaration           (polymorphic-function-dispatch-declaration apf))
          (lambda-body (if invalidate
                           (compute-polymorphic-function-lambda-body lambda-list-type
                                                                     effective-lambda-list
+                                                                    declaration
                                                                     t)
                           (compute-polymorphic-function-lambda-body lambda-list-type
-                                                                    effective-lambda-list)))
+                                                                    effective-lambda-list
+                                                                    declaration)))
          ;; FIXME: Should we COMPILE this?
          (function    (eval `(list-named-lambda (polymorphic-function ,*name*)
                                  ,(symbol-package (if (atom *name*) *name* (second *name*)))

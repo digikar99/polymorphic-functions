@@ -84,7 +84,8 @@
       (is (equalp effective-type-list '(string number &optional (or null number)))))))
 
 (defmethod compute-polymorphic-function-lambda-body
-    ((type (eql 'required-optional)) (effective-lambda-list list) &optional invalidated-p)
+    ((type (eql 'required-optional)) (effective-lambda-list list) declaration
+     &optional invalidated-p)
   (let* ((optional-position   (position '&optional effective-lambda-list))
          (required-parameters  (subseq effective-lambda-list 0 optional-position))
          (optional-parameters  (subseq effective-lambda-list (1+ optional-position)))
@@ -93,7 +94,7 @@
                                :collect `(when ,op-p (list ,op)))))
          (block-name (blockify-name *name*)))
     (with-gensyms (static-dispatch-fn)
-      `((declare ,+optimize-speed-or-compilation-speed+
+      `((declare ,declaration
                  (ignorable ,@(mapcar #'first optional-parameters)
                             ,@(mapcar #'third optional-parameters)))
         (block ,block-name

@@ -78,6 +78,21 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
     (with-slots (name type-list) o
       (format stream "~S ~S" name type-list))))
 
+(define-constant +optimize-speed-or-compilation-speed+
+    ;; optimize for compilation-speed for SBCL>2.2.3 else for speed
+    (if (and (string= "SBCL" (lisp-implementation-type))
+             (ignore-errors
+              (< (+ (* 12 (+ (* 10 2) 2))
+                    3)
+                 (destructuring-bind (major-1 major-2 minor)
+                     (mapcar #'parse-integer (split-sequence:split-sequence
+                                              #\. (lisp-implementation-version)))
+                   (+ (* 12 (+ (* 10 major-1) major-2))
+                      minor)))))
+        `(optimize compilation-speed)
+        `(optimize speed))
+  :test #'equal)
+
 (defclass polymorphic-function ()
   ((name        :initarg :name
                 :initform (error "NAME must be supplied.")
@@ -93,6 +108,9 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
                      :initarg :lambda-list-type
                      :initform (error "LAMBDA-LIST-TYPE must be supplied.")
                      :reader polymorphic-function-lambda-list-type)
+   (dispatch-declaration :initarg :dispatch-declaration
+                         :initform +optimize-speed-or-compilation-speed+
+                         :accessor polymorphic-function-dispatch-declaration)
    (default     :initarg :default
                 :initform (error ":DEFAULT must be supplied")
                 :reader polymorphic-function-default

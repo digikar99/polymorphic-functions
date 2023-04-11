@@ -91,23 +91,8 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
 ;; COMPUTE-POLYMORPHIC-FUNCTION-LAMBDA-BODY ====================================
 
 (defgeneric compute-polymorphic-function-lambda-body
-    (lambda-list-type effective-untyped-lambda-list &optional invalidated-p)
+    (lambda-list-type effective-untyped-lambda-list declaration &optional invalidated-p)
   (:documentation #.+compute-polymorphic-function-lambda-body-doc+))
-
-(define-constant +optimize-speed-or-compilation-speed+
-    ;; optimize for compilation-speed for SBCL>2.2.3 else for speed
-    (if (and (string= "SBCL" (lisp-implementation-type))
-             (ignore-errors
-              (< (+ (* 12 (+ (* 10 2) 2))
-                    3)
-                 (destructuring-bind (major-1 major-2 minor)
-                     (mapcar #'parse-integer (split-sequence:split-sequence
-                                              #\. (lisp-implementation-version)))
-                   (+ (* 12 (+ (* 10 major-1) major-2))
-                      minor)))))
-        `(optimize compilation-speed)
-        `(optimize speed))
-  :test #'equal)
 
 ;; SBCL-TRANSFORM-ARG-LVARS-FROM-LAMBDA-LIST-FORM ==============================
 

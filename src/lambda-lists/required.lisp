@@ -13,9 +13,9 @@
   (is-error (lambda-list-type '(a b &rest))))
 
 (defmethod compute-polymorphic-function-lambda-body
-    ((type (eql 'required)) (untyped-lambda-list list) &optional invalidated-p)
+    ((type (eql 'required)) (untyped-lambda-list list) declaration &optional invalidated-p)
   (let ((block-name (blockify-name *name*)))
-    `((declare ,+optimize-speed-or-compilation-speed+)
+    `((declare ,declaration)
       (block ,block-name
         ,(cond (invalidated-p
                 `(progn
