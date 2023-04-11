@@ -100,7 +100,11 @@ neither is a EXTENDED-TYPE-SPECIFIER."
                  :always (subtypep ith-v1 ith-v2 environment)))
           ((and (cl-type-specifier-p type1)
                 (cl-type-specifier-p type2))
-           (cl:subtypep type1 type2 environment))
+           (multiple-value-bind (subtypep knownp)
+               (cl:subtypep type1 type2 environment)
+             (if knownp
+                 subtypep
+                 (extensible-compound-types:subtypep type1 type2 environment))))
           (t
            (extensible-compound-types:subtypep type1 type2 environment)))))
 
@@ -117,11 +121,18 @@ neither is a EXTENDED-TYPE-SPECIFIER."
                form)
               ((and (cl-type-specifier-p type1)
                     (cl-type-specifier-p type2))
-               `(cl:subtypep ,type1-form ,type2-form ,env-form))
+               (with-gensyms (subtypep knownp)
+                 `(multiple-value-bind (,subtypep ,knownp)
+                      (cl:subtypep ,type1-form ,type2-form ,env-form)
+                    (if ,knownp
+                        ,subtypep
+                        (extensible-compound-types:subtypep
+                         ,type1-form ,type2-form ,env-form)))))
               ((and (extended-type-specifier-p (constant-form-value type1-form env))
                     (extended-type-specifier-p (constant-form-value type2-form env)))
                (once-only (env-form)
-                 `(extensible-compound-types:subtypep type1 type2 environment)))
+                 `(extensible-compound-types:subtypep
+                   ,type1-form ,type2-form ,env-form)))
               (t
                form)))
       form))
