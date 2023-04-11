@@ -131,13 +131,14 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                                        env)))
                              (lambda-with-enhanced-declarations
                                (optima:ematch inline-lambda-body
-                                 ((list lambda args _ more-decl
+                                 ((list lambda args ignorable-decl _ more-decl
                                         (list 'let
                                               type-parameter-list
                                               _
                                               (list* 'block block-name body)))
                                   `(,lambda ,args
                                      ;; The source of compile-time subtype-polymorphism
+                                     ,ignorable-decl
                                      ,@(let+ (((&values
                                                 enhanced-decl
                                                 new-type-parameter-ignorable-declaration

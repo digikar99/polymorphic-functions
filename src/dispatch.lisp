@@ -205,9 +205,10 @@ in the lambda list; the consequences of mutation are undefined."
           name)
     (declare (type function-name name)
              (optimize debug))
-    (let* ((block-name       (blockify-name name))
+    (let+ ((block-name       (blockify-name name))
            (*environment*    env)
-           (unsorted-typed-lambda-list (normalize-typed-lambda-list typed-lambda-list))
+           ((&values unsorted-typed-lambda-list ignorable-list)
+            (normalize-typed-lambda-list typed-lambda-list))
            (typed-lambda-list (if (member '&key unsorted-typed-lambda-list)
                                   (let ((key-position (position '&key
                                                                 unsorted-typed-lambda-list)))
@@ -276,6 +277,7 @@ in the lambda list; the consequences of mutation are undefined."
               `(list-named-lambda (polymorph ,name ,type-list)
                    ,(symbol-package block-name)
                  ,param-list
+                 (declare (ignorable ,@ignorable-list))
                  ,lambda-declarations
                  ,declarations
                  (let ,type-parameter-list
@@ -307,6 +309,7 @@ in the lambda list; the consequences of mutation are undefined."
                                    ;; which we will need to convert to CL:TYPE.
                                    ;; That's why, avoid the use of CL:LAMBDA here.
                                    `(lambda ,param-list
+                                      (declare (ignorable ,@ignorable-list))
                                       ,lambda-declarations
                                       ,declarations
                                       ;; The RETURN-TYPE here would be augmented by

@@ -72,7 +72,8 @@
 
 (defun normalize-typed-lambda-list (typed-lambda-list)
   (let ((state           'required)
-        (normalized-list ()))
+        (normalized-list ())
+        (ignorable-list  ()))
     (loop :for (elt . rest) :on typed-lambda-list
           :do (if (member elt lambda-list-keywords)
                   (progn
@@ -80,19 +81,35 @@
                     (when rest (push elt normalized-list)))
                   (push (case state
                           (required
-                           (if (listp elt)
-                               elt
-                               (list elt t)))
+                           (optima:ematch
+                               (if (listp elt)
+                                   elt
+                                   (list elt t))
+                             ((list parameter type)
+                              (list (if (string= "_" parameter)
+                                        (car (push (gensym) ignorable-list))
+                                        parameter)
+                                    type))))
                           ((&optional &key)
-                           (cond ((not (listp elt))
-                                  (list (list elt t) nil))
-                                 ((not (listp (first elt)))
-                                  (list (list (first elt) t)
-                                        (second elt)))
-                                 (t elt)))
-                          (&rest elt))
+                           (optima:ematch
+                               (cond ((not (listp elt))
+                                      (list (list elt t) nil))
+                                     ((not (listp (first elt)))
+                                      (list (list (first elt) t)
+                                            (second elt)))
+                                     (t elt))
+                             ((list (list parameter type) default)
+                              (list (list (if (string= "_" parameter)
+                                              (car (push (gensym) ignorable-list))
+                                              parameter)
+                                          type)
+                                    default))))
+                          (&rest (if (string= "_" elt)
+                                     (car (push (gensym) ignorable-list))
+                                     elt)))
                         normalized-list)))
-    (nreverse normalized-list)))
+    (values (nreverse normalized-list)
+            ignorable-list)))
 
 (defun normalize-untyped-lambda-list (untyped-lambda-list)
   (let ((state           'required)
@@ -340,12 +357,12 @@
     parameters))
 
 (defun map-polymorph-parameters (polymorph-parameters
-                                 &key required optional keyword rest)
+                                 &key required optional keyword rest default)
   (declare (type (or null function) required optional keyword rest))
-  (let ((required-fn required)
-        (optional-fn optional)
-        (keyword-fn  keyword)
-        (rest-fn     rest))
+  (let ((required-fn (or required default))
+        (optional-fn (or optional default))
+        (keyword-fn  (or keyword default))
+        (rest-fn     (or rest default)))
     (with-slots (required optional keyword rest) polymorph-parameters
       (remove-if #'null
                  (append (when required-fn (mapcar required-fn required))
