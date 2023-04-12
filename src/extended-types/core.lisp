@@ -103,7 +103,7 @@ neither is a EXTENDED-TYPE-SPECIFIER."
            (multiple-value-bind (subtypep knownp)
                (cl:subtypep type1 type2 environment)
              (if knownp
-                 subtypep
+                 (values subtypep knownp)
                  (extensible-compound-types:subtypep type1 type2 environment))))
           (t
            (extensible-compound-types:subtypep type1 type2 environment)))))
@@ -125,7 +125,7 @@ neither is a EXTENDED-TYPE-SPECIFIER."
                  `(multiple-value-bind (,subtypep ,knownp)
                       (cl:subtypep ,type1-form ,type2-form ,env-form)
                     (if ,knownp
-                        ,subtypep
+                        (values ,subtypep ,knownp)
                         (extensible-compound-types:subtypep
                          ,type1-form ,type2-form ,env-form)))))
               ((and (extended-type-specifier-p (constant-form-value type1-form env))
