@@ -8,7 +8,8 @@
       (equalp type-list
               (polymorph-type-list polymorph-may-be)))))
 
-(defun make-sbcl-transform-body (name typed-lambda-list inline-lambda-body polymorph-parameters)
+(defun make-sbcl-transform-body
+    (name typed-lambda-list inline-lambda-body polymorph-parameters)
   (declare (optimize debug))
   (multiple-value-bind (param-list type-parameter-list type-list effective-type-list)
       (polymorph-effective-lambda-list polymorph-parameters)

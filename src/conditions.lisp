@@ -11,7 +11,7 @@
              (let* ((name (name condition))
                     (apf  (fdefinition name)))
                (format stream "New lambda list~%  ~S~%does not match the old lambda list~%  ~S
-of the ADHOC-POLYMORPHIC-FUNCTION ~S with TYPE-LISTS:~%~{~^    ~S~%~}
+of the POLYMORPHIC-FUNCTION ~S with TYPE-LISTS:~%~{~^    ~S~%~}
 
 Do you want to delete these POLYMORPHs to associate a new ones?"
                        (new-lambda-list condition)

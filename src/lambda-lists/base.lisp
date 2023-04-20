@@ -203,7 +203,9 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
         (intersection-null-p env type1 type2)
       (cond ((not knownp)
              (cerror "Retry"
-                     "Please implement appropriate %SUBTYPEP and %INTERSECT-TYPE-P methods to check for the intersection of the following types:~%  ~S~%  ~S"
+                     "Please use EXTENSIBLE-COMPOUND-TYPES:DEFINE-SUBTYPEP-LAMBDA and
+EXTENSIBLE-COMPOUND-TYPES:DEFINE-INTERSECT-TYPE-P-LAMBDA to define the intersection
+of the following types:~%  ~S~%  ~S"
                      type1 type2)
              (definitive-intersection-null-p type1 type2 env))
             (t

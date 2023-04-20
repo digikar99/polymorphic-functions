@@ -210,8 +210,9 @@ in the lambda list; the consequences of mutation are undefined."
            ((&values unsorted-typed-lambda-list ignorable-list)
             (normalize-typed-lambda-list typed-lambda-list))
            (typed-lambda-list (if (member '&key unsorted-typed-lambda-list)
-                                  (let ((key-position (position '&key
-                                                                unsorted-typed-lambda-list)))
+                                  (let ((key-position
+                                          (position '&key
+                                                    unsorted-typed-lambda-list)))
                                     (append (subseq unsorted-typed-lambda-list
                                                     0 key-position)
                                             '(&key)
@@ -447,7 +448,10 @@ in the lambda list; the consequences of mutation are undefined."
   (update-polymorphic-function-lambda (fdefinition name) t))
 
 (defun undefine-polymorphic-function (name)
-  "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH"
+  "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH
+CL:FMAKUNBOUND will be insufficient, because polymorphic-functions
+also have a compiler macro defined for them. Additionally, on SBCL,
+they may also have transforms associated with them."
   (fmakunbound name)
   #+sbcl (sb-c::undefine-fun-name name)
   (setf (compiler-macro-function name) nil))
