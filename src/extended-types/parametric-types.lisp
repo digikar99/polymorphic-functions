@@ -92,7 +92,7 @@ which have type parameters that depend on each other."
                       ,@(loop :for slot :in slots
                               :nconcing
                               (destructuring-bind
-                                  (name &key accessor nested)
+                                  (name &key accessor nested &allow-other-keys)
                                   slot
                                 (if nested
                                     `(((and (atom ,name)
