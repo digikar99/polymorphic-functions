@@ -374,8 +374,10 @@ If it exists, the second value is T and the first value is a possibly empty
            (values nil nil))
           (t
            (loop :for polymorph :in polymorphs
-                 :do (when (equalp type-list
-                                   (polymorph-type-list polymorph))
+                 :do (when (and (type-list-more-specific-p type-list
+                                                           (polymorph-type-list polymorph))
+                                (type-list-more-specific-p (polymorph-type-list polymorph)
+                                                           type-list))
                        (return-from find-polymorph
                          (values polymorph t))))
            (values nil t)))))
