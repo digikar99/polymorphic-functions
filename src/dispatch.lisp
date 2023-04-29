@@ -385,11 +385,18 @@ in the lambda list; the consequences of mutation are undefined."
                     `(with-muffled-compilation-warnings
                        (setf (fdefinition ',static-dispatch-name) ,lambda-body))
                     `(setf (fdefinition ',static-dispatch-name) ,lambda-body))
-               ,(let ((proclaimation
-                        `(proclaim ',(ftype-for-static-dispatch static-dispatch-name
-                                                                effective-type-list
-                                                                return-type
-                                                                env))))
+               ,(let* ((ftype (deparameterize-type
+                               (ftype-for-static-dispatch static-dispatch-name
+                                                          effective-type-list
+                                                          return-type
+                                                          env)))
+                       (proclaimation
+                         `(proclaim '(,(first ftype)
+                                      #+extensible-compound-types
+                                      ,(upgraded-cl-type (second ftype))
+                                      #-extensible-compound-types
+                                      ,(second ftype)
+                                      ,(third ftype)))))
                   (if optim-debug
                       proclaimation
                       `(handler-bind ((warning #'muffle-warning))
