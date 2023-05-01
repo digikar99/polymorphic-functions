@@ -71,19 +71,21 @@ which have type parameters that depend on each other."
     #'parametric-type-symbol-p
     (flatten (ensure-list parametric-type-spec)))))
 
-(defvar *ocs-run-time-lambda-body-lambda-table* (make-hash-table))
+(defvar *ocs-run-time-lambda-body-lambda-table*
+  (trivial-garbage:make-weak-hash-table))
 
 (defun parametric-type-run-time-lambda-body (type-car type-cdr type-parameter)
   (assert (orthogonally-specializing-type-specifier-p
            (extensible-compound-types:typexpand
             (deparameterize-type `(,type-car ,@type-cdr)))))
   (let* ((type-spec  (extensible-compound-types:typexpand `(,type-car ,@type-cdr)))
-         (class-name (second type-spec)))
-    (unless (nth-value 1 (gethash class-name *ocs-run-time-lambda-body-lambda-table*))
-      (setf (gethash class-name *ocs-run-time-lambda-body-lambda-table*)
+         (class      (find-class (second type-spec))))
+    (unless (nth-value 1 (gethash class *ocs-run-time-lambda-body-lambda-table*))
+      (setf (gethash class *ocs-run-time-lambda-body-lambda-table*)
             (compile
              nil
-             (let* ((ocs (extensible-compound-types.impl::class-specializer class-name))
+             (let* ((ocs (extensible-compound-types.impl::class-specializer
+                          (class-name class)))
                     (slots (extensible-compound-types.impl::ocs-slots ocs))
                     (arg-list (extensible-compound-types.impl::ocs-arg-list ocs)))
                (with-gensyms (p o)
@@ -107,7 +109,7 @@ which have type parameters that depend on each other."
                                     `(((and (atom ,name)
                                             (equal ,name ,p))
                                        ',accessor))))))))))))
-    (apply (gethash class-name *ocs-run-time-lambda-body-lambda-table*)
+    (apply (gethash class *ocs-run-time-lambda-body-lambda-table*)
            type-parameter
            (nthcdr 2 type-spec))))
 
