@@ -153,73 +153,97 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                                            (let ,type-parameter-list
                                              ,new-type-parameter-type-decl
                                              ,new-type-parameter-ignorable-declaration
-                                             (block ,block-name ,@body))))))))
-                             ;; We need to expand here, because we want to report
-                             ;;   that the notes generated from the result of this expansion
-                             ;;   were actually generated from THIS PARTICULAR TOP-LEVEL FORM
-                             ;; But even besides compiler notes, this expansion is also
-                             ;;   required so that the type parameters above are considered appropriately.
-                             ;;   Though, it might be possible to supply this information through
-                             ;;   SYMBOL-MACROLET as we do below for TOP-LEVEL-P
-                             (macroexpanded-form
-                               (handler-bind
-                                   ((compiler-macro-notes:note
-                                      (lambda (note)
-                                        (unless
-                                            (typep note
-                                                   compiler-macro-notes:*muffled-notes-type*)
-                                          (compiler-macro-notes::swank-signal note env)
-                                          (push note notes)))))
-                                 (lastcar
-                                  (let (#+extensible-compound-types
-                                        (*disable-extype-checks* t))
-                                    (macroexpand-all
-                                     `(cl:symbol-macrolet
-                                          ((compiler-macro-notes::previous-form
-                                             ,form)
-                                           (compiler-macro-notes::parent-form
-                                             ,lambda-with-enhanced-declarations))
-                                        ,lambda-with-enhanced-declarations)
-                                     augmented-env))))))
-                        ;; MUFFLE because they would already have been reported!
-                        (mapc #'compiler-macro-notes:muffle notes)
-                        (let ((enhanced-return-type
-                                (lastcar
-                                 (form-type macroexpanded-form augmented-env))))
-                          ;; We can't just substitute the enhanced-return-type
-                          ;; because it is possible that the originally specified
-                          ;; return-type was more specific than what a derivation
-                          ;; could tell us.
-                          (setq return-type
-                                (cond ((subtypep enhanced-return-type return-type)
-                                       enhanced-return-type)
-                                      ((subtypep `(and ,enhanced-return-type
-                                                       ,return-type)
-                                                 nil)
-                                       (signal 'compile-time-return-type-mismatch
-                                               :derived enhanced-return-type
-                                               :declared return-type
-                                               :form lambda-with-enhanced-declarations)
-                                       (return-from pf-compiler-macro-function
-                                         original-form))
-                                      (t
-                                       (cl-form-types::combine-values-types
-                                        'and return-type enhanced-return-type)))))
-                        ;; Some macroexpand-all can produce a (function (lambda ...)) from (lambda ...)
-                        ;; Some others do not
-                        (if (eq 'cl:function (first macroexpanded-form))
-                            (second macroexpanded-form)
-                            macroexpanded-form))))
-              (cond (compiler-macro-lambda
-                     (when more-optimal-type-list
-                       (signal 'more-optimal-polymorph-inapplicable
-                               :more-optimal-type-list more-optimal-type-list))
-                     (when suboptimal-note (signal suboptimal-note :type-list type-list))
-                     (return-from compiler-macro-notes:with-notes
-                       (funcall compiler-macro-lambda
-                                (cons inline-lambda-body args)
-                                env)))
-                    (optim-speed
+                                             (block ,block-name ,@body)))))))))
+
+                        ;; We need to expand here, because we want to report
+                        ;;   that the notes generated from the result of this expansion
+                        ;;   were actually generated from THIS PARTICULAR TOP-LEVEL FORM
+                        ;; But even besides compiler notes, this expansion is also
+                        ;;   required so that the type parameters above are considered appropriately.
+                        ;;   Though, it might be possible to supply this information through
+                        ;;   SYMBOL-MACROLET as we do below for TOP-LEVEL-P
+
+                        (when compiler-macro-lambda
+                          (let* ((compiler-macro-form
+                                   (cons lambda-with-enhanced-declarations args))
+                                 (expansion
+                                   (handler-bind
+                                       ((compiler-macro-notes:note
+                                          (lambda (note)
+                                            (unless
+                                                (typep note *muffled-notes-type*)
+                                              (compiler-macro-notes::swank-signal note env)
+                                              (push note notes)))))
+                                     (let (#+extensible-compound-types
+                                           (*disable-extype-checks* t))
+                                       (eval
+                                        `(cl:symbol-macrolet
+                                             ((compiler-macro-notes::previous-form
+                                                ,form)
+                                              (compiler-macro-notes::parent-form
+                                                ,compiler-macro-form))
+                                           (funcall ,compiler-macro-lambda
+                                                    ',form
+                                                    ,augmented-env)))))))
+                            (unless (equal expansion form)
+                              (when more-optimal-type-list
+                                (signal 'more-optimal-polymorph-inapplicable
+                                        :more-optimal-type-list
+                                        more-optimal-type-list))
+                              (when suboptimal-note
+                                (signal suboptimal-note :type-list type-list))
+                              (return-from compiler-macro-notes:with-notes
+                                expansion))))
+
+                        (let ((macroexpanded-form
+                                (handler-bind
+                                    ((compiler-macro-notes:note
+                                       (lambda (note)
+                                         (unless
+                                             (typep note *muffled-notes-type*)
+                                           (compiler-macro-notes::swank-signal note env)
+                                           (push note notes)))))
+                                  (lastcar
+                                   (let (#+extensible-compound-types
+                                         (*disable-extype-checks* t))
+                                     (macroexpand-all
+                                      `(cl:symbol-macrolet
+                                           ((compiler-macro-notes::previous-form
+                                              ,form)
+                                            (compiler-macro-notes::parent-form
+                                              ,lambda-with-enhanced-declarations))
+                                         ,lambda-with-enhanced-declarations)
+                                      augmented-env))))))
+                          ;; MUFFLE because they would already have been reported!
+                          (mapc #'compiler-macro-notes:muffle notes)
+                          (let ((enhanced-return-type
+                                  (lastcar
+                                   (form-type macroexpanded-form augmented-env))))
+                            ;; We can't just substitute the enhanced-return-type
+                            ;; because it is possible that the originally specified
+                            ;; return-type was more specific than what a derivation
+                            ;; could tell us.
+                            (setq return-type
+                                  (cond ((subtypep enhanced-return-type return-type)
+                                         enhanced-return-type)
+                                        ((subtypep `(and ,enhanced-return-type
+                                                         ,return-type)
+                                                   nil)
+                                         (signal 'compile-time-return-type-mismatch
+                                                 :derived enhanced-return-type
+                                                 :declared return-type
+                                                 :form lambda-with-enhanced-declarations)
+                                         (return-from pf-compiler-macro-function
+                                           original-form))
+                                        (t
+                                         (cl-form-types::combine-values-types
+                                          'and return-type enhanced-return-type)))))
+                          ;; Some macroexpand-all can produce a (function (lambda ...)) from (lambda ...)
+                          ;; Some others do not
+                          (if (eq 'cl:function (first macroexpanded-form))
+                              (second macroexpanded-form)
+                              macroexpanded-form)))))
+              (cond (optim-speed
                      (when more-optimal-type-list
                        (signal 'more-optimal-polymorph-inapplicable
                                :more-optimal-type-list more-optimal-type-list))
