@@ -50,7 +50,6 @@
                                                                 "conditions"
                                                                 "compiler-macro"
                                                                 #+sbcl "sbcl-transform"))
-               (:file "specializing"               :depends-on ("dispatch"))
                (:file "misc-tests"                 :depends-on ("dispatch"))
                (:file "benchmark"                  :depends-on ("misc-tests")))
   :perform (test-op (o c)
@@ -59,6 +58,12 @@
                                               (5AM:*ON-ERROR* :DEBUG)
                                               (CL:*COMPILE-VERBOSE* NIL))
                                           (FIVEAM:RUN! :POLYMORPHIC-FUNCTIONS))")))))
+
+(defsystem "polymorphic-functions/specializing"
+  :depends-on ("polymorphic-functions")
+  :description "Defines the polymorphic-functions:specializing macro"
+  :pathname "src"
+  :components ((:file "specializing")))
 
 (defsystem "polymorphic-functions/swank"
   :depends-on ("polymorphic-functions"

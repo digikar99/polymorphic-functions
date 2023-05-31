@@ -225,3 +225,7 @@
                                           return-default-type))))
          (cl-form-types:nth-form-type form env n constant-eql-types expand-compiler-macros)))
       t))
+
+(defmacro specializing (&rest args)
+  (declare (ignore args))
+  (error "Load the polymorphic-functions/specializing system to define this macro."))
