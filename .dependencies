@@ -1,2 +1,2 @@
-(:git "https://github.com/digikar99/extensible-compound-types")
-(:git "https://github.com/digikar99/cl-form-types")
+("extensible-compound-types" :git "https://github.com/digikar99/extensible-compound-types")
+("cl-form-types" :git "https://github.com/digikar99/cl-form-types")
