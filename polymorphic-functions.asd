@@ -1,31 +1,26 @@
 (asdf:defsystem "polymorphic-functions"
   :license "MIT"
-  :version "0.4.0"                      ; beta
+  :version "0.5.0"                      ; beta
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Type based dispatch for Common Lisp"
   :depends-on ("alexandria"
-               "closer-mop"
-               "compiler-macro-notes"
-               "extensible-compound-types"
-               (:feature :extensible-compound-types "extensible-compound-types-cl")
-               "fiveam" ;; just keep tests together!
                "cl-form-types"
-               "ctype"
+               "compiler-macro-notes"
+               "fiveam" ;; just keep tests together!
                "introspect-environment"
                "let-plus"
                "optima"
                "split-sequence"
-               "trivial-garbage")
+               "trivial-types")
   :pathname #P"src/"
-  :components ((:file "pre-package")
-               (:file "package"                    :depends-on ("pre-package"))
-               (:file "types"                      :depends-on ("package"))
-               (:module "extended-types"           :depends-on ("package")
-                :components ((:file "parametric-types")
-                             (:file "ensure-type-form" :depends-on ("parametric-types"))
-                             (:file "core"         :depends-on ("parametric-types"))
-                             (:file "deparameterize-type" :depends-on ("parametric-types"))))
-               (:module "lambda-lists"             :depends-on ("extended-types" "types")
+  :components ((:file "package")
+               (:file "utils"                      :depends-on ("package"))
+               (:file "types"                      :depends-on ("utils"))
+               (:file "type-tools"                 :depends-on ("utils"))
+               (:file "ensure-type-form"           :depends-on ("utils"))
+               (:module "lambda-lists"             :depends-on ("ensure-type-form"
+                                                                "type-tools"
+                                                                "types")
                 :components ((:file "doc")
                              (:file "parameters")
                              (:file "base"         :depends-on ("doc"
@@ -34,10 +29,8 @@
                              (:file "required-optional" :depends-on ("base"))
                              (:file "required-key" :depends-on ("base"))
                              (:file "rest"         :depends-on ("base"))))
-               (:file "polymorphic-function"       :depends-on ("types"
-                                                                "extended-types"
-                                                                "lambda-lists"))
-               (:file "conditions"                 :depends-on ("extended-types"))
+               (:file "polymorphic-function"       :depends-on ("lambda-lists"))
+               (:file "conditions"                 :depends-on ("package"))
                (:file "compiler-macro"             :depends-on ("polymorphic-function"
                                                                 "lambda-lists"
                                                                 "conditions"))

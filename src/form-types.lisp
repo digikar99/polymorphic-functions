@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (defmacro the* (type-specifier form)
   "CL:THE does not guarantee FORM to be of TYPE-SPECIFIER on all the

@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 ;; In this file, our main functions/macros are
 ;; - DEFINE-LAMBDA-LIST-HELPER
@@ -164,25 +164,10 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
   (let ((*lambda-list-typed-p* nil))
     (if (equal type-list-1 type-list-2)
         t
-        (and (%type-list-more-specific-p (potential-type-of-lambda-list type-list-1)
-                                         (potential-type-of-lambda-list type-list-2)
-                                         type-list-1
-                                         type-list-2)
-             (if (%type-list-more-specific-p (potential-type-of-lambda-list type-list-2)
-                                             (potential-type-of-lambda-list type-list-1)
-                                             type-list-2
-                                             type-list-1)
-                 (cond ((parametric-type-specifiers-are-significant-p type-list-1)
-                        (if (parametric-type-specifiers-are-significant-p type-list-2)
-                            nil
-                            t))
-                       ((parametric-type-specifiers-are-significant-p type-list-2)
-                        (if (parametric-type-specifiers-are-significant-p type-list-1)
-                            nil
-                            nil))
-                       (t
-                        t))
-                 t)))))
+        (%type-list-more-specific-p (potential-type-of-lambda-list type-list-1)
+                                    (potential-type-of-lambda-list type-list-2)
+                                    type-list-1
+                                    type-list-2))))
 
 (defgeneric %type-list-more-specific-p (type-1 type-2 type-list-1 type-list-2)
   (:documentation #.+type-list-more-specific-p+))
@@ -191,28 +176,21 @@ specifiers. Bound inside the functions defined by POLYMORPHS::DEFINE-LAMBDA-LIST
 
 ;; TYPE-LIST-INTERSECTION-NULL-P ===============================================
 
-#-extensible-compound-types
 (defun intersection-null-p (env &rest types)
   (subtypep `(and ,@types) nil env))
 
 (defun definitive-intersection-null-p (type1 type2 &optional env)
-  (let ((type1 (deparameterize-type type1))
-        (type2 (deparameterize-type type2)))
-    #+extensible-compound-types
-    (multiple-value-bind (intersection-null-p knownp)
-        (intersection-null-p env type1 type2)
-      (cond ((not knownp)
-             (cerror "Retry"
-                     "Please use EXTENSIBLE-COMPOUND-TYPES:DEFINE-SUBTYPEP-LAMBDA and
-EXTENSIBLE-COMPOUND-TYPES:DEFINE-INTERSECT-TYPE-P-LAMBDA to define the intersection
+  (multiple-value-bind (intersection-null-p knownp)
+      (intersection-null-p env type1 type2)
+    (cond ((not knownp)
+           (cerror "Retry"
+                   "Please use PELTADOT:DEFINE-SUBTYPEP-LAMBDA and
+PELTADOT:DEFINE-INTERSECT-TYPE-P-LAMBDA to define the intersection
 of the following types:~%  ~S~%  ~S"
-                     type1 type2)
-             (definitive-intersection-null-p type1 type2 env))
-            (t
-             intersection-null-p)))
-    #-extensible-compound-types
-    (when (definitive-subtypep `(and ,type1 ,type2) nil env)
-      (return-from definitive-intersection-null-p t))))
+                   type1 type2)
+           (definitive-intersection-null-p type1 type2 env))
+          (t
+           intersection-null-p))))
 
 (defun type-list-intersection-null-p (type-list-1 type-list-2)
   #.+type-list-intersection-null-p+
@@ -241,33 +219,13 @@ of the following types:~%  ~S~%  ~S"
                                                           (setq state type-spec)
                                                           (ecase state
                                                             ((:required &optional)
-                                                             #+extensible-compound-types
-                                                             (deparameterize-type type-spec)
-                                                             #-extensible-compound-types
-                                                             (upgrade-extended-type
-                                                              (deparameterize-type type-spec)
-                                                              env))
+                                                             type-spec)
                                                             (&key
                                                              `(,(first type-spec)
-                                                               #+extensible-compound-types
-                                                               ,(deparameterize-type (second type-spec))
-                                                               #-extensible-compound-types
-                                                               ,(upgrade-extended-type
-                                                                 (deparameterize-type (second type-spec))
-                                                                 env))))))
+                                                               ,(second type-spec))))))
                                             :collect processed-type-spec)))
                        (if (eq '&rest (lastcar effective-type-list))
                            (append type-list '(t))
                            type-list))
-                    #+extensible-compound-types
-                    ,(deparameterize-type return-type)
-                    #-extensible-compound-types
-                    ,(upgrade-extended-type
-                      (deparameterize-type return-type)
-                      env))
+                    ,return-type)
           ,static-dispatch-name))
-
-
-
-
-

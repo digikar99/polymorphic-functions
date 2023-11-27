@@ -1,4 +1,4 @@
-(in-package polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (defun recursive-function-p (name body)
   (flet ((%recursive-p (node)
@@ -135,15 +135,14 @@ If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BO
       (handler-bind ((warning (lambda (c)
                                 (push c warnings)
                                 (muffle-warning c))))
-        (compile nil #-extensible-compound-types
-                     lambda-form
-                     #+extensible-compound-types
-                     (macroexpand-1 lambda-form))))
+        (compile nil (ecase (first lambda-form)
+                       (cl:lambda
+                        lambda-form)))))
     (if warnings
         (format nil "~{~A~^~%~}" (nreverse warnings))
         nil)))
 
-;;; Earlier (until commit e7f11394023cf06075459ea4baa735ec8bda89f3),
+;;; Earlier (until commit e7f11394023cf06075459ea4baa735ec8bda89f3 of polymorphic-functions),
 ;;; we attempted to use a code-walker to determine if there are
 ;;; free variables in the form, and accordingly decline to inline
 ;;; the polymorph. However, cases such as this (and while this is nonsense):
@@ -188,12 +187,16 @@ If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BO
         STATIC-DISPATCH-NAME
         INVALIDATE-PF
         MORE-OPTIMAL-TYPE-LIST
-        SUBOPTIMAL-NOTE)
+        SUBOPTIMAL-NOTE
+        (PARAMETER-MODE :VALUES))
 
   - Possible values for INLINE are T, NIL and :MAYBE
+
   - STATIC-DISPATCH-NAME could be useful for tracing or profiling
+
   - If INVALIDATE-PF is non-NIL then the associated polymorphic-function
     is forced to recompute its dispatching after this polymorph is defined.
+
   - SUBOPTIMAL-NOTE and MORE-OPTIMAL-TYPE-LIST are useful for signalling that the
     POLYMORPH chosen for static-dispatch, inlining, or compiler-macro is
     not the most optimal.
@@ -201,12 +204,21 @@ If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BO
     SUBOPTIMAL-POLYMORPH-NOTE - the condition class should have a slot to
     accept the TYPE-LIST of the currently chosen POLYMORPH
 
+  - PARAMETER-MODE can be either :VALUES (default) or :TYPES.
+    - :VALUES - the type parameters (if any) are treated as values extracted
+      using the accessors of the ORTHOGONALLY-SPECIALIZING-TYPE-SPECIFIER
+      associated with the CLASS-OF object. In this case, the type parameters
+      are compared using EQUAL.
+    - :TYPES - the type parameters (if any) are treated as types, compared using
+      TYPE= after accessors TODO: Finish this
+
   **Note**:
   - INLINE T or :MAYBE can result in infinite expansions for recursive polymorphs.
 Proceed at your own risk.
   - Also, because inlining results in type declaration upgradation for purposes
 of subtype polymorphism, it is recommended to not mutate the variables used
-in the lambda list; the consequences of mutation are undefined."
+in the lambda list; the consequences of mutation are undefined.
+"
   (destructuring-bind (name
                        &key (inline t ip)
                          (static-dispatch-name nil static-dispatch-name-p)
@@ -263,7 +275,7 @@ in the lambda list; the consequences of mutation are undefined."
       ;;   Thus, we actually do want collisions to take place so that a same
       ;; deterministic/latest version of the polymorph is called; therefore we
       ;; use INTERN.
-      (let+ (((&values param-list type-parameter-list type-list effective-type-list)
+      (let+ (((&values param-list type-list effective-type-list)
               (polymorph-effective-lambda-list parameters))
              ((&values declarations body doc)
               (extract-declarations body :documentation t))
@@ -281,12 +293,12 @@ in the lambda list; the consequences of mutation are undefined."
                               p-old))))
                     (if old-name
                         old-name
-                        (let ((*package* (find-package '#:polymorphic-functions.nonuser)))
+                        (let ((*package* (find-package
+                                          '#:polymorphic-functions.nonuser)))
                           (intern (write-to-string
                                    `(polymorph ,name ,type-list))
                                   '#:polymorphic-functions.nonuser))))))
-             ((&values lambda-declarations type-parameter-ignorable-declaration)
-              (lambda-declarations parameters))
+             (lambda-declarations (lambda-declarations parameters))
              (lambda-body
               `(list-named-lambda (polymorph ,name ,type-list)
                    ,(symbol-package block-name)
@@ -294,27 +306,24 @@ in the lambda list; the consequences of mutation are undefined."
                  (declare (ignorable ,@ignorable-list))
                  ,lambda-declarations
                  ,declarations
-                 (let ,type-parameter-list
-                   ,type-parameter-ignorable-declaration
-                   ,(multiple-value-bind (form form-return-type)
-                        (ensure-type-form return-type
-                                          `(block ,block-name
-                                             (locally ,@body))
-                                          (augment-environment
-                                           env
-                                           :variable
-                                           (remove-duplicates
-                                            (remove-if
-                                             #'null
-                                             (mapcar #'third
-                                                     (rest lambda-declarations))))
-                                           :declare
-                                           (remove-duplicates
-                                            (rest lambda-declarations)
-                                            :test #'equal)))
-                      (unless (parametric-type-specifier-p return-type)
-                        (setq return-type form-return-type))
-                      form))))
+                 ,(multiple-value-bind (form form-return-type)
+                      (ensure-type-form return-type
+                                        `(block ,block-name
+                                           (locally ,@body))
+                                        (augment-environment
+                                         env
+                                         :variable
+                                         (remove-duplicates
+                                          (remove-if
+                                           #'null
+                                           (mapcar #'third
+                                                   (rest lambda-declarations))))
+                                         :declare
+                                         (remove-duplicates
+                                          (rest lambda-declarations)
+                                          :test #'equal)))
+                    (setq return-type form-return-type)
+                    form)))
              ;; Currently we need INLINE-LAMBDA-BODY and the checks in M-V-B
              ;; below for DEFTRANSFORM; as well as to avoid the ASSERTs in
              ;; pf-compiler-macro emitted by ENSURE-TYPE-FORM used for LAMBDA-BODY
@@ -328,10 +337,8 @@ in the lambda list; the consequences of mutation are undefined."
                                       ,declarations
                                       ;; The RETURN-TYPE here would be augmented by
                                       ;; PF-COMPILER-MACRO
-                                      (let ,type-parameter-list
-                                        ,type-parameter-ignorable-declaration
-                                        (block ,block-name
-                                          (locally ,@body))))))
+                                      (block ,block-name
+                                        (locally ,@body)))))
              #+sbcl
              (sbcl-transform-body (make-sbcl-transform-body name
                                                             typed-lambda-list
@@ -398,18 +405,12 @@ in the lambda list; the consequences of mutation are undefined."
                     `(with-muffled-compilation-warnings
                        (setf (fdefinition ',static-dispatch-name) ,lambda-body))
                     `(setf (fdefinition ',static-dispatch-name) ,lambda-body))
-               ,(let* ((ftype (deparameterize-type
-                               (ftype-for-static-dispatch static-dispatch-name
-                                                          effective-type-list
-                                                          return-type
-                                                          env)))
+               ,(let* ((ftype (ftype-for-static-dispatch static-dispatch-name
+                                                         effective-type-list
+                                                         return-type
+                                                         env))
                        (proclaimation
-                         `(proclaim '(,(first ftype)
-                                      #+extensible-compound-types
-                                      ,(upgraded-cl-type (second ftype))
-                                      #-extensible-compound-types
-                                      ,(second ftype)
-                                      ,(third ftype)))))
+                         `(proclaim ',ftype)))
                   (if optim-debug
                       proclaimation
                       `(handler-bind ((warning #'muffle-warning))
@@ -459,13 +460,12 @@ in the lambda list; the consequences of mutation are undefined."
   ;; One (expensive) solution is to insert afresh the type lists of all polymorphs
   ;; to resolve it.
   #+sbcl
-  (unless (extended-type-list-p type-list)
-    (let ((info  (sb-c::fun-info-or-lose name))
-          (ctype (sb-c::specifier-type (list 'function type-list '*))))
-      (setf (sb-c::fun-info-transforms info)
-            (remove-if (curry #'sb-c::type= ctype)
-                       (sb-c::fun-info-transforms info)
-                       :key #'sb-c::transform-type))))
+  (let ((info  (sb-c::fun-info-or-lose name))
+        (ctype (sb-c::specifier-type (list 'function type-list '*))))
+    (setf (sb-c::fun-info-transforms info)
+          (remove-if (curry #'sb-c::type= ctype)
+                     (sb-c::fun-info-transforms info)
+                     :key #'sb-c::transform-type)))
   (remove-polymorph name type-list)
   (update-polymorphic-function-lambda (fdefinition name) t))
 

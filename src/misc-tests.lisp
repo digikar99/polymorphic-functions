@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (5am:in-suite :polymorphic-functions)
 
@@ -461,11 +461,8 @@
   ;; On CCL, this works in the absence of EXTENSIBLE-COMPOUND-TYPES
   ;; because EXTENSIBLE-COMPOUND-TYPES wraps around CL-ENVIRONMENTS-CL,
   ;; which does not seem to propagate the declarations. FIXME: Debug this.
-  (when (featurep `(:or :sbcl
-                        (:and :ccl (:not :extensible-compound-types))))
+  (when (featurep `(:or :sbcl :ccl))
     (is (equal '(compiler-macro 5 3) (eval `(setf-foo-caller-direct 2 3)))))
-  (when (featurep `(:and :ccl :extensible-compound-types))
-    (is (equal '(5 3) (eval `(setf-foo-caller-direct 2 3)))))
   (fmakunbound 'setf-foo-caller)
   (fmakunbound 'setf-foo-caller-direct)
   (undefine-polymorphic-function '(setf foo)))
@@ -572,56 +569,3 @@
     (undefine-polymorphic-function 'inner)
     (undefine-polymorphic-function 'outer)
     (fmakunbound 'outer-caller)))
-
-
-
-(def-test parametric-polymorphism ()
-
-  (unwind-protect
-       (ignoring-error-output
-         (handler-bind ((warning #'muffle-warning))
-           (let ((*parametric-type-symbol-predicates*
-                   (list (lambda (s)
-                           (let* ((name (symbol-name s))
-                                  (len  (length name)))
-                             (and (char= #\< (elt name 0))
-                                  (char= #\> (elt name (1- len)))))))))
-             (eval `(progn
-                      (define-polymorphic-function foo (a b) :overwrite t)
-                      (defpolymorph foo ((array (array <t>))
-                                         (elt <t>))
-                          t
-                        (= elt (aref array 0))))))
-
-           ;; Runtime tests
-           (5am:is-true  (eval `(foo (make-array 2 :element-type 'single-float) 0.0)))
-           (5am:is-false (eval `(foo (make-array 2 :element-type 'single-float) 1.0)))
-           (5am:signals no-applicable-polymorph
-             (eval `(foo (make-array 2 :element-type 'single-float) 1.0d0)))
-
-           ;; Compile-time tests
-           (5am:is-true  (eval `(funcall (lambda (a b)
-                                           (declare (optimize speed (debug 1))
-                                                    (type (simple-array single-float) a)
-                                                    (type single-float b))
-                                           (foo a b))
-                                         (make-array 2 :element-type 'single-float)
-                                         0.0)))
-           (5am:is-false (eval `(funcall (lambda (a b)
-                                           (declare (optimize speed)
-                                                    (type (simple-array single-float) a)
-                                                    (type single-float b))
-                                           (foo a b))
-                                         (make-array 2 :element-type 'single-float)
-                                         1.0)))
-           (ignoring-error-output
-             (5am:signals no-applicable-polymorph
-               (eval `(funcall (lambda (a b)
-                                 (declare (optimize speed)
-                                          (type (simple-array single-float) a)
-                                          (type double-float b))
-                                 (foo a b))
-                               (make-array 2 :element-type 'single-float)
-                               1.0d0))))))
-
-    (undefine-polymorphic-function 'foo)))

@@ -15,17 +15,24 @@
 (defmacro defpackage (package &body options)
   "Like CL:DEFPACKAGE but provides a (:SHADOWING-IMPORT-EXPORTED-SYMBOLS {package}*) option.
 Expects such package to be already defined."
-  `(cl:defpackage ,package
-     ,@(loop :for option :in options
-             :if (eq :shadowing-import-exported-symbols (car option))
-               :appending (mappend (lambda (package)
-                                     (let* ((exported-symbols
-                                              (let (list)
-                                                (do-external-symbols (s package)
-                                                  (push s list))
-                                                list)))
-                                       `((:shadowing-import-from ,package
-                                                                 ,@exported-symbols))))
-                                   (cdr option))
-             :else
-               :collect option)))
+  (let ((shadowing-import-symbols
+          (loop :for option :in options
+                :if (eq :shadowing-import-from (car option))
+                  :appending (cddr option))))
+    `(cl:defpackage ,package
+       ,@(loop :for option :in options
+               :if (eq :shadowing-import-exported-symbols (car option))
+                 :appending (mappend (lambda (package)
+                                       (let* ((exported-symbols
+                                                (set-difference
+                                                 (let (list)
+                                                   (do-external-symbols (s package)
+                                                     (push s list))
+                                                   list)
+                                                 shadowing-import-symbols
+                                                 :test #'string=)))
+                                         `((:shadowing-import-from ,package
+                                                                   ,@exported-symbols))))
+                                     (cdr option))
+               :else
+                 :collect option))))

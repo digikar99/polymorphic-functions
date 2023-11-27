@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (defun most-specialized-applicable-transform-p (name arg-types-alist type-list)
   (declare (optimize debug))
@@ -11,13 +11,9 @@
 (defun make-sbcl-transform-body
     (name typed-lambda-list inline-lambda-body polymorph-parameters)
   (declare (optimize debug))
-  (multiple-value-bind (param-list type-parameter-list type-list effective-type-list)
+  (multiple-value-bind (param-list type-list effective-type-list)
       (polymorph-effective-lambda-list polymorph-parameters)
     (declare (ignore effective-type-list))
-    (when (or (some #'parametric-type-specifier-p type-list)
-              ;; FIXME: Not a simple mapping, is it?
-              (extended-type-list-p type-list))
-      (return-from make-sbcl-transform-body nil))
     (let ((lambda-list-type (lambda-list-type typed-lambda-list :typed t))
           (transform-lambda-list (untyped-lambda-list typed-lambda-list)))
       (with-gensyms (node env arg arg-lvar-alist compiler-macro-lambda
@@ -102,8 +98,7 @@
                                                           (find-polymorph ',name ',type-list))
                                                          ,arg-types)
                           ,,declarations
-                          (let ,,type-parameter-list
-                            ,@,body)))))
+                          ,@,body))))
 
                ,(if (eq 'rest lambda-list-type)
                     ;; Yes, we are returning a LAMBDA-FORM below

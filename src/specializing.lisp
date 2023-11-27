@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (define-polymorphic-function specializing-type-of (object) :overwrite t
   :documentation "A clean wrapper around CL:TYPE-OF to deal with overspecialized

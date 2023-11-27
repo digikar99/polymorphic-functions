@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (defmethod %lambda-list-type ((type (eql 'rest)) (lambda-list list))
   (let ((state :required))

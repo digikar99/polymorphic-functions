@@ -1,4 +1,6 @@
-(in-package polymorphic-functions)
+(in-package #:polymorphic-functions)
+
+(5am:in-suite :polymorphic-functions)
 
 (defstruct polymorph-parameters
   required
@@ -8,6 +10,25 @@
   min-args
   max-args
   validator-form)
+
+(defmethod print-object ((o polymorph-parameters) s)
+  (with-slots (required optional rest keyword) o
+    (format s "#<POLYMORPH-PARAMETERS")
+    (when required
+      (dolist (p required)
+        (format s " ~A" (pp-local-name p))))
+    (when optional
+      (write-string "&OPTIONAL" s)
+      (dolist (p required)
+        (format s " ~A" (pp-local-name p))))
+    (when rest
+      (write-string " &REST" s)
+      (format s " ~A" (pp-local-name required)))
+    (when keyword
+      (write-string " &KEY" s)
+      (dolist (p keyword)
+        (format s " ~A" (pp-local-name p))))
+    (write-char #\> s)))
 
 (defstruct (polymorph-parameter (:conc-name pp-))
   "
@@ -22,24 +43,7 @@ Note: Only LOCAL-NAME and FORM-IN-PF are relevant for &REST parameter
   value-type
   default-value-form
   supplied-p-name
-  type-parameters
   value-effective-type)
-
-(defstruct type-parameter
-  "
-RUN-TIME-DEPARAMETERIZERS-LAMBDA-BODY :
-  A lambda *expression*, which when compiled produces a one argument function.
-  The function is called at run-time with the value bound to the parameter
-  (not type-parameter) to obtain the value of the TYPE-PARAMETER.
-COMPILE-TIME-DEPARAMETERIZER-LAMBDA-BODY :
-  A lambda *expression*, which when compiled produces a one argument function.
-  The function is called at compile-time with the type of the value bound
-  to the parameter (not type-parameter) to obtain the value of the TYPE-PARAMETER.
-"
-  name
-  run-time-deparameterizer-lambda-body
-  compile-time-deparameterizer-lambda
-  compile-time-deparameterizer-lambda-body)
 
 (defstruct polymorph
   "
@@ -162,7 +166,7 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
              (setq valid-p nil))))
     valid-p))
 
-(def-test type-list (:suite :polymorphic-functions)
+(def-test type-list ()
   (5am:is-true (type-list-p '()))
   (5am:is-true (type-list-p '(number string)))
   (5am:is-true (type-list-p '(number string &rest)))
@@ -171,21 +175,6 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
   (5am:is-true (type-list-p '(&rest)))
   (5am:is-true (type-list-p '(number &optional string)))
   (5am:is-true (type-list-p '(number &key (:a string)))))
-
-(defun extended-type-list-p (list)
-  ;; TODO: what parameter-names are valid?
-  (and (type-list-p list)
-       (let ((state :required)
-             (extended-p nil))
-         (loop :for elt :in list
-               :until extended-p
-               :do (if (member elt lambda-list-keywords)
-                       (setq state elt)
-                       (setq extended-p
-                             (ecase state
-                               ((:required &optional) (extended-type-specifier-p elt))
-                               (&key (extended-type-specifier-p (second elt))))))
-               :finally (return extended-p)))))
 
 (deftype type-list () `(satisfies type-list-p))
 

@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (defmethod %lambda-list-type ((type (eql 'required)) (lambda-list list))
   (if *lambda-list-typed-p*

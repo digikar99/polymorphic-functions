@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (define-condition return-type-mismatch (condition)
   ((actual   :initarg :actual)
@@ -60,10 +60,7 @@
   "Returns two values: a form that has ASSERTs with SIMPLE-TYPE-ERROR to check the type
 as well as the type enhanced using TYPE."
   (declare (optimize debug))
-  (let* ((type (cond ((parametric-type-specifier-p type)
-                      type)
-                     (t
-                      (typexpand type env))))
+  (let* ((type (typexpand type env))
          (optional-position (when (listp type)
                               (position '&optional type)))
          (min-values (cond (optional-position
@@ -86,8 +83,7 @@ as well as the type enhanced using TYPE."
                                          (rest type)))
                          (list type)))
 
-         (types (loop :for type :in type-forms
-                      :collect (deparameterize-type type)))
+         (types type-forms)
          (rest-type (if rest-supplied-p
                         (lastcar types)
                         t))
@@ -96,21 +92,7 @@ as well as the type enhanced using TYPE."
                     types))
 
          (type-forms (loop :for type :in type-forms
-                           :collect
-                           (if (not (parametric-type-specifier-p type))
-                               `(quote ,type)
-                               ;; Given a PARAMETRIC-TYPE, we want to traverse it and create a form suitable
-                               ;; to be supplied as the second argument to TYPEP
-                               (traverse-tree type
-                                              (lambda (node)
-                                                (etypecase node
-                                                  (atom (if (or (parametric-type-symbol-p node)
-                                                                (member node '(quote list)))
-                                                            node
-                                                            (values `(quote ,node) t)))
-                                                  (list (if (member (car node) '(quote list))
-                                                            node
-                                                            `(list ,@node)))))))))
+                           :collect `(quote ,type)))
          (rest-type-form (if rest-supplied-p
                              (lastcar type-forms)
                              t))
@@ -127,7 +109,7 @@ as well as the type enhanced using TYPE."
                                                    :constant-eql-types t)))
                        (if (and (listp may-be-list)
                                 (eql 'values (first may-be-list)))
-                           (remove '&optional (rest may-be-list))
+                           (the list (remove '&optional (rest may-be-list)))
                            (list may-be-list))))
          (form-rest-type (if (member '&rest form-types)
                              (lastcar form-types)
@@ -233,4 +215,4 @@ as well as the type enhanced using TYPE."
 
         (values-list ,form-value-list))
 
-     (form-type `(the ,(deparameterize-type type) ,form) env :expand-compiler-macros t))))
+     (form-type `(the ,type ,form) env :expand-compiler-macros t))))

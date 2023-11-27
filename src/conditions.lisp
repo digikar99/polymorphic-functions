@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (define-condition lambda-list-has-changed (error)
   ((name :initarg :name

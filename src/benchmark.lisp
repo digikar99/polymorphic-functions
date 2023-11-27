@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (5am:in-suite :polymorphic-functions)
 
@@ -48,7 +48,7 @@
                                             ,expected-sym ,actual-sym ,percent-diff)))))
 
                           #-extensible-compound-types ; too slow
-                          (expect-time (#+sbcl 5.1
+                          (expect-time (#+sbcl 3.9
                                         #+ccl  2.47)
                                        (locally (declare (optimize (debug 1) (speed 1)))
                                          (loop :repeat 50000000 :do (my= a b))))

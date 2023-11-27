@@ -1,4 +1,4 @@
-(in-package polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 (defun blockify-name (name)
   (etypecase name
@@ -423,9 +423,8 @@ If it exists, the second value is T and the first value is a possibly empty
                      l)))
              (mappend #'apropos-pf names))))))
 
-#-extensible-compound-types
 (define-declaration type-like (vars env)
-  ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined.
+  ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
   ;; On CCL, args starts with DECL-NAME while not using CL-ENVIRONMENTS-CL
   ;; Other times, it starts with the appropriate args
   (destructuring-bind (original &rest similar) (optima:match vars
@@ -439,23 +438,6 @@ If it exists, the second value is T and the first value is a possibly empty
                   :for var :in similar
                   :collect `(,var cl:type ,type)))))
 
-#+extensible-compound-types
-(define-declaration type-like (vars env)
-  ;; FIXME: Consequences of emitting CL:TYPE declaration are undefined
-  ;; On CCL, args starts with DECL-NAME while not using CL-ENVIRONMENTS-CL
-  ;; Other times, it starts with the appropriate args
-  (destructuring-bind (original &rest similar) (optima:match vars
-                                                 ((list* 'type-like vars)
-                                                  vars)
-                                                 (_ vars))
-    (values :variable
-            (loop :with type
-                    := (rest (assoc 'extensible-compound-types:extype
-                                    (nth-value 2 (variable-information original env))))
-                  :for var :in similar
-                  :collect `(,var extensible-compound-types:extype ,type)
-                  :collect `(,var cl:type ,(upgraded-cl-type type env))))))
-
 (define-declaration inline-pf (vars env)
   (values :function
           (loop :for var :in vars
@@ -467,11 +449,11 @@ If it exists, the second value is T and the first value is a possibly empty
                 :collect `(,var inline-pf notinline-pf))))
 
 (define-declaration pf-defined-before-use (args)
-  ;; (declare (ignore args))
+  #+sbcl (declare (ignore args))
   (values :declare
           (cons 'pf-defined-before-use t)))
 
 (define-declaration not-pf-defined-before-use (args)
-  ;; (declare (ignore args))
+  #+sbcl (declare (ignore args))
   (values :declare
           (cons 'pf-defined-before-use nil)))

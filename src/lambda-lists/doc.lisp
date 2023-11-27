@@ -1,4 +1,4 @@
-(in-package :polymorphic-functions)
+(in-package #:polymorphic-functions)
 
 ;; LAMBDA-LIST-TYPE ============================================================
 
