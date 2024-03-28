@@ -4,6 +4,8 @@
 (:source "quicklisp" :url "https://beta.quicklisp.org/dist/quicklisp.txt" :type :quicklisp)
 
 (:asd "polymorphic-functions.asd")
+(:asd "polymorphic-functions-lite.asd")
 
-(:github "ctype" :path "s-expressionists/ctype" :branch "main" :systems ("ctype"))
+(:github "cl-environments" :path "alex-gutev/cl-environments" :branch "main" :systems ("cl-environments"))
+(:github "cl-form-types" :path "alex-gutev/cl-form-types" :branch "main" :systems ("cl-form-types"))
 (:github "compiler-macro-notes" :path "digikar99/compiler-macro-notes" :branch "main" :systems ("compiler-macro-notes"))
