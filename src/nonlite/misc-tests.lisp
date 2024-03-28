@@ -348,13 +348,13 @@
              (undefine-polymorphic-function 'most-specialized-polymorph-tester)
              (define-polymorphic-function most-specialized-polymorph-tester (a))
              (defpolymorph most-specialized-polymorph-tester ((a string)) symbol
-               (declare (ignore a))
+               (declare (ignorable a))
                'string)
              (defpolymorph-compiler-macro most-specialized-polymorph-tester (string) (a)
-               (declare (ignore a))
+               (declare (ignorable a))
                `'(compiled string))
              (defpolymorph most-specialized-polymorph-tester ((a array)) symbol
-               (declare (ignore a))
+               (declare (ignorable a))
                'array)
              (define-compiled-function most-specialized-polymorph-tester-caller ()
                (declare (optimize speed (debug 1)))
