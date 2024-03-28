@@ -53,9 +53,10 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
                                             (sort (subseq untyped-lambda-list (1+ key-position))
                                                   #'string<
                                                   :key (lambda (param)
-                                                         (optima:ematch param
-                                                           ((list name _) name)
-                                                           (variable variable))))))
+                                                         (if (and (listp param)
+                                                                  (null (cddr param)))
+                                                             (car param)
+                                                             param)))))
                                   untyped-lambda-list)))
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -65,8 +66,7 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
                                         ,default
                                         :source #+sbcl (sb-c:source-location) #-sbcl nil
                                         :declaration ,dispatch-declaration)
-         #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
-         (setf (compiler-macro-function ',name) #'pf-compiler-macro))
+         #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t))
        (fdefinition ',name))))
 
 (defun extract-declarations (body &key documentation)
@@ -118,64 +118,7 @@ If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BO
                       existing-effective-type-list)
               (undefpolymorph name existing-type-list))))
 
-(defmacro with-muffled-compilation-warnings (&body body)
-  `(locally (declare #+sbcl (sb-ext:muffle-conditions warning))
-     (let ((*error-output* (make-string-output-stream)))
-       (let (#+sbcl (sb-c::*in-compilation-unit* nil)
-             (*compile-verbose* nil))
-         (#+sbcl progn
-          #-sbcl with-compilation-unit #-sbcl (:override t)
-          ;; TODO: Improve error reporting on other systems
-          ;; This works on SBCL and CCL
-          ,@body)))))
-
-(defun null-env-compilation-warnings (lambda-form)
-  (let* ((warnings))
-    (with-muffled-compilation-warnings
-      (handler-bind ((warning (lambda (c)
-                                (push c warnings)
-                                (muffle-warning c))))
-        (compile nil (ecase (first lambda-form)
-                       (cl:lambda
-                        lambda-form)))))
-    (if warnings
-        (format nil "~{~A~^~%~}" (nreverse warnings))
-        nil)))
-
-;;; Earlier (until commit e7f11394023cf06075459ea4baa735ec8bda89f3 of polymorphic-functions),
-;;; we attempted to use a code-walker to determine if there are
-;;; free variables in the form, and accordingly decline to inline
-;;; the polymorph. However, cases such as this (and while this is nonsense):
-;;;   (define-polymorphic-function foo (a) :overwrite t)
-;;;   (let ((a 5))
-;;;     (defpolymorph foo ((symbol (eql a))) t
-;;;       (declare (ignore symbol))
-;;;       a)
-;;;     (defun bar () (foo 'a)))
-;;; demand a user supplied value for INLINE. We put the same to use and avoid
-;;; depending on the code-walker altogether.
-
-;;; The BODY of the DEFPOLYMORPH FORM may contain macro calls referenced to the
-;;; null lexenv. When this BODY gets substituted in order to INLINE the PF,
-;;; we want to avoid MACROLET (and FLET, LABELS) from overriding the elements
-;;; of the null lexenv. That is what the behavior of INLINE-d functions defined
-;;; by DEFUN is. (Does the spec say that?)
-;;;   The MACROLET can be taken care of by MACROEXPAND-ALL. However, because
-;;; compiling to support SUBTYPE and PARAMETRIC polymorphism requires type
-;;; information that is only available at the call-compilation site rather than
-;;; at the defpolymorph-definition site. Thus, the MACROEXPAND-ALL must happen
-;;; within the pf-compiler-macro rather than DEFPOLYMORPH below.
-;;;   That still leaves FLET and LABELS though. And that does form a limitation
-;;; of polymorphic functions at the time of this writing.
-
-;;; Do minimal work at macro-expansion time?
-;;; 1. Well, to be able to handle closures, the compilation phase of the lambda
-;;;    needs the env. However, env objects cannot be dumped; nor does it seem like
-;;;    a wise idea to do so.
-;;; 2. That means, the minimum work that we need to do during macroexpansion time
-;;;    involves the emission of the lambda-body.
-
-(defmacro defpolymorph (&whole form name typed-lambda-list return-type
+(defmacro defpolymorph (name typed-lambda-list return-type
                         &body body &environment env)
   "  Expects OPTIONAL or KEY args to be in the form
 
@@ -183,48 +126,19 @@ If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BO
 
   - NAME could also be
       (NAME
-        &KEY (INLINE T)
+        &KEY
         STATIC-DISPATCH-NAME
-        INVALIDATE-PF
-        MORE-OPTIMAL-TYPE-LIST
-        SUBOPTIMAL-NOTE
-        (PARAMETER-MODE :VALUES))
-
-  - Possible values for INLINE are T, NIL and :MAYBE
+        INVALIDATE-PF)
 
   - STATIC-DISPATCH-NAME could be useful for tracing or profiling
 
   - If INVALIDATE-PF is non-NIL then the associated polymorphic-function
     is forced to recompute its dispatching after this polymorph is defined.
-
-  - SUBOPTIMAL-NOTE and MORE-OPTIMAL-TYPE-LIST are useful for signalling that the
-    POLYMORPH chosen for static-dispatch, inlining, or compiler-macro is
-    not the most optimal.
-    It is recommended that SUBOPTIMAL-NOTE should be the name of a subclass of
-    SUBOPTIMAL-POLYMORPH-NOTE - the condition class should have a slot to
-    accept the TYPE-LIST of the currently chosen POLYMORPH
-
-  - PARAMETER-MODE can be either :VALUES (default) or :TYPES.
-    - :VALUES - the type parameters (if any) are treated as values extracted
-      using the accessors of the ORTHOGONALLY-SPECIALIZING-TYPE-SPECIFIER
-      associated with the CLASS-OF object. In this case, the type parameters
-      are compared using EQUAL.
-    - :TYPES - the type parameters (if any) are treated as types, compared using
-      TYPE= after accessors TODO: Finish this
-
-  **Note**:
-  - INLINE T or :MAYBE can result in infinite expansions for recursive polymorphs.
-Proceed at your own risk.
-  - Also, because inlining results in type declaration upgradation for purposes
-of subtype polymorphism, it is recommended to not mutate the variables used
-in the lambda list; the consequences of mutation are undefined.
 "
   (destructuring-bind (name
-                       &key (inline t ip)
+                       &key
                          (static-dispatch-name nil static-dispatch-name-p)
-                         invalidate-pf
-                         more-optimal-type-list
-                         suboptimal-note)
+                         invalidate-pf)
       (if (typep name 'function-name)
           (list name)
           name)
@@ -302,7 +216,7 @@ in the lambda list; the consequences of mutation are undefined.
              (lambda-body
               `(list-named-lambda (polymorph ,name ,type-list)
                    ,(symbol-package block-name)
-                 ,param-list
+                   ,param-list
                  (declare (ignorable ,@ignorable-list))
                  ,lambda-declarations
                  ,declarations
@@ -310,170 +224,47 @@ in the lambda list; the consequences of mutation are undefined.
                       (ensure-type-form return-type
                                         `(block ,block-name
                                            (locally ,@body))
-                                        (augment-environment
-                                         env
-                                         :variable
-                                         (remove-duplicates
-                                          (remove-if
-                                           #'null
-                                           (mapcar #'third
-                                                   (rest lambda-declarations))))
-                                         :declare
-                                         (remove-duplicates
-                                          (rest lambda-declarations)
-                                          :test #'equal)))
+                                        env)
                     (setq return-type form-return-type)
-                    form)))
-             ;; Currently we need INLINE-LAMBDA-BODY and the checks in M-V-B
-             ;; below for DEFTRANSFORM; as well as to avoid the ASSERTs in
-             ;; pf-compiler-macro emitted by ENSURE-TYPE-FORM used for LAMBDA-BODY
-             (inline-lambda-body (when inline
-                                   ;; The declarations could also be EXTYPE declarations,
-                                   ;; which we will need to convert to CL:TYPE.
-                                   ;; That's why, avoid the use of CL:LAMBDA here.
-                                   `(lambda ,param-list
-                                      (declare (ignorable ,@ignorable-list))
-                                      ,lambda-declarations
-                                      ,declarations
-                                      ;; The RETURN-TYPE here would be augmented by
-                                      ;; PF-COMPILER-MACRO
-                                      (block ,block-name
-                                        (locally ,@body)))))
-             #+sbcl
-             (sbcl-transform-body (make-sbcl-transform-body name
-                                                            typed-lambda-list
-                                                            inline-lambda-body
-                                                            parameters)))
-        (multiple-value-bind (inline-safe-lambda-body inline-note)
-            (cond ((and ip inline)
-                   (values inline-lambda-body
-                           (if-let (null-env-compilation-warnings
-                                    (null-env-compilation-warnings inline-lambda-body))
-                             (with-output-to-string (*error-output*)
-                               (note-null-env inline-lambda-body
-                                              null-env-compilation-warnings))
-                             nil)))
-                  ((and ip (not inline))
-                   (values nil nil))
-                  ((and (not ip)
-                        (recursive-function-p name inline-lambda-body))
-                   (values nil
-                           (with-output-to-string (*error-output*)
-                             (note-no-inline form "it is suspected to result in infinite recursive expansion;~%  supply :INLINE T option to override and proceed at your own risk"))))
-                  (t
-                   (if-let (null-env-compilation-warnings
-                            (null-env-compilation-warnings inline-lambda-body))
-                     (values nil
-                             (with-output-to-string (*error-output*)
-                               (note-no-inline form "~%")
-                               (pprint-logical-block (*error-output* nil
-                                                                     :per-line-prefix "  ")
-                                 (note-null-env inline-lambda-body
-                                                null-env-compilation-warnings))
-                               (format *error-output* "~&PROCEED AT YOUR OWN RISK!~%~%")))
-                     (values inline-lambda-body
-                             nil))))
-          (setq inline (case inline
-                         ((t) (if ip
-                                  inline
-                                  (if inline-note nil t)))
-                         (otherwise inline)))
-          ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
-          ;; and "objects of type FUNCTION can't be dumped into fasl files"
-          `(progn
-             (eval-when (:compile-toplevel :load-toplevel :execute)
-               (unless (and (fboundp ',name)
-                            (typep (function ,name) 'polymorphic-function))
-                 (define-polymorphic-function ,name ,untyped-lambda-list)))
-             #+sbcl ,(when inline-safe-lambda-body
-                       (if optim-debug
-                           sbcl-transform-body
-                           `(locally (declare (sb-ext:muffle-conditions style-warning))
-                              (handler-bind ((style-warning #'muffle-warning))
-                                ,sbcl-transform-body))))
-             ,(when inline-note
-                ;; Even STYLE-WARNING isn't appropriate to this, because we want to
-                ;; inform the user of the warnings even when INLINE option is supplied.
-                `(compiler-macro-notes:with-notes (',form nil :unwind-on-signal nil)
-                   (signal 'defpolymorph-note :datum ,inline-note)
-                   t))
-             (eval-when (:compile-toplevel :load-toplevel :execute)
-               ;; We are not "fixing inlining" using DEFUN made functions
-               ;; because we need to take parametric polymorphism into account
-               ;; while inlining.
-               ,(if inline-note
-                    `(with-muffled-compilation-warnings
-                       (setf (fdefinition ',static-dispatch-name) ,lambda-body))
-                    `(setf (fdefinition ',static-dispatch-name) ,lambda-body))
-               ,(let* ((ftype (ftype-for-static-dispatch static-dispatch-name
-                                                         effective-type-list
-                                                         return-type
-                                                         env))
-                       (proclaimation
-                         `(proclaim ',ftype)))
-                  (if optim-debug
-                      proclaimation
-                      `(handler-bind ((warning #'muffle-warning))
-                         ,proclaimation)))
-               (register-polymorph ',name ',inline
-                                   ',doc
-                                   ',typed-lambda-list
-                                   ',type-list
-                                   ',effective-type-list
-                                   ',more-optimal-type-list
-                                   ',suboptimal-note
-                                   ',return-type
-                                   ',inline-safe-lambda-body
-                                   ',static-dispatch-name
-                                   ',lambda-list-type
-                                   ',(run-time-applicable-p-form parameters)
-                                   ,(compiler-applicable-p-lambda-body parameters)
-                                   #+sbcl (sb-c:source-location))
-               ,(when invalidate-pf
-                  `(invalidate-polymorphic-function-lambda (fdefinition ',name)))
-               ',name)))))))
-
-(defmacro defpolymorph-compiler-macro (name type-list compiler-macro-lambda-list
-                                       &body body)
-  "Example TYPE-LISTs:
-  (NUMBER NUMBER)
-  (STRING &OPTIONAL INTEGER)
-  (STRING &KEY (:ARG INTEGER))
-  (NUMBER &REST)"
-  (declare (type function-name name)
-           (type type-list type-list))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (register-polymorph-compiler-macro
-        ',name ',type-list
-        (compile nil (parse-compiler-macro ',(if (and (listp name)
-                                                      (eq 'setf (first name)))
-                                                 (second name)
-                                                 name)
-                                           ',compiler-macro-lambda-list
-                                           ',body))
-        #+sbcl (sb-c:source-location))
-       ',name))
+                    form))))
+        `(eval-when (:compile-toplevel :load-toplevel :execute)
+           (unless (and (fboundp ',name)
+                        (typep (function ,name) 'polymorphic-function))
+             (define-polymorphic-function ,name ,untyped-lambda-list))
+           (setf (fdefinition ',static-dispatch-name) ,lambda-body)
+           ,(let* ((ftype (ftype-for-static-dispatch static-dispatch-name
+                                                     effective-type-list
+                                                     return-type
+                                                     env))
+                   (proclaimation
+                     `(proclaim ',ftype)))
+              (if optim-debug
+                  proclaimation
+                  `(handler-bind ((warning #'muffle-warning))
+                     ,proclaimation)))
+           (register-polymorph ',name nil
+                               ',doc
+                               ',typed-lambda-list
+                               ',type-list
+                               ',effective-type-list
+                               nil
+                               nil
+                               ',return-type
+                               nil
+                               ',static-dispatch-name
+                               ',lambda-list-type
+                               ',(run-time-applicable-p-form parameters)
+                               ,(compiler-applicable-p-lambda-body parameters)
+                               #+sbcl (sb-c:source-location))
+           ,(when invalidate-pf
+              `(invalidate-polymorphic-function-lambda (fdefinition ',name)))
+           ',name)))))
 
 (defun undefpolymorph (name type-list)
   "Remove the POLYMORPH associated with NAME with TYPE-LIST"
-  ;; FIXME: Undefining polymorphs can also lead to polymorph call ambiguity.
-  ;; One (expensive) solution is to insert afresh the type lists of all polymorphs
-  ;; to resolve it.
-  #+sbcl
-  (let ((info  (sb-c::fun-info-or-lose name))
-        (ctype (sb-c::specifier-type (list 'function type-list '*))))
-    (setf (sb-c::fun-info-transforms info)
-          (remove-if (curry #'sb-c::type= ctype)
-                     (sb-c::fun-info-transforms info)
-                     :key #'sb-c::transform-type)))
   (remove-polymorph name type-list)
   (update-polymorphic-function-lambda (fdefinition name) t))
 
 (defun undefine-polymorphic-function (name)
-  "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH
-CL:FMAKUNBOUND will be insufficient, because polymorphic-functions
-also have a compiler macro defined for them. Additionally, on SBCL,
-they may also have transforms associated with them."
-  (fmakunbound name)
-  #+sbcl (sb-c::undefine-fun-name name)
-  (setf (compiler-macro-function name) nil))
+  "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH"
+  (fmakunbound name))

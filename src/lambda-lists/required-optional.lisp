@@ -112,9 +112,7 @@
                         (t
                          (funcall (fdefinition ',*name*) ,@required-parameters))))
                `(let ((,static-dispatch-fn
-                        (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note)
-                                          (compiler-macro-notes:muffle
-                                           compiler-macro-notes:optimization-failure-note))
+                        (locally (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
                           (cond
                             ,@(loop
                                 :for i :from 0

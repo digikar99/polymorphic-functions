@@ -166,12 +166,6 @@
   (is (equal '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
   (is (equal '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
 
-(defun ensure-default-form-type (default-form type &optional env)
-  (let ((default-form-type (nth-form-type default-form env 0 t t)))
-    (when (intersection-null-p env default-form-type type)
-      (warn "The type of~%  ~S~%was expected to be~%  ~S~%but was derived to be~%  ~S~%which does not intersect with%  ~S"
-            default-form type default-form-type type))))
-
 (declaim (ftype (function (list list) polymorph-parameters)
                 make-polymorph-parameters-from-lambda-lists))
 (defun make-polymorph-parameters-from-lambda-lists (polymorphic-function-lambda-list
@@ -238,8 +232,6 @@
                                         &optional (default nil defaultp)
                                           supplied-p-name)
                        parameter-specifier
-                     (when defaultp
-                       (ensure-default-form-type default type))
                      (setq parameter
                            (make-polymorph-parameter :local-name name
                                                      :form-in-pf (car untyped-lambda-list)
@@ -266,8 +258,6 @@
                                 &optional (default nil defaultp)
                                   supplied-p-name)
                                parameter-specifier
-                             (when defaultp
-                               (ensure-default-form-type default type))
                              (setq parameter
                                    (make-polymorph-parameter :local-name name
                                                              :form-in-pf
@@ -299,8 +289,6 @@
                                         &optional (default nil defaultp)
                                           supplied-p-name)
                        parameter-specifier
-                     (when defaultp
-                       (ensure-default-form-type default type))
                      (setq parameter
                            (make-polymorph-parameter :local-name name
                                                      :form-in-pf (car untyped-lambda-list)

@@ -82,17 +82,23 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
     (with-slots (name type-list) o
       (format stream "~S ~S" name type-list))))
 
+(with-eval-always
+  (defun sbcl-version-spec-list (&optional version)
+    (mapcar #'parse-integer
+            (uiop:split-string (or version (lisp-implementation-version))
+                               :separator '(#\.))))
+
+  (defun sbcl-version-spec-integer (&optional version)
+    (destructuring-bind (major-1 major-2 minor)
+        (sbcl-version-spec-list version)
+      (+ (* 12 (+ (* 10 major-1) major-2))
+         minor))))
+
 (define-constant +optimize-speed-or-compilation-speed+
     ;; optimize for compilation-speed for SBCL>2.2.3 else for speed
     (if (and (string= "SBCL" (lisp-implementation-type))
-             (ignore-errors
-              (< (+ (* 12 (+ (* 10 2) 2))
-                    3)
-                 (destructuring-bind (major-1 major-2 minor)
-                     (mapcar #'parse-integer (split-sequence:split-sequence
-                                              #\. (lisp-implementation-version)))
-                   (+ (* 12 (+ (* 10 major-1) major-2))
-                      minor)))))
+             (< (sbcl-version-spec-integer "2.2.3")
+                (sbcl-version-spec-integer (lisp-implementation-version))))
         `(optimize compilation-speed)
         `(optimize speed))
   :test #'equal)

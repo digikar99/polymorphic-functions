@@ -120,12 +120,11 @@ the polymorphic-function being called at the call-site is dispatched dynamically
                     ;; return-type was more specific than what a derivation
                     ;; could tell us.
                     (setq return-type
-                          (cond ((values-subtypep enhanced-return-type return-type)
+                          (cond ((subtypep enhanced-return-type return-type)
                                  enhanced-return-type)
-                                ((values-subtypep (combine-values-types 'and
-                                                                        enhanced-return-type
-                                                                        return-type)
-                                                  nil)
+                                ((subtypep `(and ,enhanced-return-type
+                                                 ,return-type)
+                                           nil)
                                  (signal 'compile-time-return-type-mismatch
                                          :derived enhanced-return-type
                                          :declared return-type

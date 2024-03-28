@@ -25,9 +25,7 @@
                 `(funcall
                   (cl:the cl:function
                           (locally
-                              (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note)
-                                       (compiler-macro-notes:muffle
-                                        compiler-macro-notes:optimization-failure-note))
+                              (declare #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
                             (cond
                               ,@(loop
                                   :for i :from 0

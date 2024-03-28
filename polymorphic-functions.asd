@@ -3,44 +3,19 @@
   :version "0.5.0"                      ; beta
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Type based dispatch for Common Lisp"
-  :depends-on ("alexandria"
+  :depends-on ("polymorphic-functions-lite"
                "cl-form-types"
-               "compiler-macro-notes"
-               "fiveam" ;; just keep tests together!
-               "introspect-environment"
-               "let-plus"
-               "optima"
-               "split-sequence"
-               "trivial-types")
-  :pathname #P"src/"
+               "compiler-macro-notes")
+  :pathname #P"src/nonlite/"
   :components ((:file "package")
                (:file "utils"                      :depends-on ("package"))
-               (:file "types"                      :depends-on ("utils"))
-               (:file "type-tools"                 :depends-on ("utils"))
                (:file "ensure-type-form"           :depends-on ("utils"))
-               (:module "lambda-lists"             :depends-on ("ensure-type-form"
-                                                                "type-tools"
-                                                                "types")
-                :components ((:file "doc")
-                             (:file "parameters")
-                             (:file "base"         :depends-on ("doc"
-                                                                "parameters"))
-                             (:file "required"     :depends-on ("base"))
-                             (:file "required-optional" :depends-on ("base"))
-                             (:file "required-key" :depends-on ("base"))
-                             (:file "rest"         :depends-on ("base"))))
-               (:file "polymorphic-function"       :depends-on ("lambda-lists"))
-               (:file "conditions"                 :depends-on ("package"))
-               (:file "compiler-macro"             :depends-on ("polymorphic-function"
-                                                                "lambda-lists"
-                                                                "conditions"))
+               (:file "polymorph-compiler-macro"   :depends-on ("utils"))
+               (:file "conditions"                 :depends-on ("polymorph-compiler-macro"))
+               (:file "compiler-macro"             :depends-on ("conditions"))
                #+sbcl
-               (:file "sbcl-transform"             :depends-on ("polymorphic-function"
-                                                                "lambda-lists"
-                                                                "conditions"))
-               (:file "dispatch"                   :depends-on ("polymorphic-function"
-                                                                "lambda-lists"
-                                                                "conditions"
+               (:file "sbcl-transform"             :depends-on ("conditions"))
+               (:file "dispatch"                   :depends-on ("conditions"
                                                                 "compiler-macro"
                                                                 #+sbcl "sbcl-transform"))
                (:file "misc-tests"                 :depends-on ("dispatch"))
@@ -55,12 +30,9 @@
 (defsystem "polymorphic-functions/specializing"
   :depends-on ("polymorphic-functions")
   :description "Defines the polymorphic-functions:specializing macro"
-  :pathname "src"
+  :pathname "src/nonlite/"
   :components ((:file "specializing")))
 
 (defsystem "polymorphic-functions/swank"
-  :depends-on ("polymorphic-functions"
-               "swank")
-  :description "slime/swank integration for polymorphic-functions"
-  :pathname "src"
-  :components ((:file "swank")))
+  :depends-on ("polymorphic-functions-lite/swank")
+  :description "slime/swank integration for polymorphic-functions")
