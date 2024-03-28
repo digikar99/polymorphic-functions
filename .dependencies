@@ -1,2 +1,3 @@
-("extensible-compound-types" :git "https://github.com/digikar99/extensible-compound-types")
-("cl-form-types" :git "https://github.com/digikar99/cl-form-types")
+("cl-form-types" :git "https://github.com/alex-gutev/cl-form-types")
+("cl-environments" :git "https://github.com/alex-gutev/cl-environments")
+("compiler-macro-notes" :git "https://github.com/digikar99/compiler-macro-notes")

@@ -30,8 +30,20 @@ jobs:
         ls -l
         bash <(curl -s https://raw.githubusercontent.com/digikar99/lisp-travis-lite/master/run.sh)
 
-    # Testing it on the second load confirms that functionalities do not
-    # solely eval-when compile-toplevel, and that they persist across multiple loads.
+    - name: Download download-dependencies
+      run: |
+        git clone https://github.com/digikar99/download-dependencies $HOME/quicklisp/local-projects/download-dependencies
+
+
+    - name: Download dependencies
+      run: |
+        cl --eval '(ql:quickload "download-dependencies")' \
+           --eval '(push "~/" ql:*local-project-directories*)' \
+           --eval '(in-package :download-dependencies)' \
+           --eval '(let ((*dependencies-home* (first ql:*local-project-directories*))) (ensure-system "polymorphic-functions"))'\
+           --eval '(ql:register-local-projects)'
+        ls -l ~/
+
     - name: Lite - Run Tests
       run: |
         cl --eval '(progn
@@ -40,12 +52,14 @@ jobs:
                      (ql:quickload "polymorphic-functions-lite")
                      (asdf:test-system "polymorphic-functions-lite")
                      (uiop:quit 0))'
+
     - name: Full - Compile Tests
       run: |
         cl --eval '(progn
                      (push "~/" ql:*local-project-directories*)
                      (print ql:*local-project-directories*)
                      (print (ql:where-is-system "polymorphic-functions"))
+                     (push :travis *features*)
                      (ql:quickload "polymorphic-functions")
                      (uiop:quit 0))'
 
