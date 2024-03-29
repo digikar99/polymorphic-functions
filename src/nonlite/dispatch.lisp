@@ -231,8 +231,7 @@ in the lambda list; the consequences of mutation are undefined.
               `(compiler-macro-notes:with-notes (',whole nil :unwind-on-signal nil)
                  (signal 'defpolymorph-note :datum ,inline-notes)
                  t))
-           (eval-when (:compile-toplevel :load-toplevel :execute)
-
+           (eval-when (:load-toplevel :execute)
              ;; We have implemented inlining through the PF-COMPILER-MACRO.
              ;; In addition to inlining, it also propagates the type declarations
              ;; so that further compiler/macroexpansions can make use of this info.
@@ -247,9 +246,8 @@ in the lambda list; the consequences of mutation are undefined.
                   ;; deal with them first.
                   `(with-muffled-compilation-warnings
                      (setf (fdefinition ',static-dispatch-name) ,lambda-body))
-                  `(setf (fdefinition ',static-dispatch-name) ,lambda-body))
-
-
+                  `(setf (fdefinition ',static-dispatch-name) ,lambda-body)))
+           (eval-when (:compile-toplevel :load-toplevel :execute)
 
              (register-polymorph ',name ',inline
                                  ',doc
