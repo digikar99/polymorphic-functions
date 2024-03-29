@@ -56,11 +56,12 @@
 (define-condition return-type-count-mismatch/warning (return-type-count-mismatch warning)
   ())
 
-(defun ensure-type-form (type form &optional env)
-  "Returns two values: a form that has ASSERTs with SIMPLE-TYPE-ERROR to check the type
-as well as the type enhanced using TYPE."
+(defmacro with-return-type (return-type &body body)
+  ;; We put the &BODY only for good indentation
   (declare (optimize debug))
-  (let* ((type (typexpand type env))
+  (assert (null (cdr body)))
+  (let* ((form (car body))
+         (type (typexpand return-type))
          (optional-position (when (listp type)
                               (position '&optional type)))
          (min-values (cond (optional-position
@@ -113,45 +114,63 @@ as well as the type enhanced using TYPE."
                             :expected ,type)))))
 
 
-    (values
+    `(let* ((,form-value-list (multiple-value-list ,form))
+            (,num-values (length ,form-value-list)))
+       (declare (ignorable ,num-values))
 
-     `(let* ((,form-value-list (multiple-value-list ,form))
-             (,num-values (length ,form-value-list)))
-        (declare (ignorable ,num-values))
+       ,@(let ((return-type-count-form
+                 (cond ((and optional-position rest-p)
+                        `(assert (<= ,(1- optional-position)
+                                     ,num-values)
+                                 (,form-value-list)
+                                 'return-type-count-mismatch :min ,min-values :actual ,num-values))
+                       ((and optional-position (not rest-p))
+                        `(assert (<= ,(1- optional-position)
+                                     ,num-values
+                                     ,num-types)
+                                 (,form-value-list)
+                                 'return-type-count-mismatch
+                                 :min ,min-values :max ,num-types :actual ,num-values))))
 
-        ,@(let ((return-type-count-form
-                  (cond ((and optional-position rest-p)
-                         `(assert (<= ,(1- optional-position)
-                                      ,num-values)
-                                  (,form-value-list)
-                                  'return-type-count-mismatch :min ,min-values :actual ,num-values))
-                        ((and optional-position (not rest-p))
-                         `(assert (<= ,(1- optional-position)
-                                      ,num-values
-                                      ,num-types)
-                                  (,form-value-list)
-                                  'return-type-count-mismatch
-                                  :min ,min-values :max ,num-types :actual ,num-values))))
+               (rest-type-form
+                 (unless (eq rest-type-form t)
+                   (with-gensyms (value i)
+                     `(loop :for ,value :in (nthcdr ,num-types ,form-value-list)
+                            :for ,i :from ,num-types
+                            :do (assert (typep ,value ,rest-type-form)
+                                        (,form-value-list)
+                                        'return-type-mismatch/error
+                                        :expected ,rest-type-form
+                                        :actual ,value
+                                        :index ,i))))))
+           (list return-type-count-form
+                 rest-type-form))
 
-                (rest-type-form
-                  (unless (eq rest-type-form t)
-                    (with-gensyms (value i)
-                      `(loop :for ,value :in (nthcdr ,num-types ,form-value-list)
-                             :for ,i :from ,num-types
-                             :do (assert (typep ,value ,rest-type-form)
-                                         (,form-value-list)
-                                         'return-type-mismatch/error
-                                         :expected ,rest-type-form
-                                         :actual ,value
-                                         :index ,i))))))
-            (list return-type-count-form
-                  rest-type-form))
+       (multiple-value-bind ,form-values
+           (values-list ,form-value-list)
+         (declare (ignorable ,@form-values))
+         ,@ensure-type-forms)
 
-        (multiple-value-bind ,form-values
-            (values-list ,form-value-list)
-          (declare (ignorable ,@form-values))
-          ,@ensure-type-forms)
+       (values-list ,form-value-list))))
 
-        (values-list ,form-value-list))
+(defun ensure-type-form (type block-name body &key variable declare)
+  "Returns two values: a form that has ASSERTs with SIMPLE-TYPE-ERROR to check the type
+as well as the type enhanced using TYPE."
+  (declare (optimize debug))
+  (if (macro-function 'with-return-type-in-env)
+      (values `(with-return-type-in-env (:variable ,variable :declare ,declare)
+                                        ,type
+                 (block ,block-name (locally ,@body)))
+              (uiop:symbol-call '#:polymorphic-functions '#:form-type
+                                `(the ,type (block ,block-name (locally ,@body)))
+                                (uiop:symbol-call '#:cl-environments
+                                                  '#:augment-environment
+                                                  nil
+                                                  :variable variable
+                                                  :declare declare)
+                         :expand-compiler-macros t))
+      (values `(with-return-type ,type
+                 (block ,block-name (locally ,@body)))
+              type)))
 
-     type)))
+

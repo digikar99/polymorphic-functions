@@ -1,9 +1,5 @@
 (in-package #:polymorphic-functions)
 
-(defvar *disable-static-dispatch* nil
-  "If value at the time of compilation of the call-site is non-NIL,
-the polymorphic-function being called at the call-site is dispatched dynamically.")
-
 ;;; TODO: Allow user to specify custom optim-speed etc
 
 (defun pf-compiler-macro-function

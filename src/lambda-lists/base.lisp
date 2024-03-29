@@ -229,3 +229,15 @@ of the following types:~%  ~S~%  ~S"
                            type-list))
                     ,return-type)
           ,static-dispatch-name))
+
+(defun ftype-proclaimation
+    (static-dispatch-name effective-type-list return-type env)
+  (let* ((ftype (ftype-for-static-dispatch
+                 static-dispatch-name effective-type-list return-type env))
+         (proclaimation
+           `(proclaim ',ftype)))
+    (if optim-debug
+        proclaimation
+        `(handler-bind ((warning #'muffle-warning))
+           ,proclaimation))))
+

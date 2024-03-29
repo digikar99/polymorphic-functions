@@ -44,30 +44,19 @@ At compile-time *COMPILER-MACRO-EXPANDING-P* is bound to non-NIL."
     (setq documentation (constant-form-value documentation env)))
   (when docp (check-type documentation string))
   (let* ((*name*        name)
-         (*environment*  env)
          (untyped-lambda-list (normalize-untyped-lambda-list untyped-lambda-list))
-         (untyped-lambda-list (if (member '&key untyped-lambda-list)
-                                  (let* ((key-position (position '&key untyped-lambda-list)))
-                                    (append (subseq untyped-lambda-list 0 key-position)
-                                            '(&key)
-                                            (sort (subseq untyped-lambda-list (1+ key-position))
-                                                  #'string<
-                                                  :key (lambda (param)
-                                                         (if (and (listp param)
-                                                                  (null (cddr param)))
-                                                             (car param)
-                                                             param)))))
-                                  untyped-lambda-list)))
+         (untyped-lambda-list (sort-untyped-lambda-list untyped-lambda-list)))
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
-         ,(when overwrite
-            `(undefine-polymorphic-function ',name))
+         ,(when overwrite `(undefine-polymorphic-function ',name))
          (register-polymorphic-function ',name ',untyped-lambda-list ,documentation
                                         ,default
                                         :source #+sbcl (sb-c:source-location) #-sbcl nil
                                         :declaration ,dispatch-declaration)
-         #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t))
-       (fdefinition ',name))))
+         #+sbcl (sb-c:defknown ,name * * nil :overwrite-fndb-silently t)
+         ,(when (fboundp 'pf-compiler-macro)
+            `(setf (compiler-macro-function ',name) #'pf-compiler-macro))
+         (fdefinition ',name)))))
 
 (defun extract-declarations (body &key documentation)
   "Returns two values: DECLARATIONS and remaining BODY
@@ -118,7 +107,99 @@ If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BO
                       existing-effective-type-list)
               (undefpolymorph name existing-type-list))))
 
-(defmacro defpolymorph (name typed-lambda-list return-type
+(defun expand-defpolymorph-lite
+    (name typed-lambda-list return-type body env)
+  (destructuring-bind
+      (name &rest keys
+       &key invalidate-pf (static-dispatch-name nil static-dispatch-name-p)
+       &allow-other-keys)
+      (if (typep name 'function-name)
+          (list name)
+          name)
+    (declare (type function-name name)
+             (optimize debug))
+    (remf keys :invalidate-pf)
+    (remf keys :static-dispatch-name)
+    (assert (null keys) ()
+            "The only legal options for DEFPOLYMORPH are:~%  STATIC-DISPATCH-NAME and INVALIDATE-PF~%Did you intend to polymorphic-functions instead of polymorphic-functions-lite?")
+    (let+ ((block-name       (blockify-name name))
+           (*environment*    env)
+           ((&values unsorted-typed-lambda-list ignorable-list)
+            (normalize-typed-lambda-list typed-lambda-list))
+           (typed-lambda-list (sort-typed-lambda-list unsorted-typed-lambda-list))
+           (untyped-lambda-list (untyped-lambda-list typed-lambda-list))
+           (pf-lambda-list      (may-be-pf-lambda-list name untyped-lambda-list))
+           (parameters          (make-polymorph-parameters-from-lambda-lists
+                                 pf-lambda-list typed-lambda-list))
+           (lambda-list-type  (lambda-list-type typed-lambda-list :typed t))
+           ((&values param-list type-list effective-type-list)
+            (polymorph-effective-lambda-list parameters))
+           ((&values declarations body doc)
+            (extract-declarations body :documentation t))
+           (static-dispatch-name
+            (if static-dispatch-name-p
+                static-dispatch-name
+                (make-or-retrieve-static-dispatch-name name type-list)))
+           (lambda-declarations (lambda-declarations parameters))
+           ((&values ensure-type-form return-type)
+            (ensure-type-form return-type block-name body
+                              :variable
+                              (remove-duplicates
+                               (remove-if
+                                #'null
+                                (mapcar #'third
+                                        (rest lambda-declarations))))
+                              :declare
+                              (remove-duplicates
+                               (rest lambda-declarations)
+                               :test #'equal)))
+           (lambda-body
+            `(list-named-lambda (polymorph ,name ,type-list)
+                 ,(symbol-package block-name)
+                 ,param-list
+               (declare (ignorable ,@ignorable-list))
+               ,lambda-declarations
+               ,declarations
+               ,ensure-type-form))
+           ;; LAMBDA-BODY contains the ENSURE-TYPE-FORM that performs
+           ;;   run time checks on the return types.
+           (ftype-proclaimation
+            (ftype-proclaimation
+             static-dispatch-name effective-type-list return-type env)))
+
+      `(eval-when (:compile-toplevel :load-toplevel :execute)
+
+         (unless (and (fboundp ',name)
+                      (typep (function ,name) 'polymorphic-function))
+           (define-polymorphic-function ,name ,untyped-lambda-list))
+
+         (setf (fdefinition ',static-dispatch-name) ,lambda-body)
+         ,ftype-proclaimation
+         (register-polymorph ',name nil
+                             ',doc
+                             ',typed-lambda-list
+                             ',type-list
+                             ',effective-type-list
+                             nil
+                             nil
+                             ',return-type
+                             nil
+                             ',static-dispatch-name
+                             ',lambda-list-type
+                             ',(run-time-applicable-p-form parameters)
+                             nil
+                             #+sbcl (sb-c:source-location))
+         ,(when invalidate-pf
+            `(invalidate-polymorphic-function-lambda (fdefinition ',name)))
+         ',name))))
+
+;;; CLHS recommends that
+;;;   Macros intended for use in top level forms should be written so that
+;;;   side-effects are done by the forms in the macro expansion. The
+;;;   macro-expander itself should not do the side-effects.
+;;; Reference: http://clhs.lisp.se/Body/s_eval_w.htm
+
+(defmacro defpolymorph (&whole whole name typed-lambda-list return-type
                         &body body &environment env)
   "  Expects OPTIONAL or KEY args to be in the form
 
@@ -135,136 +216,29 @@ If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BO
   - If INVALIDATE-PF is non-NIL then the associated polymorphic-function
     is forced to recompute its dispatching after this polymorph is defined.
 "
-  (destructuring-bind (name
-                       &key
-                         (static-dispatch-name nil static-dispatch-name-p)
-                         invalidate-pf)
-      (if (typep name 'function-name)
-          (list name)
-          name)
-    (declare (type function-name name)
-             (optimize debug))
-    (let+ ((block-name       (blockify-name name))
-           (*environment*    env)
-           ((&values unsorted-typed-lambda-list ignorable-list)
-            (normalize-typed-lambda-list typed-lambda-list))
-           (typed-lambda-list (if (member '&key unsorted-typed-lambda-list)
-                                  (let ((key-position
-                                          (position '&key
-                                                    unsorted-typed-lambda-list)))
-                                    (append (subseq unsorted-typed-lambda-list
-                                                    0 key-position)
-                                            '(&key)
-                                            (sort (subseq unsorted-typed-lambda-list
-                                                          (1+ key-position))
-                                                  #'string<
-                                                  :key #'caar)))
-                                  unsorted-typed-lambda-list))
-           (untyped-lambda-list (untyped-lambda-list typed-lambda-list))
-           (pf-lambda-list      (if (and (fboundp name)
-                                         (typep (fdefinition name) 'polymorphic-function))
-                                    (mapcar (lambda (elt)
-                                              (if (atom elt) elt (first elt)))
-                                            (polymorphic-function-lambda-list
-                                             (fdefinition name)))
-                                    untyped-lambda-list))
-           (parameters          (make-polymorph-parameters-from-lambda-lists
-                                 pf-lambda-list typed-lambda-list))
-           (lambda-list-type  (lambda-list-type typed-lambda-list :typed t)))
-      (declare (type typed-lambda-list typed-lambda-list))
-
-      ;; USE OF INTERN BELOW:
-      ;;   We do want STATIC-DISPATCH-NAME symbol collision to actually take place
-      ;; when type lists of two polymorphs are "equivalent".
-      ;;   (Credits to phoe for pointing out in the issue at
-      ;;   https://github.com/digikar99/polymorphic-functions/issues/3)
-      ;;   Consider a file A to be
-      ;; compiled before restarting a lisp image, and file B after the
-      ;; restart. The use of GENTEMP meant that two "separate" compilations of
-      ;; the same polymorph in the two files, could result in different
-      ;; STATIC-DISPATCH-NAMEs. If the two files were then loaded
-      ;; simultaneously, and the polymorphs static-dispatched at some point,
-      ;; then there remained the possibility that different static-dispatches
-      ;; could be using "different versions" of the polymorph.
-      ;;   Thus, we actually do want collisions to take place so that a same
-      ;; deterministic/latest version of the polymorph is called; therefore we
-      ;; use INTERN.
-      (let+ (((&values param-list type-list effective-type-list)
-              (polymorph-effective-lambda-list parameters))
-             ((&values declarations body doc)
-              (extract-declarations body :documentation t))
-             (static-dispatch-name
-              (if static-dispatch-name-p
-                  static-dispatch-name
-                  (let* ((p-old
-                           (and (fboundp name)
-                                (typep (fdefinition name)
-                                       'polymorphic-function)
-                                (find-polymorph name type-list)))
-                         (old-name
-                           (when p-old
-                             (polymorph-static-dispatch-name
-                              p-old))))
-                    (if old-name
-                        old-name
-                        (let ((*package* (find-package
-                                          '#:polymorphic-functions.nonuser)))
-                          (intern (write-to-string
-                                   `(polymorph ,name ,type-list))
-                                  '#:polymorphic-functions.nonuser))))))
-             (lambda-declarations (lambda-declarations parameters))
-             (lambda-body
-              `(list-named-lambda (polymorph ,name ,type-list)
-                   ,(symbol-package block-name)
-                   ,param-list
-                 (declare (ignorable ,@ignorable-list))
-                 ,lambda-declarations
-                 ,declarations
-                 ,(multiple-value-bind (form form-return-type)
-                      (ensure-type-form return-type
-                                        `(block ,block-name
-                                           (locally ,@body))
-                                        env)
-                    (setq return-type form-return-type)
-                    form))))
-        `(eval-when (:compile-toplevel :load-toplevel :execute)
-           (unless (and (fboundp ',name)
-                        (typep (function ,name) 'polymorphic-function))
-             (define-polymorphic-function ,name ,untyped-lambda-list))
-           (setf (fdefinition ',static-dispatch-name) ,lambda-body)
-           ,(let* ((ftype (ftype-for-static-dispatch static-dispatch-name
-                                                     effective-type-list
-                                                     return-type
-                                                     env))
-                   (proclaimation
-                     `(proclaim ',ftype)))
-              (if optim-debug
-                  proclaimation
-                  `(handler-bind ((warning #'muffle-warning))
-                     ,proclaimation)))
-           (register-polymorph ',name nil
-                               ',doc
-                               ',typed-lambda-list
-                               ',type-list
-                               ',effective-type-list
-                               nil
-                               nil
-                               ',return-type
-                               nil
-                               ',static-dispatch-name
-                               ',lambda-list-type
-                               ',(run-time-applicable-p-form parameters)
-                               ,(compiler-applicable-p-lambda-body parameters)
-                               #+sbcl (sb-c:source-location))
-           ,(when invalidate-pf
-              `(invalidate-polymorphic-function-lambda (fdefinition ',name)))
-           ',name)))))
+  (if (fboundp 'pf-compiler-macro)
+      (uiop:symbol-call '#:polymorphic-functions
+                        '#:expand-defpolymorph-full
+                        whole name typed-lambda-list return-type body env)
+      (expand-defpolymorph-lite name typed-lambda-list return-type body env)))
 
 (defun undefpolymorph (name type-list)
   "Remove the POLYMORPH associated with NAME with TYPE-LIST"
+  ;; FIXME: Undefining polymorphs can also lead to polymorph call ambiguity.
+  ;; One (expensive) solution is to insert afresh the type lists of all polymorphs
+  ;; to resolve it.
+  #+sbcl
+  (let ((info  (sb-c::fun-info-or-lose name))
+        (ctype (sb-c::specifier-type (list 'function type-list '*))))
+    (setf (sb-c::fun-info-transforms info)
+          (remove-if (curry #'sb-c::type= ctype)
+                     (sb-c::fun-info-transforms info)
+                     :key #'sb-c::transform-type)))
   (remove-polymorph name type-list)
   (update-polymorphic-function-lambda (fdefinition name) t))
 
 (defun undefine-polymorphic-function (name)
   "Remove the POLYMORPH(-WRAPPER) defined by DEFINE-POLYMORPH"
-  (fmakunbound name))
+  (fmakunbound name)
+  #+sbcl (sb-c::undefine-fun-name name)
+  (setf (compiler-macro-function name) nil))

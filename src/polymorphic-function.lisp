@@ -1,5 +1,9 @@
 (in-package #:polymorphic-functions)
 
+(defvar *disable-static-dispatch* nil
+  "If value at the time of compilation of the call-site is non-NIL,
+the polymorphic-function being called at the call-site is dispatched dynamically.")
+
 (defun blockify-name (name)
   (etypecase name
     (symbol name)
@@ -311,3 +315,44 @@ If it exists, the second value is T and the first value is a possibly empty
 
 (defvar *compiler-macro-expanding-p* nil
   "Bound to T inside the DEFINE-COMPILER-MACRO defined in DEFINE-POLYMORPH")
+
+(defun may-be-pf-lambda-list (name untyped-lambda-list)
+  (if (and (fboundp name)
+           (typep (fdefinition name) 'polymorphic-function))
+      (mapcar (lambda (elt)
+                (if (atom elt) elt (first elt)))
+              (polymorphic-function-lambda-list
+               (fdefinition name)))
+      untyped-lambda-list))
+
+;; USE OF INTERN BELOW:
+;;   We do want STATIC-DISPATCH-NAME symbol collision to actually take place
+;; when type lists of two polymorphs are "equivalent".
+;;   (Credits to phoe for pointing out in the issue at
+;;   https://github.com/digikar99/polymorphic-functions/issues/3)
+;;   Consider a file A to be
+;; compiled before restarting a lisp image, and file B after the
+;; restart. The use of GENTEMP meant that two "separate" compilations of
+;; the same polymorph in the two files, could result in different
+;; STATIC-DISPATCH-NAMEs. If the two files were then loaded
+;; simultaneously, and the polymorphs static-dispatched at some point,
+;; then there remained the possibility that different static-dispatches
+;; could be using "different versions" of the polymorph.
+;;   Thus, we actually do want collisions to take place so that a same
+;; deterministic/latest version of the polymorph is called; therefore we
+;; use INTERN.
+(defun make-or-retrieve-static-dispatch-name (name type-list)
+  (let* ((p-old (and (fboundp name)
+                     (typep (fdefinition name)
+                            'polymorphic-function)
+                     (find-polymorph name type-list)))
+         (old-name (when p-old
+                     (polymorph-static-dispatch-name
+                      p-old))))
+    (if old-name
+        old-name
+        (let ((*package* (find-package
+                          '#:polymorphic-functions.nonuser)))
+          (intern (write-to-string
+                   `(polymorph ,name ,type-list))
+                  '#:polymorphic-functions.nonuser)))))

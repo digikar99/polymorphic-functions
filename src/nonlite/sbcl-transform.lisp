@@ -8,7 +8,7 @@
       (equalp type-list
               (polymorph-type-list polymorph-may-be)))))
 
-(defun make-sbcl-transform-body
+(defun make-sbcl-deftransform-form
     (name typed-lambda-list inline-lambda-body polymorph-parameters)
   (declare (optimize debug))
   (multiple-value-bind (param-list type-list effective-type-list)
@@ -123,3 +123,14 @@
                                                    (cons ,lvar-sym ,arg-sym))
                                                  ,lvar-syms ,arg-syms))
                          `(funcall ,,inline-lambda-body-sym ,@,arg-syms))))))))))
+
+(defun make-and-wrap-sbcl-deftransform-form
+    (env name typed-lambda-list inline-lambda-body parameters)
+  (let ((sbcl-deftransform-form
+          (make-sbcl-deftransform-form
+           name typed-lambda-list inline-lambda-body parameters)))
+    (if optim-debug
+        sbcl-deftransform-form ; Leave the form as it is.
+        `(locally (declare (sb-ext:muffle-conditions style-warning))
+           (handler-bind ((style-warning #'muffle-warning))
+             ,sbcl-deftransform-form)))))

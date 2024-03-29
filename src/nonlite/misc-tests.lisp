@@ -9,12 +9,6 @@
   #-sbcl
   `(compile ',name '(lambda ,lambda-list ,@body)))
 
-(defmacro ignoring-error-output (&body body)
-  `(let ((*error-output* (make-string-output-stream))
-         (*disable-static-dispatch* nil))
-     (handler-bind ((warning #'muffle-warning))
-       ,@body)))
-
 ;; unwind-protect (apparantly) does not have an effect in the def-test forms below :/
 
 (def-test required-args-correctness/static ()
