@@ -172,5 +172,3 @@ as well as the type enhanced using TYPE."
       (values `(with-return-type ,type
                  (block ,block-name (locally ,@body)))
               type)))
-
-

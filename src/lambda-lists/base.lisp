@@ -240,4 +240,3 @@ of the following types:~%  ~S~%  ~S"
         proclaimation
         `(handler-bind ((warning #'muffle-warning))
            ,proclaimation))))
-

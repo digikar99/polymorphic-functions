@@ -1,6 +1,7 @@
 (in-package :polymorphic-functions)
 
 (defmacro with-return-type-in-env ((&key variable declare) return-type &body body)
+  ;; We put the &BODY only for good indentation
   "Returns two values: a form that has ASSERTs with SIMPLE-TYPE-ERROR to check the type
 as well as the type enhanced using TYPE."
   (declare (optimize debug))

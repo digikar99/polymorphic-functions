@@ -1,6 +1,6 @@
 (asdf:defsystem "polymorphic-functions-lite"
   :license "MIT"
-  :version "0.5.0"                      ; beta
+  :version "0.5.1"                      ; beta
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Variant of polymorphic-functions with no support for static dispatch. This lets it have minimal dependencies."
   :depends-on ("alexandria"

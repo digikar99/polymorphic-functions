@@ -130,36 +130,6 @@
                         normalized-list)))
     (nreverse normalized-list)))
 
-(defun sort-untyped-lambda-list (untyped-lambda-list)
-  "Sorts keyword arguments (if any) according to STRING<"
-  (if (member '&key untyped-lambda-list)
-      (let* ((key-position (position '&key untyped-lambda-list)))
-        (append (subseq untyped-lambda-list 0 key-position)
-                '(&key)
-                (sort (subseq untyped-lambda-list (1+ key-position))
-                      #'string<
-                      :key (lambda (param)
-                             (if (and (listp param)
-                                      (null (cddr param)))
-                                 (car param)
-                                 param)))))
-      untyped-lambda-list))
-
-(defun sort-typed-lambda-list (typed-lambda-list)
-  "Sorts keyword arguments (if any) according to STRING<"
-  (if (member '&key typed-lambda-list)
-      (let ((key-position
-              (position '&key
-                        typed-lambda-list)))
-        (append (subseq typed-lambda-list
-                        0 key-position)
-                '(&key)
-                (sort (subseq typed-lambda-list
-                              (1+ key-position))
-                      #'string<
-                      :key #'caar)))
-      typed-lambda-list))
-
 (def-test normalize-typed-lambda-list (:suite lambda-list)
   (5am:is-true (equal '((a t))
                       (normalize-typed-lambda-list '(a))))
@@ -195,6 +165,36 @@
   (is (equal '(&key c d)   (untyped-lambda-list '(&key ((c string)) ((d number))))))
   (is (equal '(a &key c) (untyped-lambda-list '((a number) &key ((c string))))))
   (is (equal '(a &rest args) (untyped-lambda-list '((a number) &rest args)))))
+
+(defun sort-untyped-lambda-list (untyped-lambda-list)
+  "Sorts keyword arguments (if any) according to STRING<"
+  (if (member '&key untyped-lambda-list)
+      (let* ((key-position (position '&key untyped-lambda-list)))
+        (append (subseq untyped-lambda-list 0 key-position)
+                '(&key)
+                (sort (subseq untyped-lambda-list (1+ key-position))
+                      #'string<
+                      :key (lambda (param)
+                             (if (and (listp param)
+                                      (null (cddr param)))
+                                 (car param)
+                                 param)))))
+      untyped-lambda-list))
+
+(defun sort-typed-lambda-list (typed-lambda-list)
+  "Sorts keyword arguments (if any) according to STRING<"
+  (if (member '&key typed-lambda-list)
+      (let ((key-position
+              (position '&key
+                        typed-lambda-list)))
+        (append (subseq typed-lambda-list
+                        0 key-position)
+                '(&key)
+                (sort (subseq typed-lambda-list
+                              (1+ key-position))
+                      #'string<
+                      :key #'caar)))
+      typed-lambda-list))
 
 (declaim (ftype (function (list list) polymorph-parameters)
                 make-polymorph-parameters-from-lambda-lists))

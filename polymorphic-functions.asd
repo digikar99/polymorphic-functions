@@ -1,6 +1,6 @@
 (asdf:defsystem "polymorphic-functions"
   :license "MIT"
-  :version "0.5.0"                      ; beta
+  :version "0.5.1"                      ; beta
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Type based dispatch for Common Lisp"
   :depends-on ("polymorphic-functions-lite"
@@ -14,10 +14,11 @@
                (:file "conditions"                 :depends-on ("polymorph-compiler-macro"))
                (:file "compiler-macro"             :depends-on ("conditions"))
                #+sbcl
-               (:file "sbcl-transform"             :depends-on ("conditions"))
+               (:file "sbcl-deftransform"          :depends-on ("conditions"))
                (:file "dispatch"                   :depends-on ("conditions"
                                                                 "compiler-macro"
-                                                                #+sbcl "sbcl-transform"))
+                                                                #+sbcl
+                                                                "sbcl-deftransform"))
                (:file "misc-tests"                 :depends-on ("dispatch"))
                (:file "benchmark"                  :depends-on ("misc-tests")))
   :perform (test-op (o c)
