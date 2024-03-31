@@ -1,8 +1,8 @@
 * About
-  :PROPERTIES:
-  :CUSTOM_ID: polymorphic-functions
-  :TOC: :ignore this
-  :END:
+:PROPERTIES:
+:CUSTOM_ID: polymorphic-functions
+:TOC: :ignore this
+:END:
 
 #+BEGIN_QUOTE
 BIG CAVEAT: This will especially fail with multiple inheritance, because I thought subtyping is the same as subclassing! But [[https://www.cmi.ac.in/~madhavan/courses/pl2009/lecturenotes/lecture-notes/node28.html][subtyping is different from subclassing]]. (Also [[https://www.cs.princeton.edu/courses/archive/fall98/cs441/mainus/node12.html][this]].)
@@ -13,12 +13,12 @@ The library primarily aims to provide a function type to dispatch on types rathe
 
 Support for optional and keyword arguments, as well as heterogeneous lambda lists is also provided.
 
-Load the asdf system =polymorphic-functions-lite= if you are happy with run-time dispatch. The system =polymorphic-functions= provides compile-time dispatch through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. This takes place when the call-site is compiled with =(declare (optimize speed (debug 1)))= declaration in place. The newly added (= unstable) [[#specializing][specializing]]
+Load the asdf system =polymorphic-functions-lite= if you are happy with run-time dispatch. The system =polymorphic-functions= provides optional compile-time dispatch through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. See below for details. The newly added (= unstable) [[#specializing][specializing]]
 macro also provides runtime numcl/julia-like JAOT dispatch analogous to [[https://github.com/numcl/specialized-function][specialized-function]].
 
 Continuous Integration through Github Actions tests this library on SBCL, CCL, and ECL. The library was initially put to use at [[https://github.com/digikar99/numericals/][numericals]], but numericals has subsequently moved to the polymorphic-functions variant at [[https://gitlab.com/digikar/peltadot/][peltadot]]. This library continues to be used at [[https://github.com/lisp-polymorph/][lisp-polymorph]].
 
-See the [[#limitations][pitfalls]] before using this library in a production environment!
+See the [[#pitfalls-and-limitations][pitfalls]] before using this library in a production environment!
 
 * Table of Contents
 :PROPERTIES:
@@ -26,11 +26,13 @@ See the [[#limitations][pitfalls]] before using this library in a production env
 :END:
 
 :CONTENTS:
-- [[#basic-usage][Basic Usage]]
+- [[#introduction][Introduction]]
+  - [[#basic-usage][Basic Usage]]
   - [[#installation][Installation]]
     - [[#getting-it-from-ultralisp][Getting it from ultralisp]]
     - [[#getting-it-from-clpm][Getting it from clpm]]
     - [[#getting-it-using-download-dependencies][Getting it using download-dependencies]]
+    - [[#using-roswell][Using roswell]]
 - [[#advanced-usage][Advanced Usage]]
   - [[#static-dispatch--inline-optimizations][Static Dispatch / Inline Optimizations]]
   - [[#subtype-polymorphism][Subtype Polymorphism]]
@@ -38,6 +40,7 @@ See the [[#limitations][pitfalls]] before using this library in a production env
   - [[#parametric-polymorphism-ala-type-templating][Parametric polymorphism ala Type templating]]
   - [[#type-list--polymorph-specificity][Type list / Polymorph specificity]]
   - [[#slimeswank-integration][SLIME/Swank Integration]]
+  - [[#compiler-error-messages][Compiler Error Messages]]
   - [[#pitfalls-and-limitations][Pitfalls and Limitations]]
 - [[#tests][Tests]]
 - [[#related-projects][Related Projects]]
@@ -71,10 +74,15 @@ See the [[#limitations][pitfalls]] before using this library in a production env
   - [[#undefpolymorph][undefpolymorph]]
 :END:
 
-* Basic Usage
-    :PROPERTIES:
-    :CUSTOM_ID: basic-usage
-    :END:
+* Introduction
+:PROPERTIES:
+:CUSTOM_ID: introduction
+:END:
+
+** Basic Usage
+:PROPERTIES:
+:CUSTOM_ID: basic-usage
+:END:
 
 Users define a =polymorphic-function= (analogous to =cl:generic-function=) with one or more =polymorph= (similar to =cl:method=).
 
@@ -227,16 +235,16 @@ Note however that the policy under which these may be invoked is undefined. In e
 See [[file:src/misc-tests.lisp]] and [[file:src/nonlite/misc-tests.lisp]] for more examples.
 
 ** Installation
-   :PROPERTIES:
-   :CUSTOM_ID: installation
-   :END:
+:PROPERTIES:
+:CUSTOM_ID: installation
+:END:
 
 =polymorphic-functions= has been added to quicklisp, but if you want to use the latest, get it from ultralisp! Make sure you have SBCL 2.0.9+.
 
 *** Getting it from ultralisp
-    :PROPERTIES:
-    :CUSTOM_ID: getting-it-from-ultralisp
-    :END:
+:PROPERTIES:
+:CUSTOM_ID: getting-it-from-ultralisp
+:END:
 
 #+BEGIN_SRC lisp
 (ql-dist:install-dist "http://dist.ultralisp.org/"
@@ -288,7 +296,34 @@ Running the following in lisp will download or update peltadot as well as some o
    :source "https://github.com/digikar99/polymorphic-functions"))
 #+end_src
 
-Finally quickload it.
+Finally quickload it to install other dependencies.
+
+#+begin_src lisp
+(ql:quickload "polymorphic-functions")
+; OR
+(ql:quickload "polymorphic-functions-lite")
+#+end_src
+
+*** Using roswell
+:PROPERTIES:
+:CUSTOM_ID: using-roswell
+:END:
+
+For just the lite variant -
+
+#+begin_src sh
+ros install digikar99/polymorphic-functions
+#+end_src
+
+The compilation will probably fail. But =ros run= and =(ql:quickload "polymorphic-functions-lite")=.
+
+For the nonlite/full polymorphic-functions, some quicklisp dependencies are yet to be updated. Therefore -
+
+#+begin_src sh
+ros install alex-gutev/cl-environments alex-gutev/cl-form-types digikar99/compiler-macro-notes digikar99/polymorphic-functions
+#+end_src
+
+Finally quickload it to install other dependencies.
 
 #+begin_src lisp
 (ql:quickload "polymorphic-functions")
@@ -400,16 +435,163 @@ The arguments are ordered in the order they are specified in the case of require
 :CUSTOM_ID: slimeswank-integration
 :END:
 
-At the moment, SLIME is non-extensible. There is an [[https://github.com/slime/slime/issues/642][open issue here]] about this. Until then, loading =(asdf:load-system "polymorphic-functions/swank")= and calling =(polymorphic-functions::extend-swank)= should get you going. This system essentially is just one file at file:src/swank.lisp.
+At the moment, SLIME is non-extensible. There is an [[https://github.com/slime/slime/issues/642][open issue here]] about this. Until then, loading =(asdf:load-system "polymorphic-functions-lite/swank")= or =(asdf:load-system "polymorphic-functions/swank")= and calling =(polymorphic-functions::extend-swank)= should get you going. This system essentially is just one file at file:src/swank.lisp.
+
+** Compiler Error Messages
+:PROPERTIES:
+:CUSTOM_ID: compiler-error-messages
+:END:
+
+It is a very valid concern to want good error messages from your compiler. 
+
+For polymorphic-functions-lite which performs only run time dispatch, the sole place compiler error messages arise is during the compilation of the polymorphs themselves. Polymorphic functions does not do any special compilation of the polymorph bodies beyond macroexpansion - the compilation is handled by the underlying lisp system itself. Thus, the goodness of compiler error messages is limited by the underlying lisp system. For example, consider compilation of the below code on SBCL 2.3.11:
+
+#+begin_src lisp
+(defpackage :pf-user
+  (:use :cl :polymorphic-functions))
+
+(in-package :pf-user)
+
+(defpolymorph my= ((a string) (b string))
+    boolean
+  (string= 2 a))
+#+end_src
+
+The error messages are generated very similar to a function defined using =cl:defun=:
+
+#+begin_src lisp
+cd /home/shubhamkar/
+3 compiler notes:
+
+*slime-scratch*:6:1:
+  style-warning:
+    The variable B is defined but never used.
+    --> EVAL-WHEN SETF LET* LET* POLYMORPHIC-FUNCTIONS::LIST-NAMED-LAMBDA
+    --> SB-INT:NAMED-LAMBDA
+    ==>
+      #'(SB-INT:NAMED-LAMBDA (POLYMORPHIC-FUNCTIONS:POLYMORPH PF-USER::MY=
+                              (STRING STRING))
+            (PF-USER::A PF-USER::B)
+          (DECLARE (IGNORABLE))
+          (DECLARE (TYPE STRING PF-USER::B)
+                   (TYPE STRING PF-USER::A))
+          (DECLARE)
+          (POLYMORPHIC-FUNCTIONS::WITH-RETURN-TYPE BOOLEAN
+            (BLOCK PF-USER::MY= (LOCALLY (STRING= 2 PF-USER::A)))))
+
+
+,*slime-scratch*:8:3:
+  note: deleting unreachable code
+  warning:
+    Constant 2 conflicts with its asserted type (OR STRING SYMBOL CHARACTER).
+    See also:
+      SBCL Manual, Handling of Types [:node]
+
+Compilation failed.
+#+end_src
+
+The case for the nonlite polymorphic-functions is more complex. The polymorphs themselves stay the same and will produce similar error messages as above. But another class of compiler error messages arise pertaining to the compilation of calls to these polymorphic-functions. To consider a slightly non-trivial case^, we will look into optimizing the compilation of a call to =numericals:mean= which compute the mean of the elements of a given array-like. =numericals:mean= is itself a polymorphic-function as you can check from the result of =(type-of (fdefinition 'numericals:mean))=. This, however, is implemented as a polymorphic-function over =numericals:sum=.
+
+#+begin_src lisp
+(uiop:define-package :numericals-user
+  (:mix :numericals :cl))
+
+(in-package :numericals-user)
+
+;; To focus on the compiler notes by polymorphic-functions,
+;; instead of SBCL, we muffle SBCL's compiler notes.
+(declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
+
+(defun generic-mean (array-like)
+  (declare (optimize speed))
+  (mean array-like))
+#+end_src
+
+Compiling the last form should emit a compiler note such as the following:
+
+#+begin_src lisp
+; processing (DEFUN GENERIC-MEAN ...)
+; In file /tmp/slimePh90MB
+; (Compiler) Macro of
+;    #<PELTADOT/POLYMORPHIC-FUNCTIONS:POLYMORPHIC-FUNCTION MEAN (8)>
+; is unable to optimize
+;   (MEAN ARRAY-LIKE)
+; because:
+;
+;   Type of
+;     NUMERICALS.IMPL::OUT
+;   could not be determined
+;   Type of
+;     ARRAY-LIKE
+;   could not be determined
+#+end_src
+
+If you are using SLIME, you should also see the =(mean array-like)= form underlined to indicate that it was this form that emitted this compiler note. This should also be evident from the compiler note emitted above. This compiler note says that the type of =array-like= could not be derived.
+Let us try supplying a more specific argument.
+
+#+begin_src lisp
+(defun single-float-mean (array)
+  (declare (optimize speed)
+           (type (simple-array single-float) array))
+  (mean array))
+#+end_src
+
+This compiled without emitting any notes! If you compare =(disassemble 'generic-mean)= with =(disassemble 'single-float-mean)=, you will find that the latter contains a call to the CFFI function BMAS_ssum^^ while the former is simply calls the =numericals:mean= function. Let us check if this makes any performance difference!
+
+#+begin_src lisp
+(let ((a (rand 1000 1000 :type 'single-float)))
+  (time (loop repeat 1000 do (generic-mean a))))
+;; Evaluation took:
+;;   0.636 seconds of real time
+;;   0.636028 seconds of total run time (0.636028 user, 0.000000 system)
+;;   100.00% CPU
+;;   1,404,383,458 processor cycles
+;;   0 bytes consed
+(let ((a (rand 1000 1000 :type 'single-float)))
+  (time (loop repeat 1000 do (single-float-mean a))))
+;; Evaluation took:
+;;   0.632 seconds of real time
+;;   0.632850 seconds of total run time (0.632850 user, 0.000000 system)
+;;   100.16% CPU
+;;   1,397,359,136 processor cycles
+;;   0 bytes consed
+#+end_src
+
+For a single-float array of size 1000x1000, this made no performance difference. This makes sense, because for such a large array, we expect most of the time to be spent within the C function BMAS_ssum itself and very overhead would be involved in the 1000 function calls. But what about for smaller arrays and greater number of high level function calls?
+
+#+begin_src lisp
+(let ((a (rand 100 :type 'single-float)))
+  (time (loop repeat 10000000 do (generic-mean a))))
+;; Evaluation took:
+;;   4.201 seconds of real time
+;;   4.199076 seconds of total run time (3.883141 user, 0.315935 system)
+;;   [ Real times consist of 0.500 seconds GC time, and 3.701 seconds non-GC time. ]
+;;   [ Run times consist of 0.500 seconds GC time, and 3.700 seconds non-GC time. ]
+;;   99.95% CPU
+;;   9,269,228,604 processor cycles
+;;   160,052,784 bytes consed
+(let ((a (rand 100 :type 'single-float)))
+  (time (loop repeat 10000000 do (single-float-mean a))))
+;; Evaluation took:
+;;   0.920 seconds of real time
+;;   0.918671 seconds of total run time (0.918671 user, 0.000000 system)
+;;   99.89% CPU
+;;   2,028,490,598 processor cycles
+;;   0 bytes consed
+#+end_src
+
+Here, for arrays of size 100, this results in a performance difference of about 4 times! If or not this is relevant depends on your use case.
+
+^: =numericals:mean= actually uses peltadot instead of polymorphic-functions, but the concepts are similar.
+
+^^: =BMAS_ssum= uses SIMD under the hood. Because it is a C function, you can use it wherever you can use CFFI!
+
+PS: Thanks to [[https://www.reddit.com/r/lisp/comments/1bq44p6/comment/kx4c0x8/?utm_source=share&utm_medium=web2x&context=3][u/corbasai on reddit]] for the motivation for this section!
 
 ** Pitfalls and Limitations
 :PROPERTIES:
 :CUSTOM_ID: pitfalls-and-limitations
 :END:
-
-    :PROPERTIES:
-    :CUSTOM_ID: limitations
-    :END:
 
 Yes, there are quite a few:
 
@@ -1087,4 +1269,3 @@ them.
 
 Remove the [[#polymorph][polymorph]] associated with =name= with
 =type-list=
-
