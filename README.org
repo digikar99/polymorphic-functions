@@ -13,8 +13,17 @@ The library primarily aims to provide a function type to dispatch on types rathe
 
 Support for optional and keyword arguments, as well as heterogeneous lambda lists is also provided.
 
-Load the asdf system =polymorphic-functions-lite= if you are happy with run-time dispatch. The system =polymorphic-functions= provides optional compile-time dispatch through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. See below for details. The newly added (= unstable) [[#specializing][specializing]]
-macro also provides runtime numcl/julia-like JAOT dispatch analogous to [[https://github.com/numcl/specialized-function][specialized-function]].
+Load the asdf system =polymorphic-functions-lite= if you are happy with run-time dispatch. It also has lesser dependencies, so more sustainable in the long term.
+
+#+CAPTION: System dependency graph for polymorphic-functions-lite
+#+ATTR_HTML: :width 360px
+[[./pf-lite.png]]
+
+The system =polymorphic-functions= provides optional compile-time dispatch through the use of CLTL2 through [[https://github.com/alex-gutev/cl-environments][cl-environments]]. See below for details. The newly added (= unstable) [[#specializing][specializing]] macro also provides runtime numcl/julia-like JAOT dispatch analogous to [[https://github.com/numcl/specialized-function][specialized-function]].
+
+#+CAPTION: System dependency graph for polymorphic-functions (non lite)
+#+ATTR_HTML: :width 360px
+[[./pf.png]]
 
 Continuous Integration through Github Actions tests this library on SBCL, CCL, and ECL. The library was initially put to use at [[https://github.com/digikar99/numericals/][numericals]], but numericals has subsequently moved to the polymorphic-functions variant at [[https://gitlab.com/digikar/peltadot/][peltadot]]. This library continues to be used at [[https://github.com/lisp-polymorph/][lisp-polymorph]].
 
@@ -442,7 +451,7 @@ At the moment, SLIME is non-extensible. There is an [[https://github.com/slime/s
 :CUSTOM_ID: compiler-error-messages
 :END:
 
-It is a very valid concern to want good error messages from your compiler. 
+It is a very valid concern to want good error messages from your compiler.
 
 For polymorphic-functions-lite which performs only run time dispatch, the sole place compiler error messages arise is during the compilation of the polymorphs themselves. Polymorphic functions does not do any special compilation of the polymorph bodies beyond macroexpansion - the compilation is handled by the underlying lisp system itself. Thus, the goodness of compiler error messages is limited by the underlying lisp system. For example, consider compilation of the below code on SBCL 2.3.11:
 
