@@ -38,7 +38,7 @@
                                           (FIVEAM:RUN! :POLYMORPHIC-FUNCTIONS))")))))
 
 (defsystem "polymorphic-functions-lite/swank"
-  :depends-on ("polymorphic-functions"
+  :depends-on ("polymorphic-functions-lite"
                "swank")
   :description "slime/swank integration for polymorphic-functions"
   :pathname "src"
