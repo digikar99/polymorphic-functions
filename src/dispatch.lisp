@@ -167,31 +167,33 @@ If DOCUMENTATION is non-NIL, returns three values: DECLARATIONS and remaining BO
             (ftype-proclaimation
              static-dispatch-name effective-type-list return-type env)))
 
-      `(eval-when (:compile-toplevel :load-toplevel :execute)
+      `(progn
+         (eval-when (:compile-toplevel :load-toplevel :execute)
 
-         (unless (and (fboundp ',name)
-                      (typep (function ,name) 'polymorphic-function))
-           (define-polymorphic-function ,name ,untyped-lambda-list))
-
-         (setf (fdefinition ',static-dispatch-name) ,lambda-body)
-         ,ftype-proclaimation
-         (register-polymorph ',name nil
-                             ',doc
-                             ',typed-lambda-list
-                             ',type-list
-                             ',effective-type-list
-                             nil
-                             nil
-                             ',return-type
-                             nil
-                             ',static-dispatch-name
-                             ',lambda-list-type
-                             ',(run-time-applicable-p-form parameters)
-                             nil
-                             #+sbcl (sb-c:source-location))
-         ,(when invalidate-pf
-            `(invalidate-polymorphic-function-lambda (fdefinition ',name)))
-         ',name))))
+           (unless (and (fboundp ',name)
+                        (typep (function ,name) 'polymorphic-function))
+             (define-polymorphic-function ,name ,untyped-lambda-list)))
+         (eval-when (:load-toplevel :execute)
+           ,ftype-proclaimation
+           (setf (fdefinition ',static-dispatch-name) ,lambda-body))
+         (eval-when (:compile-toplevel :load-toplevel :execute)
+           (register-polymorph ',name nil
+                               ',doc
+                               ',typed-lambda-list
+                               ',type-list
+                               ',effective-type-list
+                               nil
+                               nil
+                               ',return-type
+                               nil
+                               ',static-dispatch-name
+                               ',lambda-list-type
+                               ',(run-time-applicable-p-form parameters)
+                               nil
+                               #+sbcl (sb-c:source-location))
+           ,(when invalidate-pf
+              `(invalidate-polymorphic-function-lambda (fdefinition ',name)))
+           ',name)))))
 
 ;;; CLHS recommends that
 ;;;   Macros intended for use in top level forms should be written so that

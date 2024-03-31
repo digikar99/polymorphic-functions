@@ -220,18 +220,24 @@ in the lambda list; the consequences of mutation are undefined.
         ;; NOTE: We need the LAMBDA-BODY due to compiler macros,
         ;; and "objects of type FUNCTION can't be dumped into fasl files"
         `(progn
+
            (eval-when (:compile-toplevel :load-toplevel :execute)
              (unless (and (fboundp ',name)
                           (typep (function ,name) 'polymorphic-function))
                (define-polymorphic-function ,name ,untyped-lambda-list)))
+
            #+sbcl ,sbcl-deftransform-form
-           ,(when inline-notes
-              ;; Even STYLE-WARNING isn't appropriate to this, because we want to
-              ;; inform the user of the warnings even when INLINE option is supplied.
-              `(compiler-macro-notes:with-notes (',whole nil :unwind-on-signal nil)
-                 (signal 'defpolymorph-note :datum ,inline-notes)
-                 t))
+
            (eval-when (:load-toplevel :execute)
+
+             ,(when inline-notes
+                ;; Even STYLE-WARNING isn't appropriate to this, because we want to
+                ;; inform the user of the warnings even when INLINE option is supplied.
+                `(compiler-macro-notes:with-notes
+                     (',whole nil :unwind-on-signal nil)
+                   (signal 'defpolymorph-note :datum ,inline-notes)
+                   t))
+
              ;; We have implemented inlining through the PF-COMPILER-MACRO.
              ;; In addition to inlining, it also propagates the type declarations
              ;; so that further compiler/macroexpansions can make use of this info.
@@ -247,8 +253,8 @@ in the lambda list; the consequences of mutation are undefined.
                   `(with-muffled-compilation-warnings
                      (setf (fdefinition ',static-dispatch-name) ,lambda-body))
                   `(setf (fdefinition ',static-dispatch-name) ,lambda-body)))
-           (eval-when (:compile-toplevel :load-toplevel :execute)
 
+           (eval-when (:compile-toplevel :load-toplevel :execute)
              (register-polymorph ',name ',inline
                                  ',doc
                                  ',typed-lambda-list
