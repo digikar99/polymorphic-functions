@@ -74,3 +74,11 @@ jobs:
                      (asdf:test-system "polymorphic-functions")
                      (uiop:quit 0))'
 
+    - name: Load Specializing
+      run: |
+        cl --eval '(progn
+                     (push "~/" ql:*local-project-directories*)
+                     (push :travis *features*)
+                     (ql:quickload "polymorphic-functions/specializing")
+                     (uiop:quit 0))'
+
