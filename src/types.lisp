@@ -84,21 +84,32 @@ or SUBOPTIMAL-NOTE is non-NIL, then emits a OPTIMIZATION-FAILURE-NOTE
 
 (with-eval-always
   (defun sbcl-version-spec-list (&optional version)
-    (mapcar #'parse-integer
-            (uiop:split-string (or version (lisp-implementation-version))
-                               :separator '(#\.))))
+    (let ((spec-list (uiop:split-string (or version (lisp-implementation-version))
+                                        :separator '(#\.))))
+      (cond ((nth 2 spec-list) ; there are atleast three elements
+             (handler-case (loop :for elt :in spec-list
+                                 :collect (parse-integer elt :junk-allowed t))
+               (parse-error () `(0 0 0))))
+            (t
+             `(0 0 0)))))
 
   (defun sbcl-version-spec-integer (&optional version)
-    (destructuring-bind (major-1 major-2 minor)
+    (destructuring-bind (major-1 major-2 minor &rest sub-minor)
         (sbcl-version-spec-list version)
+      (declare (ignore sub-minor))
       (+ (* 12 (+ (* 10 major-1) major-2))
          minor))))
 
 (define-constant +optimize-speed-or-compilation-speed+
     ;; optimize for compilation-speed for SBCL>2.2.3 else for speed
     (if (and (string= "SBCL" (lisp-implementation-type))
-             (< (sbcl-version-spec-integer "2.2.3")
-                (sbcl-version-spec-integer (lisp-implementation-version))))
+             (let ((spec-integer (sbcl-version-spec-integer (lisp-implementation-version))))
+               (if (zerop spec-integer)
+                   (progn
+                     (warn "Detected implementation to be SBCL but could not parse version ~A as X.Y.Z~%Optimizing polymorphic-functions for compilation-speed." (lisp-implementation-version))
+                     t)
+                   (< (sbcl-version-spec-integer "2.2.3")
+                      spec-integer))))
         `(optimize compilation-speed)
         `(optimize speed))
   :test #'equal)
