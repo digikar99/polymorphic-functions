@@ -33,6 +33,19 @@
 (defun env-safety (environment)
   (second (assoc 'safety (declaration-information 'optimize environment))))
 
+(define-symbol-macro optim-safety (= 3 (env-safety env)))
+
+(define-symbol-macro optim-debug (or (= 3 (env-debug env))
+                                     (> (env-debug env)
+                                        (env-speed env))))
+(define-symbol-macro optim-speed (and (/= 3 (env-debug env))
+                                      (= 3 (env-speed env))))
+(define-symbol-macro optim-slight-speed (and (/= 3 (env-debug env))
+                                             (/= 3 (env-speed env))
+                                             (<= (env-debug env)
+                                                 (env-speed env))))
+
+
 (defun form-type (form env &key (return-default-type t)
                              expand-compiler-macros constant-eql-types)
   (or (ignore-errors
