@@ -1,6 +1,6 @@
 (asdf:defsystem "polymorphic-functions"
   :license "MIT"
-  :version "0.5.1"                      ; beta
+  :version "0.5.2"                      ; beta
   :author "Shubhamkar Ayare (shubhamayare@yahoo.co.in)"
   :description "Type based dispatch for Common Lisp"
   :depends-on ("polymorphic-functions-lite"
@@ -29,7 +29,8 @@
                                           (FIVEAM:RUN! :POLYMORPHIC-FUNCTIONS))")))))
 
 (defsystem "polymorphic-functions/specializing"
-  :depends-on ("polymorphic-functions")
+  :depends-on ("polymorphic-functions"
+               "trivial-garbage")
   :description "Defines the polymorphic-functions:specializing macro"
   :pathname "src/nonlite/"
   :components ((:file "specializing")))
