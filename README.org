@@ -535,8 +535,7 @@ Compiling the last form should emit a compiler note such as the following:
 ;   could not be determined
 #+end_src
 
-If you are using SLIME, you should also see the =(mean array-like)= form underlined to indicate that it was this form that emitted this compiler note. This should also be evident from the compiler note emitted above. This compiler note says that the type of =array-like= could not be derived.
-Let us try supplying a more specific argument.
+If you are using SLIME, you should also see the =(mean array-like)= form underlined to indicate that it was this form that emitted this compiler note. This should also be evident from the compiler note emitted above. This compiler note says that the type of =array-like= could not be derived. Let us try supplying a more specific argument.
 
 #+begin_src lisp
 (defun single-float-mean (array)
@@ -591,7 +590,7 @@ For a single-float array of size 1000x1000, this made no performance difference.
 
 Here, for arrays of size 100, this results in a performance difference of about 4 times! If or not this is relevant depends on your use case.
 
-^: =numericals:mean= actually uses peltadot instead of polymorphic-functions, but the concepts are similar.
+^: =numericals:mean= actually uses peltadot instead of polymorphic-functions, but the concepts are similar. Improving the compiler notes for these cases is still a work in progress. So, expect rough edges!
 
 ^^: =BMAS_ssum= uses SIMD under the hood. Because it is a C function, you can use it wherever you can use CFFI!
 
