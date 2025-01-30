@@ -54,7 +54,8 @@
     #+clisp (return (null
                      (nth-value 1 (ignore-errors
                                    (ext:type-expand type-specifier)))))
-    #-(or sbcl openmcl ecl lisp)
+    #+lispworks (return (type:valid-type-specifier type-specifier))
+    #-(or sbcl openmcl ecl clisp lispworks)
     (or (when (symbolp type-specifier)
           (documentation type-specifier 'type))
         (error "TYPE-SPECIFIER-P not available for this implementation"))))
